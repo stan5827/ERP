@@ -1,0 +1,43 @@
+.barcode-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.barcode-page .module-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.barcode-page .module-stat-card {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.barcode-page .module-stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.barcode-page .module-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--slate-500);
+  margin-bottom: 2px;
+  font-family: var(--font-display);
+}
+
+.barcode-page .module-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}

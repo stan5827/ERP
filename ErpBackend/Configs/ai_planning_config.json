@@ -1,0 +1,298 @@
+{
+  "prompts": {
+    "planner": {
+      "current_version": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "content": "你是一位專業的ERP AI規劃代理，負責將複雜任務分解為可執行的子任務。\n\n## 任務\n{task_description}\n\n## 上下文\n{context}\n\n## 輸出格式\n請輸出JSON格式的執行計畫：\n{\n  \"tasks\": [\n    {\n      \"id\": \"task_1\",\n      \"description\": \"子任務描述\",\n      \"dependencies\": [],\n      \"estimated_time\": \"minutes\",\n      \"tools_needed\": [\"tool1\", \"tool2\"],\n      \"priority\": 1-100\n    }\n  ],\n  \"strategy\": \"parallel|serial|mixed\",\n  \"confidence\": 0.95\n}",
+          "created_at": "2026-04-13",
+          "metrics": { "avg_accuracy": 0.95, "usage_count": 128 }
+        }
+      ]
+    },
+    "executor": {
+      "current_version": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "content": "你是一位專業的ERP任務執行代理，負責執行具體的任務步驟。\n\n## 執行計畫\n{plan}\n\n## 可用工具\n{available_tools}\n\n## 請執行並回報結果",
+          "created_at": "2026-04-13",
+          "metrics": { "avg_execution_time": 2.5, "success_rate": 0.98 }
+        }
+      ]
+    },
+    "reviewer": {
+      "current_version": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "content": "你是一位專業的ERP任務審核代理，負責驗證執行結果的品質。\n\n## 執行結果\n{execution_results}\n\n## 審核標準\n- 任務完成度 > 95%\n- 無重大錯誤\n- 結果符合預期\n\n## 請提供審核意見",
+          "created_at": "2026-04-13",
+          "metrics": { "avg_review_time": 0.5, "approval_rate": 0.92 }
+        }
+      ]
+    }
+  },
+  "tools": [
+    {
+      "id": "erp_inventory_search",
+      "name": "庫存搜尋",
+      "module": "inventory",
+      "description": "搜尋ERP系統中的庫存資料",
+      "parameters": ["sku_code", "warehouse_id", "date"],
+      "category": "search"
+    },
+    {
+      "id": "erp_po_search",
+      "name": "採購訂單搜尋",
+      "module": "procurement",
+      "description": "搜尋採購訂單資料",
+      "parameters": ["po_number", "supplier_id", "status"],
+      "category": "search"
+    },
+    {
+      "id": "erp_so_search",
+      "name": "銷售訂單搜尋",
+      "module": "sales",
+      "description": "搜尋銷售訂單資料",
+      "parameters": ["so_number", "customer_id", "status"],
+      "category": "search"
+    },
+    {
+      "id": "erp_bom_search",
+      "name": "BOM搜尋",
+      "module": "engineering",
+      "description": "搜尋物料清單資料",
+      "parameters": ["sku_id", "bom_level"],
+      "category": "search"
+    },
+    {
+      "id": "erp_customer_search",
+      "name": "客戶搜尋",
+      "module": "sales",
+      "description": "搜尋客戶資料",
+      "parameters": ["customer_code", "name", "region"],
+      "category": "search"
+    },
+    {
+      "id": "erp_supplier_search",
+      "name": "供應商搜尋",
+      "module": "procurement",
+      "description": "搜尋供應商資料",
+      "parameters": ["supplier_code", "name", "category"],
+      "category": "search"
+    },
+    {
+      "id": "erp_warehouse_search",
+      "name": "倉庫搜尋",
+      "module": "inventory",
+      "description": "搜尋倉庫資料",
+      "parameters": ["warehouse_code", "type"],
+      "category": "search"
+    },
+    {
+      "id": "erp_workcenter_search",
+      "name": "工作中心搜尋",
+      "module": "production",
+      "description": "搜尋工作中心產能",
+      "parameters": ["workcenter_id", "date"],
+      "category": "search"
+    },
+    {
+      "id": "erp_employee_search",
+      "name": "員工搜尋",
+      "module": "hr",
+      "description": "搜尋員工資料",
+      "parameters": ["employee_no", "department_id"],
+      "category": "search"
+    },
+    {
+      "id": "erp_asset_search",
+      "name": "資產搜尋",
+      "module": "asset",
+      "description": "搜尋固定資產資料",
+      "parameters": ["asset_id", "category"],
+      "category": "search"
+    },
+    {
+      "id": "erp_mps_search",
+      "name": "MPS搜尋",
+      "module": "planning",
+      "description": "搜尋主排程資料",
+      "parameters": ["date_range", "status"],
+      "category": "search"
+    },
+    {
+      "id": "calculator",
+      "name": "計算機",
+      "module": "utility",
+      "description": "執行數學運算",
+      "parameters": ["expression"],
+      "category": "compute"
+    },
+    {
+      "id": "mrp_engine",
+      "name": "MRP引擎",
+      "module": "planning",
+      "description": "執行物料需求規劃",
+      "parameters": ["horizon_start", "horizon_end", "run_type"],
+      "category": "compute"
+    },
+    {
+      "id": "aps_scheduler",
+      "name": "APS排程器",
+      "module": "planning",
+      "description": "執行先進排程",
+      "parameters": ["orders", "constraints"],
+      "category": "compute"
+    },
+    {
+      "id": "erp_cost_calculate",
+      "name": "成本計算",
+      "module": "finance",
+      "description": "計算產品成本",
+      "parameters": ["sku_id", "quantity", "date"],
+      "category": "compute"
+    },
+    {
+      "id": "erp_pr_create",
+      "name": "建立採購申請",
+      "module": "procurement",
+      "description": "建立採購申請單",
+      "parameters": ["items", "supplier", "quantity"],
+      "category": "create"
+    },
+    {
+      "id": "erp_po_create",
+      "name": "建立採購訂單",
+      "module": "procurement",
+      "description": "建立採購訂單",
+      "parameters": ["pr_id", "supplier_id", "delivery_date"],
+      "category": "create"
+    },
+    {
+      "id": "erp_wo_create",
+      "name": "建立工單",
+      "module": "production",
+      "description": "建立生產工單",
+      "parameters": ["sku", "quantity", "priority"],
+      "category": "create"
+    },
+    {
+      "id": "erp_so_create",
+      "name": "建立銷售訂單",
+      "module": "sales",
+      "description": "建立銷售訂單",
+      "parameters": ["customer_id", "items", "delivery_date"],
+      "category": "create"
+    },
+    {
+      "id": "erp_inventory_adjust",
+      "name": "庫存調整",
+      "module": "inventory",
+      "description": "調整庫存數量",
+      "parameters": ["sku_id", "warehouse_id", "quantity", "reason"],
+      "category": "update"
+    },
+    {
+      "id": "erp_quality_check",
+      "name": "品質檢驗",
+      "module": "quality",
+      "description": "執行品質檢驗",
+      "parameters": ["lot_no", "check_type"],
+      "category": "check"
+    },
+    {
+      "id": "erp_approval_trigger",
+      "name": "觸發審批",
+      "module": "workflow",
+      "description": "觸發審批流程",
+      "parameters": ["doc_type", "doc_id", "approver_id"],
+      "category": "action"
+    },
+    {
+      "id": "erp_notification_send",
+      "name": "發送通知",
+      "module": "collaboration",
+      "description": "發送系統通知",
+      "parameters": ["recipient_id", "message", "channel"],
+      "category": "action"
+    },
+    {
+      "id": "report_generator",
+      "name": "報告產生器",
+      "module": "utility",
+      "description": "產生各類報告",
+      "parameters": ["report_type", "parameters"],
+      "category": "output"
+    },
+    {
+      "id": "erp_document_generate",
+      "name": "文件產生",
+      "module": "utility",
+      "description": "產生PDF/Excel文件",
+      "parameters": ["doc_type", "data"],
+      "category": "output"
+    },
+    {
+      "id": "erp_quote_create",
+      "name": "建立報價單",
+      "module": "sales",
+      "description": "建立報價單",
+      "parameters": ["customer_id", "items"],
+      "category": "create"
+    },
+    {
+      "id": "erp_delivery_create",
+      "name": "建立出貨單",
+      "module": "sales",
+      "description": "建立出貨單",
+      "parameters": ["so_id", "items", "date"],
+      "category": "create"
+    },
+    {
+      "id": "erp_invoice_create",
+      "name": "建立發票",
+      "module": "finance",
+      "description": "建立銷貨發票",
+      "parameters": ["delivery_id", "invoice_type"],
+      "category": "create"
+    },
+    {
+      "id": "erp_routing_search",
+      "name": "製程搜尋",
+      "module": "engineering",
+      "description": "搜尋製程資料",
+      "parameters": ["routing_id", "sku_id"],
+      "category": "search"
+    },
+    {
+      "id": "erp_equipment_search",
+      "name": "設備搜尋",
+      "module": "production",
+      "description": "搜尋設備資料",
+      "parameters": ["equipment_id", "status"],
+      "category": "search"
+    }
+  ],
+  "kpi_targets": {
+    "accuracy_rate": 95,
+    "roi": 200,
+    "max_execution_time_seconds": 30,
+    "min_success_rate": 0.95
+  },
+  "graph_config": {
+    "nodes": [
+      { "id": "planner", "name": "Planner", "type": "agent", "description": "任務規劃與分解" },
+      { "id": "executor", "name": "Executor", "type": "agent", "description": "任務執行與工具調用" },
+      { "id": "reviewer", "name": "Reviewer", "type": "agent", "description": "結果審核與品質控制" }
+    ],
+    "edges": [
+      { "from": "planner", "to": "executor", "condition": "plan_created" },
+      { "from": "executor", "to": "reviewer", "condition": "execution_completed" },
+      { "from": "reviewer", "to": "planner", "condition": "needs_retry" },
+      { "from": "reviewer", "to": "end", "condition": "approved" }
+    ]
+  }
+}

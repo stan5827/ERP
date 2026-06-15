@@ -1,0 +1,397 @@
+/* Sales-Luxury.css - 奢華商務銷貨指揮中心 */
+:root {
+  --lux-gold: #d4af37;
+  --lux-gold-glow: rgba(212, 175, 55, 0.2);
+  --lux-emerald: #10b981;
+  --lux-obsidian: #020408;
+  --lux-surface: rgba(15, 23, 42, 0.4);
+  --lux-border: rgba(212, 175, 55, 0.15);
+}
+
+.sales-container {
+  min-height: 100vh;
+  padding: 2.5rem;
+  background-color: var(--lux-obsidian);
+  color: #fff;
+  font-family: var(--font-body);
+  background-image: 
+    radial-gradient(circle at 0% 0%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+}
+
+.lux-header {
+  margin-bottom: 3rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.lux-title-group h1 {
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(to bottom, #fff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lux-subtitle {
+  color: var(--lux-gold);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  margin-bottom: 0.5rem;
+}
+
+/* 奢華數據卡片 */
+.lux-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.lux-stat-card {
+  background: var(--lux-surface);
+  border: 1px solid var(--lux-border);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.lux-stat-card:hover {
+  border-color: var(--lux-gold);
+  box-shadow: 0 0 30px var(--lux-gold-glow);
+  transform: translateY(-4px);
+}
+
+.lux-stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--lux-gold), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.lux-stat-card:hover::before {
+  transform: translateX(100%);
+}
+
+.lux-stat-label {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lux-stat-value {
+  font-family: var(--font-mono);
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 導覽按鈕組合 */
+.lux-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.lux-tab-btn {
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.lux-tab-btn.active {
+  background: var(--lux-gold);
+  color: #000;
+  box-shadow: 0 4px 12px var(--lux-gold-glow);
+}
+
+/* 下單與控制列 */
+.lux-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.lux-search-box {
+  background: var(--lux-surface);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px 20px;
+  width: 400px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lux-search-box input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  width: 100%;
+  outline: none;
+}
+
+/* 列表美學 */
+.lux-table-wrapper {
+  background: var(--lux-surface);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 1.5rem;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+.lux-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.lux-table th {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.lux-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  transition: all 0.2s ease;
+}
+
+.lux-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lux-row td {
+  padding: 1.5rem;
+}
+
+.lux-btn-primary {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #000;
+  font-weight: 700;
+  padding: 12px 28px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lux-btn-primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 20px var(--lux-gold-glow);
+}
+
+.lux-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Pipeline Visualization Styles */
+.lux-pipeline-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 10px 0;
+}
+
+.lux-pipeline-point {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.4s ease;
+  position: relative;
+}
+
+.lux-pipeline-point.reached {
+  background: var(--lux-gold);
+  border-color: var(--lux-gold);
+  box-shadow: 0 0 10px var(--lux-gold-glow);
+}
+
+.lux-pipeline-point.active {
+  transform: scale(1.4);
+  background: #fff;
+  border-color: var(--lux-gold);
+  box-shadow: 0 0 15px var(--lux-gold);
+}
+
+.lux-pipeline-line {
+  height: 2px;
+  width: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.4s ease;
+}
+
+.lux-pipeline-line.reached {
+  background: var(--lux-gold);
+}
+
+.lux-pipeline-point::after {
+  content: attr(title);
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: var(--lux-gold);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lux-pipeline-point:hover::after {
+  opacity: 1;
+}
+
+/* Items Editor Styles */
+.lux-items-editor {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--lux-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.lux-items-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.lux-items-header {
+  display: flex;
+  padding: 0.75rem 1rem;
+  background: rgba(212, 175, 55, 0.08);
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--lux-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  gap: 1rem;
+  align-items: center;
+}
+
+.lux-item-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.lux-item-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.lux-item-row .form-input {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  font-size: 0.85rem !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+}
+
+.lux-item-row .form-input:focus {
+  border-color: var(--lux-gold) !important;
+  box-shadow: 0 0 10px var(--lux-gold-glow) !important;
+}
+
+.lux-item-subtotal {
+  color: var(--lux-gold);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  text-shadow: 0 0 8px var(--lux-gold-glow);
+}
+
+.lux-items-footer {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--lux-border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.icon-action-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-action-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  transform: scale(1.1);
+}
+
+.btn-outline.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--lux-gold);
+  color: var(--lux-gold);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-outline.btn-sm:hover {
+  background: var(--lux-gold);
+  color: #000;
+}

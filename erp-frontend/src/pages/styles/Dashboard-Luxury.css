@@ -1,0 +1,433 @@
+/* Dashboard-Luxury.css - 企業核心智能儀表板 */
+:root {
+  --lux-gold: #d4af37;
+  --lux-gold-glow: rgba(212, 175, 55, 0.2);
+  --lux-emerald: #10b981;
+  --lux-obsidian: #020408;
+  --lux-surface: rgba(15, 23, 42, 0.4);
+  --lux-border: rgba(212, 175, 55, 0.15);
+}
+
+.dashboard-container {
+  min-height: 100vh;
+  padding: 2.5rem;
+  background-color: var(--lux-obsidian);
+  color: #fff;
+  font-family: var(--font-body);
+  background-image: 
+    radial-gradient(circle at 0% 0%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+}
+
+.lux-header {
+  margin-bottom: 3.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.lux-main-title {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(to bottom, #fff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.lux-subtitle {
+  color: var(--lux-gold);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  margin-bottom: 0.75rem;
+}
+
+.lux-header-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.lux-header-meta span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* KPI Cards */
+.lux-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.lux-stat-card {
+  background: var(--lux-surface);
+  border: 1px solid var(--lux-border);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.lux-stat-card:hover {
+  border-color: var(--lux-gold);
+  box-shadow: 0 0 30px var(--lux-gold-glow);
+  transform: translateY(-4px);
+}
+
+.lux-stat-icon {
+  margin-bottom: 1.25rem;
+  opacity: 0.8;
+}
+
+.lux-stat-label {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.lux-stat-value-container {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.lux-stat-value {
+  font-family: var(--font-mono);
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.lux-stat-unit {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.lux-stat-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Main Grid Layout */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+}
+
+.dashboard-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Luxury Cards */
+.lux-card {
+  background: var(--lux-surface);
+  border: 1px solid var(--lux-border);
+  border-radius: 1.5rem;
+  backdrop-filter: blur(15px);
+  overflow: hidden;
+}
+
+.lux-card-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lux-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.lux-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--lux-gold);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 2px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+
+/* Chart Styles */
+.lux-chart-container {
+  padding: 1.5rem 2rem 2rem 1rem;
+}
+
+.lux-chart-legend {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* Work Order List */
+.wo-list-luxury {
+  display: flex;
+  flex-direction: column;
+}
+
+.wo-item-luxury {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.3s ease;
+}
+
+.wo-item-luxury:hover {
+  background: rgba(212, 175, 55, 0.03);
+}
+
+.wo-item-luxury:last-child {
+  border-bottom: none;
+}
+
+.lux-progress-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.lux-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.lux-progress-fill {
+  height: 100%;
+  background: var(--lux-gold);
+  box-shadow: 0 0 10px var(--lux-gold-glow);
+}
+
+.lux-progress-text {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  min-width: 40px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+/* Sidebar Widgets */
+.lux-action-grid {
+  padding: 1.5rem 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.lux-action-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.lux-action-btn:hover {
+  background: rgba(212, 175, 55, 0.05);
+  border-color: var(--lux-gold);
+  transform: translateY(-4px);
+}
+
+.lux-action-icon {
+  color: var(--lux-gold);
+  background: rgba(212, 175, 55, 0.1);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lux-action-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+/* Alerts List */
+.lux-alert-list {
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.lux-alert-item {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.lux-alert-content {
+  flex: 1;
+}
+
+.alert-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}
+
+.alert-time {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.lux-dot-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  position: relative;
+}
+
+.lux-dot-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid #ef4444;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* Buttons */
+.lux-btn-primary {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #000;
+  font-weight: 700;
+  padding: 12px 28px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lux-btn-primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 20px var(--lux-gold-glow);
+}
+
+.lux-tab-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+  border: none;
+  background: rgba(255,255,255,0.05);
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lux-tab-btn:hover {
+  color: var(--lux-gold);
+}
+
+/* Tooltip */
+.lux-tooltip {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid var(--lux-border);
+  padding: 12px 16px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.lux-tooltip-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.lux-tooltip-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.lux-tooltip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.lux-tooltip-value {
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-mono);
+}
+
+.lux-tooltip-name {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.lux-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}

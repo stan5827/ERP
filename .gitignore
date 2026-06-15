@@ -1,0 +1,123 @@
+# ========================================
+# Environment & Secrets
+# ========================================
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+*.cer
+*.jks
+
+# ========================================
+# Node.js
+# ========================================
+node_modules/
+dist/
+.vite/
+.next/
+*.tsbuildinfo
+
+# ========================================
+# .NET / C#
+# ========================================
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+[Bb]uilds/
+*.dll
+*.pdb
+*.exe
+
+# ========================================
+# Expo / React Native
+# ========================================
+.expo/
+expo-env.d.ts
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# ========================================
+# Documentation (binary docs)
+# ========================================
+*.docx
+*.pptx
+*.xlsx
+*.pdf
+*.zip
+*.tar.gz
+*.rar
+
+# ========================================
+# Monitoring
+# ========================================
+monitoring/prometheus/prometheus_data/
+monitoring/grafana/grafana_data/
+
+# ========================================
+# OS & Editor
+# ========================================
+Thumbs.db
+.DS_Store
+*.swp
+*~
+.idea/
+*.cache
+
+# ========================================
+# Test Reports
+# ========================================
+playwright-report/
+test-results/
+coverage/
+eslint-pages-output.json
+strict-eslint-pages-output.json
+
+# ========================================
+# Scripts output
+# ========================================
+tools/conversation_reports/
+
+# ========================================
+# Remotion video output
+# ========================================
+erp-remotion-video/output/
+
+# Import logs
+backend-import.err.log
+backend-import.out.log
+
+# Windows reserved name that somehow exists
+erp-employee-app/nul

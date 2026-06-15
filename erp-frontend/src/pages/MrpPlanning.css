@@ -1,0 +1,293 @@
+:root {
+  --mrp-primary: #8b5cf6;
+  --mrp-primary-glow: rgba(139, 92, 246, 0.4);
+  --mrp-success: #10b981;
+  --mrp-warning: #f59e0b;
+  --mrp-danger: #ef4444;
+  --mrp-bg: #0f172a;
+  --mrp-card-bg: rgba(30, 41, 59, 0.6);
+  --mrp-border: rgba(255, 255, 255, 0.1);
+  --mrp-text: #f8fafc;
+  --mrp-text-muted: #94a3b8;
+}
+
+.mrp-page {
+  padding: 2rem;
+  background: radial-gradient(circle at bottom left, #1e1b4b, #0f172a);
+  min-height: 100vh;
+  color: var(--mrp-text);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.mrp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2.5rem;
+}
+
+.mrp-title h1 {
+  font-size: 2.5rem;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.last-run-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--mrp-text-muted);
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Summary Grid */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.summary-card {
+  background: var(--mrp-card-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--mrp-border);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.summary-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--mrp-primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.icon-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.icon-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.icon-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.icon-purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+
+.card-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.card-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--mrp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-trend {
+  position: absolute;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  opacity: 0.2;
+}
+
+/* Controls Bar */
+.mrp-controls {
+  background: var(--mrp-card-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--mrp-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.search-box {
+  position: relative;
+  width: 400px;
+}
+
+.search-box input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--mrp-border);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  color: white;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.search-box input:focus {
+  border-color: var(--mrp-primary);
+  box-shadow: 0 0 0 2px var(--mrp-primary-glow);
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mrp-text-muted);
+}
+
+/* Table Design */
+.mrp-table-container {
+  background: var(--mrp-card-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--mrp-border);
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+.mrp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mrp-table th {
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mrp-text-muted);
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--mrp-border);
+}
+
+.mrp-table td {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.95rem;
+  vertical-align: middle;
+}
+
+.mrp-table tr:last-child td {
+  border-bottom: none;
+}
+
+.mrp-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sku-info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sku-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--mrp-primary);
+}
+
+.sku-name {
+  font-weight: 500;
+  color: var(--mrp-text);
+}
+
+.qty-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.date-cell {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+
+.date-label {
+  font-size: 0.7rem;
+  color: var(--mrp-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pill-amber { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
+.pill-emerald { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+
+.action-btn {
+  background: var(--mrp-primary);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px var(--mrp-primary-glow);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 16px var(--mrp-primary-glow);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.converted-doc {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--mrp-success);
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Order Type Badge */
+.type-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.type-wo { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+.type-po { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+/* Animation */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-up {
+  animation: slideUp 0.5s ease-out forwards;
+}

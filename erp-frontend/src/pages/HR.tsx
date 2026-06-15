@@ -131,8 +131,8 @@ function buildEmployeeTabs(
     {
       label: '法定保障',
       fields: [
-        { name: 'laborInsuranceGrade', label: '勞保投保等級', type: 'number', placeholder: '0', min: 0, description: '勞工保險投保等級(1-20級)，決定每月勞保費金額。依月薪對照勞保局公告表投保。' },
-        { name: 'healthInsuranceGrade', label: '健保投保等級', type: 'number', placeholder: '0', min: 0, description: '全民健康保險投保金額等級，決定每月健保費金額。' },
+{ name: 'laborInsuranceGrade', label: '勞保投保等級', type: 'number', placeholder: '0', min: 0, description: '勞工保險投保等級(1-20級)，決定每月勞保費金額。常用等級：第1級(27,470元)→第11級(45,800元)→第20級(45,800元(最高))。雇主負擔70%、員工自負20%、政府補助10%。依月薪對照勞保局公告投保薪資分級表投保。' },
+{ name: 'healthInsuranceGrade', label: '健保投保等級', type: 'number', placeholder: '0', min: 0, description: '全民健康保險投保金額等級(1-13級)，決定每月健保費金額。常用等級：第1級(26,400元)→第6級(45,800元)→第13級(219,500元(最高))。雇主負擔60%、員工自負30%、政府補助10%。依全民健康保險署公告投保金額分級表填寫。' },
         { name: 'pensionContributionRate', label: '勞退提繳率（%）', type: 'number', placeholder: '6', min: 0, max: 100, step: 0.5, description: '勞工退休金提繳率，雇主最低須提繳6%，最高可提繳15%。' },
         { name: 'taxDependents', label: '所得稅扶養人數', type: 'number', placeholder: '0', min: 0, description: '年度所得稅申報時的免稅額人數，包括本人與符合條件的眷屬。' },
         { name: 'disabilityCategory', label: '身心障礙類別', type: 'text', placeholder: '無則免填', description: '若有身心障礙手冊請填寫，可享有相關稅務優惠與勞保優惠。' },
@@ -214,8 +214,8 @@ function buildEmployeeWizardFields(
       { name: 'bankAccount', label: '銀行帳號', type: 'text', placeholder: '帳號', description: '員工的薪資入帳帳號，請確認帳號正確避免匯款失敗。' },
     ],
     [
-      { name: 'laborInsuranceGrade', label: '勞保投保等級', type: 'number', placeholder: '0', min: 0, description: '勞工保險投保等級(1-20級)，決定每月勞保費金額。依月薪對照勞保局公告表投保。' },
-      { name: 'healthInsuranceGrade', label: '健保投保等級', type: 'number', placeholder: '0', min: 0, description: '全民健康保險投保金額等級，決定每月健保費金額。' },
+      { name: 'laborInsuranceGrade', label: '勞保投保等級', type: 'number', placeholder: '0', min: 0, description: '勞工保險投保等級(1-20級)，決定每月勞保費金額。常用等級：第1級(27,470元)→第11級(45,800元)→第20級(45,800元(最高))。雇主負擔70%、員工自負20%、政府補助10%。依月薪對照勞保局公告投保薪資分級表投保。' },
+      { name: 'healthInsuranceGrade', label: '健保投保等級', type: 'number', placeholder: '0', min: 0, description: '全民健康保險投保金額等級(1-13級)，決定每月健保費金額。常用等級：第1級(26,400元)→第6級(45,800元)→第13級(219,500元(最高))。雇主負擔60%、員工自負30%、政府補助10%。依全民健康保險署公告投保金額分級表填寫。' },
       { name: 'pensionContributionRate', label: '勞退提繳率（%）', type: 'number', placeholder: '6', min: 0, max: 100, step: 0.5, description: '勞工退休金提繳率，雇主最低須提繳6%，最高可提繳15%。' },
       { name: 'taxDependents', label: '所得稅扶持人數', type: 'number', placeholder: '0', min: 0, description: '年度所得稅申報時的免稅額人數，包括本人與符合條件的眷屬。' },
       { name: 'disabilityCategory', label: '身心障礙類別', type: 'text', placeholder: '無則免填', description: '若有身心障礙手冊請填寫，可享有相關稅務優惠與勞保優惠。' },
@@ -697,40 +697,42 @@ export const HR: React.FC = () => {
         }}
         onClose={() => setShowAdd(false)}
         onSubmit={async (data: Record<string, unknown>) => {
-          if (data.nationalId && !/^[A-Z]\d{9}$/.test(String(data.nationalId))) {
-            alert('身分證字號格式錯誤，應為 1 個大寫英文字母加上 9 位數字');
-            return;
-          }
-          if (data.email && !String(data.email).includes('@')) {
-            alert('Email 格式錯誤，需包含 @');
-            return;
-          }
-          if (data.mobile && !/^09\d{8}$/.test(String(data.mobile))) {
-            alert('手機號碼格式錯誤，應為 09 開頭的 10 位數字');
-            return;
-          }
-          if (data.baseSalary != null) {
-            const num = Number(data.baseSalary);
-            if (isNaN(num) || num < 0) {
-              alert('底薪不可為負數');
-              return;
+          try {
+            if (data.nationalId && !/^[A-Z]\d{9}$/.test(String(data.nationalId))) {
+              throw new Error('身分證字號格式錯誤，應為 1 個大寫英文字母加上 9 位數字');
             }
-          }
-          if (data.probationEndDate && data.hireDate) {
-            const probationEnd = new Date(data.probationEndDate as string);
-            const hireDate = new Date(data.hireDate as string);
-            if (probationEnd <= hireDate) {
-              alert('試用期截止日必須晚於到職日');
-              return;
+            if (data.email && !String(data.email).includes('@')) {
+              throw new Error('Email 格式錯誤，需包含 @');
             }
+            if (data.mobile && !/^09\d{8}$/.test(String(data.mobile))) {
+              throw new Error('手機號碼格式錯誤，應為 09 開頭的 10 位數字');
+            }
+            if (data.baseSalary != null) {
+              const num = Number(data.baseSalary);
+              if (isNaN(num) || num < 0) {
+                throw new Error('底薪不可為負數');
+              }
+            }
+            if (data.probationEndDate && data.hireDate) {
+              const probationEnd = new Date(data.probationEndDate as string);
+              const hireDate = new Date(data.hireDate as string);
+              if (probationEnd <= hireDate) {
+                throw new Error('試用期截止日必須晚於到職日');
+              }
+            }
+            
+            const cleaned: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(data)) {
+              cleaned[key] = value === '' ? null : value;
+            }
+            
+            await employeesApi.create(cleaned);
+            setShowAdd(false);
+            setRefreshKey(k => k + 1);
+          } catch (err: any) {
+            alert('新增失敗: ' + (err.response?.data?.message || err.message));
+            throw err;
           }
-          const cleaned: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(data)) {
-            cleaned[key] = value === '' ? null : value;
-          }
-          await employeesApi.create(cleaned);
-          setShowAdd(false);
-          setRefreshKey(k => k + 1);
         }}
       />
 
@@ -747,36 +749,39 @@ export const HR: React.FC = () => {
         })() : undefined}
         onClose={() => setEditingEmployee(null)}
         onSubmit={async (data) => {
-          if (data.nationalId && !/^[A-Z]\d{9}$/.test(String(data.nationalId))) {
-            alert('身分證字號格式錯誤，應為 1 個大寫英文字母加上 9 位數字');
-            return;
-          }
-          if (data.email && !String(data.email).includes('@')) {
-            alert('Email 格式錯誤，需包含 @');
-            return;
-          }
-          if (data.mobile && !/^09\d{8}$/.test(String(data.mobile))) {
-            alert('手機號碼格式錯誤，應為 09 開頭的 10 位數字');
-            return;
-          }
-          if (data.baseSalary != null && data.baseSalary !== '' && Number(data.baseSalary) < 0) {
-            alert('底薪不可為負數');
-            return;
-          }
-          if (data.probationEndDate && data.hireDate && new Date(String(data.probationEndDate)) <= new Date(String(data.hireDate))) {
-            alert('試用期截止日必須晚於到職日');
-            return;
-          }
-          const cleaned: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(data)) {
-            cleaned[key] = value === '' ? null : value;
-          }
           try {
-            await employeesApi.update(editingEmployee.id, cleaned);
+            if (data.nationalId && !/^[A-Z]\d{9}$/.test(String(data.nationalId))) {
+              throw new Error('身分證字號格式錯誤，應為 1 個大寫英文字母加上 9 位數字');
+            }
+            if (data.email && !String(data.email).includes('@')) {
+              throw new Error('Email 格式錯誤，需包含 @');
+            }
+            if (data.mobile && !/^09\d{8}$/.test(String(data.mobile))) {
+              throw new Error('手機號碼格式錯誤，應為 09 開頭的 10 位數字');
+            }
+            if (data.baseSalary != null && data.baseSalary !== '' && Number(data.baseSalary) < 0) {
+              throw new Error('底薪不可為負數');
+            }
+            if (data.probationEndDate && data.hireDate && new Date(String(data.probationEndDate)) <= new Date(String(data.hireDate))) {
+              throw new Error('試用期截止日必須晚於到職日');
+            }
+            
+            const cleaned: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(data)) {
+              if (value !== undefined && value !== '') {
+                cleaned[key] = value;
+              }
+            }
+            
+            console.log('更新員工 - 原始資料:', JSON.stringify(data));
+            console.log('更新員工 - 清理後:', JSON.stringify(cleaned));
+            const updateResponse = await employeesApi.update(editingEmployee.id, cleaned);
+            console.log('員工更新結果:', updateResponse);
             setEditingEmployee(null);
             setRefreshKey(k => k + 1);
           } catch (err: any) {
             alert('更新失敗: ' + (err.response?.data?.message || err.message));
+            throw err;
           }
         }}
       />
@@ -798,6 +803,9 @@ export const HR: React.FC = () => {
             <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>Email</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.email ?? '—'}</p></div>
             <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>手機</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.mobile ?? '—'}</p></div>
             <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>底薪</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.baseSalary?.toLocaleString() ?? '—'}</p></div>
+            <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>伙食津貼</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.foodAllowance?.toLocaleString() ?? '—'}</p></div>
+            <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>職務加給</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.positionAllowance?.toLocaleString() ?? '—'}</p></div>
+            <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>全勤獎金</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.fullAttendanceBonus?.toLocaleString() ?? '—'}</p></div>
             <div><label style={{ fontSize: 11, color: 'var(--slate-500)' }}>職務類別</label><p style={{ color: 'var(--slate-200)' }}>{viewingEmployee.jobCategory === 'production' ? '生產部門' : viewingEmployee.jobCategory === 'admin' ? '管理部門' : viewingEmployee.jobCategory === 'service' ? '服務部門' : '—'}</p></div>
           </div>
         )}
@@ -840,20 +848,65 @@ export const HR: React.FC = () => {
 
       <FormModal open={showAddLeave} title="新增請假" width={480}
         onClose={() => setShowAddLeave(false)}
+        onChangeData={(values, _, __, setFieldValues) => {
+          if (values.startDate && values.endDate) {
+            const start = new Date(values.startDate as string);
+            const end = new Date(values.endDate as string);
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+              const diffTime = end.getTime() - start.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+              if (diffDays > 0 && setFieldValues) {
+                setFieldValues({ totalHours: diffDays * 8 });
+              }
+            }
+          }
+        }}
         onSubmit={async (data: Record<string, unknown>) => {
+          console.log('[LeaveRequest] 最終精密提交開始...', data);
+          
+          // 精密對齊：鎖定所有後端 DTO 可能的反序列化陷阱
+          const finalPayload = {
+            EmployeeId: data.employeeId,
+            LeaveType: data.leaveType,
+            StartDate: data.startDate, // YYYY-MM-DD
+            EndDate: data.endDate,     // YYYY-MM-DD
+            TotalHours: parseFloat(String(data.totalHours || 8)),
+            StartTime: data.startTime ? `${String(data.startTime).slice(0, 5)}:00` : null, // 強制 HH:mm:ss
+            EndTime: data.endTime ? `${String(data.endTime).slice(0, 5)}:00` : null,     // 強制 HH:mm:ss
+            Reason: data.reason ? String(data.reason) : "",
+            IncludesSpecialPeriod: false,
+            ShiftConflictFlag: false,
+            AutoDeductPayFlag: true,
+            ImpactOtOrBonus: false,
+            Remarks: "v3-precision-submit"
+          };
+
           try {
-            await leaveRequestsApi.create(data);
+            // 直接進行 API 調用
+            await leaveRequestsApi.create(finalPayload as any);
             setShowAddLeave(false);
             setRefreshKey(k => k + 1);
           } catch (err: any) {
-            alert('建立失敗: ' + (err.response?.data?.message || err.message));
+            console.error('[LeaveRequest] 精密提交失敗具體原因:', err.response?.data);
+            
+            // 提取最深層的錯誤訊息
+            let errorDetail = '資料驗證失敗 (可能是時間或時數格式問題)';
+            if (err.response?.data?.errors) {
+                const errorEntries = Object.entries(err.response.data.errors);
+                errorDetail = errorEntries.map(([key, val]) => `${key}: ${JSON.stringify(val)}`).join('\n');
+            } else if (err.response?.data?.message) {
+                errorDetail = err.response.data.message;
+            }
+            
+            alert('儲存失敗詳情:\n' + errorDetail);
           }
         }}
         fields={[
-          { name: 'employeeId', label: '員工', type: 'select', required: true, options: employees.map(e => ({ value: e.id, label: `${e.employeeNo} - ${e.chineseName}` })) },
+          { name: 'employeeId', label: '員工', type: 'select', required: true, searchable: true, options: employees.map(e => ({ value: e.id, label: `${e.employeeNo} - ${e.chineseName}` })) },
           { name: 'leaveType', label: '假別', type: 'select', required: true, options: leaveTypes },
           { name: 'startDate', label: '開始日期', type: 'date', required: true },
           { name: 'endDate', label: '結束日期', type: 'date', required: true },
+          { name: 'totalHours', label: '請假總時數', type: 'number', required: true, placeholder: '8', min: 0.5, step: 0.5, description: '本次請假的總小時數。扣除休息時間後每天通常為 8 小時。' },
           { name: 'startTime', label: '開始時間', type: 'text', placeholder: '如：09:00' },
           { name: 'endTime', label: '結束時間', type: 'text', placeholder: '如：18:00' },
           { name: 'reason', label: '請假原因', type: 'textarea', placeholder: '請輸入請假原因...' },
@@ -872,7 +925,7 @@ export const HR: React.FC = () => {
           }
         }}
         fields={[
-          { name: 'employeeId', label: '員工', type: 'select', required: true, options: employees.map(e => ({ value: e.id, label: `${e.employeeNo} - ${e.chineseName}` })), description: '選擇員工' },
+          { name: 'employeeId', label: '員工', type: 'select', required: true, searchable: true, options: employees.map(e => ({ value: e.id, label: `${e.employeeNo} - ${e.chineseName}` })), description: '選擇員工' },
           { name: 'date', label: '出勤日期', type: 'date', required: true, description: '出勤的日期' },
           { name: 'shiftType', label: '班別類型', type: 'select', options: [{ value: 'fixed', label: '固定班' }, { value: 'day', label: '常日班' }, { value: 'rotating', label: '輪班制' }], description: '上班班別' },
           { name: 'clockIn', label: '上班打卡時間', type: 'time', placeholder: '如：09:00', description: '上班打卡時間' },
@@ -898,7 +951,7 @@ export const HR: React.FC = () => {
           }
         }}
         fields={[
-          { name: 'employeeId', label: '員工', type: 'select', required: true, options: employees.map(e => ({ value: e.id, label: `${e.employeeNo} - ${e.chineseName}` })), description: '選擇要發放薪資的員工' },
+          { name: 'employeeId', label: '員工', type: 'select', required: true, searchable: true, options: employees.map(e => ({ value: e.id, label: `${e.employeeNo} - ${e.chineseName}` })), description: '選擇要發放薪資的員工' },
           { name: 'periodStart', label: '薪資年月', type: 'month', required: true, description: '薪資所屬的年月' },
           { name: 'basicSalary', label: '基本薪資', type: 'number', required: true, placeholder: '29500', description: '員工的基本工資' },
           { name: 'overtimeHours', label: '加班時數', type: 'number', placeholder: '0', min: 0, description: '本月加班時數' },

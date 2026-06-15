@@ -1,0 +1,1275 @@
+/* ==========================================
+   工藝設計 - Industrial Elegance Theme
+   ========================================== */
+
+.manufacturing-engineering {
+  padding: 28px 32px;
+  max-width: 1600px;
+}
+
+/* ==========================================
+   Page Header
+   ========================================== */
+
+.manufacturing-engineering .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+}
+
+.manufacturing-engineering .page-title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.manufacturing-engineering .page-title-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--cobalt-500, #2d6ef5), var(--cobalt-400, #4b8af5));
+  border-radius: 12px;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(45, 110, 245, 0.25);
+}
+
+.manufacturing-engineering .page-title-text h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary, #e8edf5);
+  letter-spacing: -0.02em;
+}
+
+.manufacturing-engineering .page-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary, #8b95a8);
+  margin: 4px 0 0 0;
+}
+
+/* ==========================================
+   Tab Navigation
+   ========================================== */
+
+.manufacturing-engineering .tab-navigation {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.manufacturing-engineering .tab-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  overflow: hidden;
+}
+
+.manufacturing-engineering .tab-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent, rgba(45, 110, 245, 0.05));
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.manufacturing-engineering .tab-card:hover {
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
+  border-color: rgba(45, 110, 245, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.manufacturing-engineering .tab-card:hover::before {
+  opacity: 1;
+}
+
+.manufacturing-engineering .tab-card.active {
+  background: linear-gradient(135deg, rgba(45, 110, 245, 0.12), rgba(45, 110, 245, 0.06));
+  border-color: var(--cobalt-400, #4b8af5);
+  box-shadow: 0 4px 20px rgba(45, 110, 245, 0.15);
+}
+
+.manufacturing-engineering .tab-card-icon {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 110, 245, 0.1);
+  border-radius: 10px;
+  color: var(--cobalt-400, #4b8af5);
+  flex-shrink: 0;
+}
+
+.manufacturing-engineering .tab-card.active .tab-card-icon {
+  background: linear-gradient(135deg, var(--cobalt-500, #2d6ef5), var(--cobalt-400, #4b8af5));
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(45, 110, 245, 0.3);
+}
+
+.manufacturing-engineering .tab-card-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manufacturing-engineering .tab-card-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .tab-card-desc {
+  font-size: 11px;
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .tab-card-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cobalt-400, #4b8af5), transparent);
+  border-radius: 2px;
+}
+
+/* ==========================================
+   Toolbar
+   ========================================== */
+
+.manufacturing-engineering .toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.manufacturing-engineering .search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: 10px;
+  flex: 1;
+  max-width: 400px;
+  transition: all 0.2s;
+}
+
+.manufacturing-engineering .search-bar:focus-within {
+  border-color: var(--cobalt-400, #4b8af5);
+  box-shadow: 0 0 0 3px rgba(45, 110, 245, 0.1);
+}
+
+.manufacturing-engineering .search-bar svg {
+  color: var(--text-secondary, #8b95a8);
+  flex-shrink: 0;
+}
+
+.manufacturing-engineering .search-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary, #e8edf5);
+  font-family: var(--font-body, 'Noto Sans TC', sans-serif);
+}
+
+.manufacturing-engineering .search-bar input::placeholder {
+  color: var(--text-muted, #5a6577);
+}
+
+.manufacturing-engineering .search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #8b95a8);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.manufacturing-engineering .search-clear:hover {
+  color: var(--text-primary, #e8edf5);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.manufacturing-engineering .toolbar-stats {
+  display: flex;
+  align-items: center;
+}
+
+.manufacturing-engineering .stat-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .stat-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--emerald-400, #10b97a);
+  border-radius: 50%;
+}
+
+/* ==========================================
+   Data Table Container
+   ========================================== */
+
+.manufacturing-engineering .data-table-container {
+  background: var(--bg-primary, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.manufacturing-engineering .table-wrapper {
+  overflow-x: auto;
+}
+
+.manufacturing-engineering .data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.manufacturing-engineering .data-table th,
+.manufacturing-engineering .data-table td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.04));
+}
+
+.manufacturing-engineering .data-table th {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #8b95a8);
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .data-table tbody tr {
+  transition: background 0.15s;
+}
+
+.manufacturing-engineering .data-table tbody tr:hover {
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+}
+
+.manufacturing-engineering .data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Column widths */
+.manufacturing-engineering .col-code { width: 120px; }
+.manufacturing-engineering .col-name { min-width: 160px; }
+.manufacturing-engineering .col-capacity { width: 100px; }
+.manufacturing-engineering .col-efficiency { width: 140px; }
+.manufacturing-engineering .col-time { width: 110px; }
+.manufacturing-engineering .col-cost { width: 100px; }
+.manufacturing-engineering .col-type { width: 90px; }
+.manufacturing-engineering .col-status { width: 100px; }
+.manufacturing-engineering .col-product { min-width: 120px; }
+.manufacturing-engineering .col-version { width: 80px; }
+.manufacturing-engineering .col-ops { width: 80px; }
+.manufacturing-engineering .col-actions { width: 90px; }
+
+/* ==========================================
+   Cell Components
+   ========================================== */
+
+.manufacturing-engineering .code-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(45, 110, 245, 0.1);
+  color: var(--cobalt-300, #6ba1f5);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.manufacturing-engineering .name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .name-icon {
+  color: var(--text-secondary, #8b95a8);
+  flex-shrink: 0;
+}
+
+.manufacturing-engineering .metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e8edf5);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+/* Efficiency Bar */
+.manufacturing-engineering .efficiency-bar {
+  position: relative;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 100px;
+}
+
+.manufacturing-engineering .efficiency-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--emerald-500, #0ea56a), var(--emerald-400, #10b97a));
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.manufacturing-engineering .efficiency-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Status Pill */
+.manufacturing-engineering .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.manufacturing-engineering .status-pill.active {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-400, #10b97a);
+}
+
+.manufacturing-engineering .status-pill.inactive {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary, #8b95a8);
+}
+
+/* Time Badge */
+.manufacturing-engineering .time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--amber-400, #f5970a);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+/* Cost Value */
+.manufacturing-engineering .cost-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--emerald-400, #10b97a);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+/* Type Badge */
+.manufacturing-engineering .type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.manufacturing-engineering .type-badge.internal {
+  background: rgba(45, 110, 245, 0.1);
+  color: var(--cobalt-400, #4b8af5);
+}
+
+.manufacturing-engineering .type-badge.outsourced {
+  background: rgba(168, 85, 247, 0.1);
+  color: var(--purple-400, #a855f7);
+}
+
+/* Product SKU */
+.manufacturing-engineering .product-sku {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+  color: var(--cobalt-300, #6ba1f5);
+  background: rgba(45, 110, 245, 0.08);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.manufacturing-engineering .product-name {
+  font-size: 13px;
+  color: var(--text-primary, #e8edf5);
+}
+
+/* Version Badge */
+.manufacturing-engineering .version-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(168, 85, 247, 0.1);
+  color: var(--purple-400, #a855f7);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+/* Ops Count */
+.manufacturing-engineering .ops-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--cobalt-500, #2d6ef5), var(--cobalt-400, #4b8af5));
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ==========================================
+   Action Buttons
+   ========================================== */
+
+.manufacturing-engineering .action-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.manufacturing-engineering .btn-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .btn-action:hover {
+  transform: translateY(-1px);
+}
+
+.manufacturing-engineering .btn-action-edit:hover {
+  background: rgba(45, 110, 245, 0.1);
+  border-color: var(--cobalt-400, #4b8af5);
+  color: var(--cobalt-400, #4b8af5);
+}
+
+.manufacturing-engineering .btn-action-delete:hover {
+  background: rgba(232, 51, 82, 0.1);
+  border-color: var(--crimson-400, #e83352);
+  color: var(--crimson-400, #e83352);
+}
+
+/* ==========================================
+   Empty State
+   ========================================== */
+
+.manufacturing-engineering .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.manufacturing-engineering .empty-state-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 110, 245, 0.06);
+  border-radius: 20px;
+  color: var(--text-muted, #5a6577);
+  margin-bottom: 20px;
+}
+
+.manufacturing-engineering .empty-state h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #e8edf5);
+  margin: 0 0 8px 0;
+}
+
+.manufacturing-engineering .empty-state p {
+  font-size: 13px;
+  color: var(--text-secondary, #8b95a8);
+  margin: 0 0 20px 0;
+}
+
+/* ==========================================
+   Loading State
+   ========================================== */
+
+.manufacturing-engineering .loading-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.manufacturing-engineering .loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.manufacturing-engineering .spinner-icon {
+  animation: spin 1s linear infinite;
+  color: var(--cobalt-400, #4b8af5);
+}
+
+.manufacturing-engineering .loading-text {
+  font-size: 13px;
+  color: var(--text-secondary, #8b95a8);
+}
+
+@keyframes spin {
+   from { transform: rotate(0deg); }
+   to { transform: rotate(360deg); }
+}
+
+/* ==========================================
+   Modal
+   ========================================== */
+
+.manufacturing-engineering .modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.manufacturing-engineering .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 14, 26, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.manufacturing-engineering .modal-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  background: var(--navy-900, #0f172a);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: modalSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.manufacturing-engineering .modal-wide {
+  max-width: 780px;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Modal Header */
+.manufacturing-engineering .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+}
+
+.manufacturing-engineering .modal-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.manufacturing-engineering .modal-title-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--cobalt-500, #2d6ef5), var(--cobalt-400, #4b8af5));
+  border-radius: 10px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.manufacturing-engineering .modal-title h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .modal-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary, #8b95a8);
+  margin: 2px 0 0 0;
+}
+
+.manufacturing-engineering .modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  color: var(--text-secondary, #8b95a8);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.manufacturing-engineering .modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .modal-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal Body */
+.manufacturing-engineering .modal-body {
+  flex: 1;
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+.manufacturing-engineering .custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.manufacturing-engineering .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.manufacturing-engineering .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.manufacturing-engineering .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Form Content */
+.manufacturing-engineering .form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.manufacturing-engineering .form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.manufacturing-engineering .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #8b95a8);
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.manufacturing-engineering .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.manufacturing-engineering .section-header .section-title {
+  margin-bottom: 0;
+}
+
+/* Form Grid */
+.manufacturing-engineering .form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.manufacturing-engineering .form-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Form Fields */
+.manufacturing-engineering .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manufacturing-engineering .form-field-sm .form-input-sm {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.manufacturing-engineering .field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .required-mark {
+  color: var(--crimson-400, #e83352);
+  margin-left: 2px;
+}
+
+.manufacturing-engineering .form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  color: var(--text-primary, #e8edf5);
+  font-size: 13px;
+  font-family: var(--font-body, 'Noto Sans TC', sans-serif);
+  transition: all 0.15s;
+  box-sizing: border-box;
+}
+
+.manufacturing-engineering .form-input:focus {
+  outline: none;
+  border-color: var(--cobalt-400, #4b8af5);
+  box-shadow: 0 0 0 3px rgba(45, 110, 245, 0.12);
+}
+
+.manufacturing-engineering .form-input::placeholder {
+  color: var(--text-muted, #5a6577);
+}
+
+.manufacturing-engineering .form-input-sm {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.manufacturing-engineering .form-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  color: var(--text-primary, #e8edf5);
+  font-size: 13px;
+  font-family: var(--font-body, 'Noto Sans TC', sans-serif);
+  transition: all 0.15s;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b95a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  box-sizing: border-box;
+}
+
+.manufacturing-engineering .form-select:focus {
+  outline: none;
+  border-color: var(--cobalt-400, #4b8af5);
+  box-shadow: 0 0 0 3px rgba(45, 110, 245, 0.12);
+}
+
+.manufacturing-engineering .form-select option {
+  background: var(--navy-800, #1e293b);
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .form-select-sm {
+  padding: 8px 10px;
+  font-size: 12px;
+  padding-right: 30px;
+  background-position: right 8px center;
+}
+
+/* Toggle Field */
+.manufacturing-engineering .toggle-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: 10px;
+}
+
+.manufacturing-engineering .toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manufacturing-engineering .toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .toggle-desc {
+  font-size: 11px;
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.manufacturing-engineering .toggle-switch.on {
+  background: linear-gradient(135deg, var(--emerald-500, #0ea56a), var(--emerald-400, #10b97a));
+}
+
+.manufacturing-engineering .toggle-switch.off {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.manufacturing-engineering .toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.manufacturing-engineering .toggle-switch.on .toggle-knob {
+  left: 22px;
+}
+
+/* Routing Ops List */
+.manufacturing-engineering .routing-ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manufacturing-engineering .routing-op-card {
+  padding: 14px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: 10px;
+  transition: all 0.15s;
+}
+
+.manufacturing-engineering .routing-op-card:hover {
+  border-color: rgba(45, 110, 245, 0.2);
+}
+
+.manufacturing-engineering .routing-op-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.manufacturing-engineering .routing-op-seq {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .seq-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, var(--cobalt-500, #2d6ef5), var(--cobalt-400, #4b8af5));
+  color: #fff;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.manufacturing-engineering .seq-arrow {
+  color: var(--text-muted, #5a6577);
+}
+
+.manufacturing-engineering .routing-op-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+/* Empty Subsection */
+.manufacturing-engineering .empty-subsection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.02));
+  border: 1px dashed var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  color: var(--text-muted, #5a6577);
+}
+
+.manufacturing-engineering .empty-subsection svg {
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.manufacturing-engineering .empty-subsection p {
+  font-size: 12px;
+  margin: 0;
+}
+
+/* Modal Footer */
+.manufacturing-engineering .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 28px 24px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+}
+
+/* ==========================================
+   Buttons
+   ========================================== */
+
+.manufacturing-engineering .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body, 'Noto Sans TC', sans-serif);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.manufacturing-engineering .btn-primary {
+  background: linear-gradient(135deg, var(--cobalt-500, #2d6ef5), var(--cobalt-400, #4b8af5));
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(45, 110, 245, 0.25);
+}
+
+.manufacturing-engineering .btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(45, 110, 245, 0.35);
+}
+
+.manufacturing-engineering .btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.manufacturing-engineering .btn-lg {
+  padding: 12px 22px;
+  font-size: 14px;
+  border-radius: 12px;
+}
+
+.manufacturing-engineering .btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.manufacturing-engineering .btn-ghost {
+  background: transparent;
+  color: var(--text-secondary, #8b95a8);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.manufacturing-engineering .btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .btn-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* ==========================================
+   Small Icon Button
+   ========================================== */
+
+.manufacturing-engineering .btn-icon-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.manufacturing-engineering .btn-icon-danger {
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .btn-icon-danger:hover {
+  background: rgba(232, 51, 82, 0.1);
+  border-color: var(--crimson-400, #e83352);
+  color: var(--crimson-400, #e83352);
+}
+
+/* ==========================================
+   BOM Specific Styles
+   ========================================== */
+
+.manufacturing-engineering .bom-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manufacturing-engineering .bom-item-row {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.manufacturing-engineering .bom-item-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(45, 110, 245, 0.2);
+}
+
+.manufacturing-engineering .item-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.manufacturing-engineering .item-index {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted, #5a6577);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.manufacturing-engineering .btn-remove {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(232, 51, 82, 0.1);
+  color: var(--crimson-400, #e83352);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.manufacturing-engineering .btn-remove:hover {
+  background: var(--crimson-400, #e83352);
+  color: #fff;
+}
+
+.manufacturing-engineering .empty-items {
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-secondary, #8b95a8);
+  font-size: 13px;
+}
+
+.manufacturing-engineering .checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.manufacturing-engineering .checkbox-container input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.manufacturing-engineering .checkbox-label {
+  font-size: 13px;
+  color: var(--text-primary, #e8edf5);
+}
+
+.manufacturing-engineering .form-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ==========================================
+   Responsive
+   ========================================== */
+
+@media (max-width: 1200px) {
+  .manufacturing-engineering .tab-navigation {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .manufacturing-engineering {
+    padding: 20px;
+  }
+
+  .manufacturing-engineering .tab-navigation {
+    grid-template-columns: 1fr;
+  }
+
+  .manufacturing-engineering .tab-card {
+    padding: 14px 16px;
+  }
+
+  .manufacturing-engineering .routing-op-fields {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .manufacturing-engineering .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .manufacturing-engineering .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .manufacturing-engineering .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manufacturing-engineering .search-bar {
+    max-width: none;
+  }
+
+  .manufacturing-engineering .modal-container {
+    max-width: none;
+    margin: 16px;
+  }
+
+  .manufacturing-engineering .modal-header,
+  .manufacturing-engineering .modal-body,
+  .manufacturing-engineering .modal-footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

@@ -1,0 +1,305 @@
+/* Manufacturing-Cyber.css - 高性能製造指揮中心美學 */
+:root {
+  --cy-cyan: #00f2ff;
+  --cy-blue: #0062ff;
+  --cy-dark: #02060f;
+  --cy-slate: #0f172a;
+  --cy-border: rgba(0, 242, 255, 0.15);
+  --cy-glow: 0 0 15px rgba(0, 242, 255, 0.15);
+}
+
+.manufacturing-container {
+  min-height: 100vh;
+  padding: 2rem;
+  background: var(--cy-dark);
+  color: #f8fafc;
+  font-family: var(--font-body);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 網格背景與氛圍效果 */
+.manufacturing-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 10% 10%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 90%, rgba(0, 98, 255, 0.05) 0%, transparent 40%),
+    linear-gradient(rgba(15, 23, 42, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.3) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.cy-title-group h1 {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.cy-badge-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cy-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.25rem;
+}
+
+.cy-badge-label::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--cy-cyan);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--cy-cyan);
+}
+
+/* 數據卡片區域 */
+.cy-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.cy-stat-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--cy-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.cy-stat-card:hover {
+  border-color: rgba(0, 242, 255, 0.4);
+  box-shadow: var(--cy-glow);
+  transform: translateY(-2px);
+}
+
+.cy-stat-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(225deg, rgba(0, 242, 255, 0.1) 0%, transparent 70%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.cy-stat-label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.cy-stat-value {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.cy-stat-trend {
+  font-size: 0.7rem;
+  margin-top: 0.5rem;
+  color: var(--emerald-400);
+}
+
+/* 數據表格區域 */
+.cy-panel {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(20px);
+}
+
+.cy-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+.cy-search-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.cy-search-input {
+  width: 100%;
+  background: rgba(2, 6, 15, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  color: #fff;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.cy-search-input:focus {
+  border-color: var(--cy-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 242, 255, 0.1);
+  outline: none;
+}
+
+.cy-table-wrapper {
+  overflow-x: auto;
+  border-radius: 1rem;
+}
+
+.cy-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+}
+
+.cy-table th {
+  padding: 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.cy-row {
+  background: rgba(30, 41, 59, 0.4);
+  transition: all 0.2s ease;
+}
+
+.cy-row:hover {
+  background: rgba(51, 65, 85, 0.6);
+  transform: scale(1.002);
+}
+
+.cy-row td {
+  padding: 1.25rem 1rem;
+}
+
+.cy-row td:first-child {
+  border-top-left-radius: 0.75rem;
+  border-bottom-left-radius: 0.75rem;
+}
+
+.cy-row td:last-child {
+  border-top-right-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+}
+
+.cy-wo-number {
+  font-family: var(--font-mono);
+  color: var(--cy-cyan);
+  font-weight: 600;
+}
+
+.cy-progress-track {
+  width: 120px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cy-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cy-blue), var(--cy-cyan));
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+}
+
+.btn-cy {
+  background: linear-gradient(135deg, var(--cy-blue), #004ecc);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-cy:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 98, 255, 0.3);
+}
+
+.cy-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.cy-status-pending { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border-color: rgba(148, 163, 184, 0.2); }
+.cy-status-active { background: rgba(0, 242, 255, 0.1); color: var(--cy-cyan); border-color: rgba(0, 242, 255, 0.2); }
+.cy-status-complete { background: rgba(16, 185, 122, 0.1); color: #10b981; border-color: rgba(16, 185, 122, 0.2); }
+
+/* 動作按鈕 */
+.cy-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cy-action-btn:hover {
+  background: rgba(0, 242, 255, 0.1);
+  color: var(--cy-cyan);
+  border-color: rgba(0, 242, 255, 0.2);
+}
+
+@keyframes cy-pulse {
+  0% { opacity: 1; box-shadow: 0 0 0px rgba(168, 85, 247, 0); }
+  50% { opacity: 0.8; box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.05); }
+  100% { opacity: 1; box-shadow: 0 0 0px rgba(168, 85, 247, 0); }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(1.1); }
+}

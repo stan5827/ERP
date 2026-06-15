@@ -1,0 +1,48 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.log
+*.vs/
+*.[Pp]ackage/[Cc]ache/
+packages/
+*.nupkg
+
+# Build results
+[Bb]in/[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# DotNetCore
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# SQL Server
+*.mdf
+*.ldf
+*.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Secrets
+*.pfx
+*.key
+*.cer
+
+# OS
+Thumbs.db
+.DS_Store

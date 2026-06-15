@@ -1,0 +1,181 @@
+/* ================================
+   DataTable Styles
+   ================================ */
+
+.data-table-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.data-table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--slate-700, #334155);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  background: var(--slate-800, #1E293B);
+  color: var(--slate-300, #CBD5E1);
+  font-weight: 600;
+  padding: 14px 16px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--slate-700, #334155);
+  user-select: none;
+}
+
+.data-table th.sortable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.data-table th.sortable:hover {
+  background: var(--slate-750, #253248);
+}
+
+.th-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-icon {
+  display: flex;
+  align-items: center;
+  color: var(--slate-600, #475569);
+  transition: color 0.2s;
+}
+
+.sort-icon.active {
+  color: var(--cobalt-400, #3B82F6);
+}
+
+.data-table td {
+  padding: 12px 16px;
+  color: var(--slate-200, #E2E8F0);
+  border-bottom: 1px solid var(--slate-800, #1E293B);
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  transition: background 0.2s;
+}
+
+.data-table tbody tr:hover {
+  background: var(--slate-800, #1E293B);
+}
+
+.data-table tbody tr.clickable {
+  cursor: pointer;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Row numbers */
+.th-row-number,
+.td-row-number {
+  width: 50px;
+  text-align: center;
+  color: var(--slate-500, #64748B);
+  font-size: 13px;
+}
+
+/* Loading state */
+.loading-cell,
+.empty-cell {
+  text-align: center;
+  padding: 48px 16px !important;
+  color: var(--slate-500, #64748B);
+}
+
+.table-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.table-loading span {
+  font-size: 13px;
+}
+
+/* ================================
+   Pagination
+   ================================ */
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--slate-800, #1E293B);
+  border: 1px solid var(--slate-700, #334155);
+  border-radius: 6px;
+  color: var(--slate-400, #94A3B8);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--slate-700, #334155);
+  color: var(--slate-200, #E2E8F0);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-page {
+  font-weight: 500;
+}
+
+.pagination-btn.active {
+  background: var(--cobalt-500, #3B82F6);
+  border-color: var(--cobalt-500, #3B82F6);
+  color: white;
+}
+
+.pagination-ellipsis {
+  padding: 0 8px;
+  color: var(--slate-500, #64748B);
+}
+
+/* ================================
+   Responsive
+   ================================ */
+
+@media (max-width: 768px) {
+  .data-table {
+    font-size: 13px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 10px 12px;
+  }
+  
+  .pagination-btn {
+    min-width: 32px;
+    height: 32px;
+  }
+}

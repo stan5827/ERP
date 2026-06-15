@@ -1,0 +1,11 @@
+{
+  "LLM": {
+    "Provider": "openai",
+    "ApiKey": "",
+    "BaseUrl": "https://api.openai.com/v1",
+    "DefaultModel": "gpt-4",
+    "MaxTokens": 2000,
+    "Temperature": 0.7,
+    "TimeoutSeconds": 60
+  }
+}

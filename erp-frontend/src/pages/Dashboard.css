@@ -1,0 +1,292 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ── 頂部區塊 ── */
+.dashboard-header {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 40px 32px;
+  border-radius: var(--radius-2xl);
+  background: var(--premium-glass);
+  border: 1px solid var(--premium-border);
+  overflow: hidden;
+}
+
+.dashboard-header::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(45, 110, 245, 0.15) 0%, transparent 70%);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.dashboard-header::after {
+  content: "";
+  position: absolute;
+  bottom: -30%;
+  left: -10%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+  filter: blur(50px);
+  pointer-events: none;
+}
+
+.dashboard-greeting {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cobalt-300);
+  margin-bottom: 8px;
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dashboard-title {
+  font-size: 42px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin-bottom: 12px;
+  background: linear-gradient(to bottom, #fff, var(--slate-400));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dashboard-subtitle {
+  font-size: 13px;
+  color: var(--slate-400);
+  font-family: var(--font-body);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dashboard-subtitle span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── KPI 網格 ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.premium-kpi-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kpi-icon-container {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.kpi-icon-container::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1px solid currentColor;
+  opacity: 0.2;
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.kpi-value-container {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kpi-main-value {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #fff;
+  letter-spacing: -0.05em;
+}
+
+.kpi-sub-trend {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── 改良後的圖表與佈局 ── */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-wrapper {
+  padding: 24px;
+  height: 400px;
+}
+
+.section-header-premium {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.premium-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  background: rgba(0, 242, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+/* ── 精緻化工單列表 ── */
+.wo-card-premium {
+  padding: 0;
+}
+
+.wo-header-full {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--premium-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wo-item-premium {
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background 0.2s;
+}
+
+.wo-item-premium:hover {
+  background: rgba(45, 110, 245, 0.05);
+}
+
+.wo-item-premium:last-child {
+  border-bottom: none;
+}
+
+/* ── 側邊欄 Widget 精緻化 ── */
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar-widget {
+  padding: 20px;
+}
+
+.quick-action-premium-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.action-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--premium-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.action-card:hover {
+  background: rgba(45, 110, 245, 0.1);
+  border-color: var(--cobalt-400);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.action-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 110, 245, 0.1);
+  color: var(--cobalt-300);
+}
+
+.action-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-200);
+}
+
+/* ── 動畫輔助 ── */
+.mesh-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: 
+    radial-gradient(at 0% 0%, rgba(45, 110, 245, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(16, 185, 122, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(245, 151, 10, 0.1) 0px, transparent 50%);
+  filter: blur(80px);
+}
+
+/* 小型月曆覆寫 */
+.mini-calendar-premium {
+  margin-top: 12px;
+}
+
+.mini-calendar-premium .cal-day {
+  font-size: 12px;
+  height: 32px;
+  width: 32px;
+}
+
+.mini-calendar-premium .cal-day.today {
+  background: linear-gradient(135deg, var(--cobalt-500), var(--cobalt-400));
+  border-radius: 8px;
+}
