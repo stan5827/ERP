@@ -5,6 +5,9 @@
 .manufacturing-engineering {
   padding: 28px 32px;
   max-width: 1600px;
+  background-color: var(--theme-background, transparent);
+  color: var(--theme-text, #1a202c);
+  min-height: 100vh;
 }
 
 /* ==========================================
@@ -311,6 +314,46 @@
 .manufacturing-engineering .col-ops { width: 80px; }
 .manufacturing-engineering .col-actions { width: 90px; }
 
+.manufacturing-engineering .bom-table .col-code {
+  width: 160px;
+  min-width: 160px;
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .bom-table .code-badge {
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .operations-table .col-code {
+  width: 160px;
+  min-width: 160px;
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .operations-table .code-badge {
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .operations-table .col-type {
+  width: 120px;
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .operations-table .type-badge {
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .routing-table .col-code {
+  width: 180px;
+  min-width: 180px;
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .routing-table .code-badge {
+  white-space: nowrap;
+}
+
 /* ==========================================
    Cell Components
    ========================================== */
@@ -318,12 +361,13 @@
 .manufacturing-engineering .code-badge {
   display: inline-block;
   padding: 4px 10px;
-  background: rgba(45, 110, 245, 0.1);
-  color: var(--cobalt-300, #6ba1f5);
+  background: rgba(45, 110, 245, 0.16);
+  border: 1px solid rgba(120, 166, 255, 0.2);
+  color: var(--theme-text, #e8edf5);
   border-radius: 6px;
   font-size: 12px;
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 
@@ -436,22 +480,23 @@
 }
 
 .manufacturing-engineering .type-badge.internal {
-  background: rgba(45, 110, 245, 0.1);
-  color: var(--cobalt-400, #4b8af5);
+  background: rgba(45, 110, 245, 0.16);
+  color: var(--theme-text, #e8edf5);
 }
 
 .manufacturing-engineering .type-badge.outsourced {
-  background: rgba(168, 85, 247, 0.1);
-  color: var(--purple-400, #a855f7);
+  background: rgba(168, 85, 247, 0.16);
+  color: var(--theme-text, #e8edf5);
 }
 
 /* Product SKU */
 .manufacturing-engineering .product-sku {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 12px;
-  color: var(--cobalt-300, #6ba1f5);
-  background: rgba(45, 110, 245, 0.08);
+  color: var(--theme-text, #e8edf5);
+  background: rgba(45, 110, 245, 0.16);
   padding: 4px 8px;
+  border: 1px solid rgba(120, 166, 255, 0.2);
   border-radius: 4px;
 }
 
@@ -864,6 +909,64 @@
   color: var(--text-primary, #e8edf5);
 }
 
+.manufacturing-engineering .bom-sku-picker {
+  position: relative;
+}
+
+.manufacturing-engineering .bom-sku-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--slate-600, #475569);
+  border-radius: 8px;
+  background: var(--navy-900, #07111f);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.manufacturing-engineering .bom-sku-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, #e8edf5);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.manufacturing-engineering .bom-sku-option:hover,
+.manufacturing-engineering .bom-sku-option:focus-visible {
+  outline: none;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.08));
+}
+
+.manufacturing-engineering .bom-sku-option-code {
+  flex: 0 0 auto;
+  color: var(--cobalt-300, #7aaaff);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.manufacturing-engineering .bom-sku-dropdown-message,
+.manufacturing-engineering .bom-sku-dropdown-footer {
+  padding: 9px 10px;
+  color: var(--text-muted, #7b8798);
+  font-size: 11px;
+}
+
+.manufacturing-engineering .bom-sku-dropdown-footer {
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
 .manufacturing-engineering .form-select-sm {
   padding: 8px 10px;
   font-size: 12px;
@@ -959,6 +1062,27 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+}
+
+.manufacturing-engineering .routing-op-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.manufacturing-engineering .routing-op-move {
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .routing-op-move:not(:disabled):hover {
+  background: rgba(45, 110, 245, 0.1);
+  border-color: var(--cobalt-400, #4b8af5);
+  color: var(--cobalt-400, #4b8af5);
+}
+
+.manufacturing-engineering .routing-op-move:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .manufacturing-engineering .routing-op-seq {

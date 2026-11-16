@@ -4,6 +4,61 @@
   gap: 16px;
 }
 
+.barcode-scan-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.barcode-scan-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.barcode-page .barcode-scan-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px 0 42px;
+  color: var(--theme-text, var(--slate-100));
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.barcode-page .barcode-scan-input::placeholder {
+  color: var(--slate-400);
+  opacity: 1;
+}
+
+.barcode-page .barcode-scan-input:focus {
+  border-color: var(--cobalt-400);
+  box-shadow: 0 0 0 3px rgba(45, 110, 245, 0.16);
+}
+
+.barcode-scan-icon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--slate-300);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.barcode-page .barcode-scan-button {
+  min-width: 88px;
+  min-height: 42px;
+  justify-content: center;
+}
+
 .barcode-page .module-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -40,4 +95,14 @@
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.04em;
+}
+
+@media (max-width: 640px) {
+  .barcode-scan-controls {
+    flex-direction: column;
+  }
+
+  .barcode-page .barcode-scan-button {
+    width: 100%;
+  }
 }

@@ -1,0 +1,47 @@
+# ============================================================
+# ERP Backend - ASP.NET Core 10.0 Multi-stage Build (Security Hardened)
+# Build: docker build -f deployment/Dockerfile.backend -t erp-backend:latest .
+# ============================================================
+
+# ---------- Stage 1: Build ----------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy csproj and restore dependencies (layer caching)
+COPY ErpBackend/ErpBackend.csproj ErpBackend/
+RUN dotnet restore ErpBackend/ErpBackend.csproj
+
+# Copy source and build
+COPY ErpBackend/ ErpBackend/
+WORKDIR /src/ErpBackend
+RUN dotnet publish ErpBackend.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+# ---------- Stage 2: Runtime ----------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -s /sbin/nologin -c "ERP App User" appuser
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/publish .
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Environment variables (override at runtime)
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
+# Prometheus metrics
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["dotnet", "ErpBackend.dll"]

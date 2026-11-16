@@ -27,20 +27,6 @@ public class Equipment
     public WorkCenter? WorkCenter { get; set; }
 }
 
-public class EquipmentListDto
-{
-    public Guid Id { get; set; }
-    public string EquipmentCode { get; set; } = null!;
-    public string EquipmentName { get; set; } = null!;
-    public string? EquipmentType { get; set; }
-    public string? WorkCenterName { get; set; }
-    public string? SupplierName { get; set; }
-    public string Status { get; set; } = "active";
-    public string? MaintenanceStatus { get; set; }
-    public DateTime? LastMaintenanceDate { get; set; }
-    public DateTime? NextMaintenanceDate { get; set; }
-}
-
 public class MaintenancePlan
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();

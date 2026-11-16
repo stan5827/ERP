@@ -18,6 +18,7 @@ public class CostCenter
     public bool IsActive { get; set; } = true;
     [Column(TypeName = "decimal(14,2)")] public decimal BudgetLimit { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal BudgetUsed { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal? AreaSquareMeters { get; set; }
     [MaxLength(200)] public string? Description { get; set; }
     public int DisplayOrder { get; set; } = 0;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

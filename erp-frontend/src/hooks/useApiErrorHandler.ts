@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useToast } from '../hooks/useToast';
+import { useToast } from './toastContext';
 
 export interface ApiError {
   status: number;
@@ -13,21 +13,36 @@ export interface UseApiErrorOptions {
   onError?: (error: ApiError) => void;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getErrorStatus(value: unknown): number | undefined {
+  if (!isRecord(value)) return undefined;
+  return typeof value.status === 'number' ? value.status : undefined;
+}
+
 export function useApiErrorHandler(options: UseApiErrorOptions = {}) {
   const { showToast = true, onError } = options;
   const [error, setError] = useState<ApiError | null>(null);
-  const { showError } = useToast();
+  const { addToast } = useToast();
 
   const handleApiError = useCallback((err: unknown, defaultMessage = '發生錯誤'): ApiError => {
     let apiError: ApiError;
 
-    if (err instanceof Response || (err && typeof err === 'object' && 'status' in err)) {
+    if (err instanceof Response || (isRecord(err) && 'status' in err)) {
       // Already an API error object
+      const errorRecord = isRecord(err) ? err : {};
+      const details = isRecord(errorRecord.details) ? errorRecord.details : undefined;
       apiError = {
-        status: (err as any).status || 500,
-        message: (err as any).message || defaultMessage,
-        code: (err as any).code,
-        details: (err as any).details
+        status: typeof errorRecord.status === 'number' && errorRecord.status
+          ? errorRecord.status
+          : 500,
+        message: typeof errorRecord.message === 'string' && errorRecord.message
+          ? errorRecord.message
+          : defaultMessage,
+        code: typeof errorRecord.code === 'string' ? errorRecord.code : undefined,
+        details
       };
     } else if (err instanceof Error) {
       // JavaScript error
@@ -55,7 +70,7 @@ export function useApiErrorHandler(options: UseApiErrorOptions = {}) {
 
     // Show toast notification if enabled
     if (showToast) {
-      showError(apiError.message);
+      addToast({ type: 'error', title: '錯誤', message: apiError.message });
     }
 
     // Call custom error handler
@@ -64,15 +79,18 @@ export function useApiErrorHandler(options: UseApiErrorOptions = {}) {
     }
 
     return apiError;
-  }, [showToast, showError, onError]);
+  }, [showToast, addToast, onError]);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
   const getErrorMessage = useCallback((err: unknown, fallback = '發生錯誤'): string => {
-    if (err && typeof err === 'object') {
-      return (err as any).message || (err as any).data?.message || fallback;
+    if (isRecord(err)) {
+      if (typeof err.message === 'string' && err.message) return err.message;
+      const data = isRecord(err.data) ? err.data : undefined;
+      if (typeof data?.message === 'string' && data.message) return data.message;
+      return fallback;
     }
     if (typeof err === 'string') {
       return err;
@@ -81,12 +99,13 @@ export function useApiErrorHandler(options: UseApiErrorOptions = {}) {
   }, []);
 
   const isAuthError = useCallback((err: ApiError | unknown): boolean => {
-    const status = (err as ApiError).status || (err as any)?.status;
+    const status = getErrorStatus(err);
     return status === 401 || status === 403;
   }, []);
 
   const isNetworkError = useCallback((err: unknown): boolean => {
-    return !err || (err as any).status === 0 || (err as any).status === undefined;
+    const status = getErrorStatus(err);
+    return !err || status === 0 || status === undefined;
   }, []);
 
   return {

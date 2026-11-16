@@ -1,14 +1,9 @@
 import React, { useMemo } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Cell, ReferenceLine, LineChart as ReLineChart, Line, ComposedChart
-} from 'recharts';
-import { 
-  BarChart2, AlertCircle, CheckCircle2, TrendingUp, Clock, 
-  Filter, Download, ChevronRight, Activity, Zap, Factory, ShieldAlert
+  AlertCircle, CheckCircle2, TrendingUp, Clock, Activity, Zap, Factory, ShieldAlert
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { mpsApi, AggregateRccpDto, ResourceAggregateLoadDto } from '../api/api';
+import { mpsApi } from '../api/api';
 import './RccpDashboard.css';
 
 export const RccpDashboard: React.FC = () => {

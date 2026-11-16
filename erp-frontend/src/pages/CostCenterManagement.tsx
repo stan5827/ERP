@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ChevronRight, ChevronDown, DollarSign, Layers, Activity, GitBranch, PieChart, TrendingUp, Building2, Calculator, ArrowRightLeft } from 'lucide-react';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
@@ -6,18 +6,94 @@ import { useQueryClient } from '@tanstack/react-query';
 import { costCentersApi, costElementsApi, activityTypesApi, allocationRulesApi, costPostingsApi, departmentsApi, workCentersApi } from '../api/api';
 import './CostCenterManagement.css';
 
+interface CostCenterRecord extends Record<string, unknown> {
+  id: string;
+  costCenterCode?: string;
+  costCenterName?: string;
+  costCenterType?: string;
+  areaSquareMeters?: number;
+  children?: CostCenterRecord[];
+}
+
+interface BudgetSummaryRecord extends Record<string, unknown> {
+  id: string;
+  budgetLimit?: number;
+  budgetUsed?: number;
+  utilizationPercent?: number;
+}
+
+interface CostElementRecord extends Record<string, unknown> {
+  id: string;
+  elementCode?: string;
+  elementName?: string;
+  elementType?: string;
+  glAccountCode?: string;
+  glAccountName?: string;
+  description?: string;
+}
+
+interface ActivityRecord extends Record<string, unknown> {
+  id: string;
+  activityCode?: string;
+  activityName?: string;
+  costCenterName?: string;
+  unitOfMeasure?: string;
+  standardRate?: number;
+  description?: string;
+}
+
+interface AllocationRecord extends Record<string, unknown> {
+  id: string;
+  sourceCostCenterName?: string;
+  targetCostCenterName?: string;
+  allocationBasis?: string;
+  percentage?: number;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  description?: string;
+}
+
+interface PostingRecord extends Record<string, unknown> {
+  id: string;
+  postingDate?: string;
+  costCenterName?: string;
+  elementName?: string;
+  amount?: number;
+  quantity?: number;
+  referenceType?: string;
+  notes?: string;
+}
+
+interface DepartmentRecord extends Record<string, unknown> {
+  id: string;
+  deptCode?: string;
+  deptName?: string;
+}
+
+interface WorkCenterRecord extends Record<string, unknown> {
+  id: string;
+  workCenterCode?: string;
+  workCenterName?: string;
+}
+
+function getRecords<T extends Record<string, unknown>>(value: unknown): T[] {
+  return Array.isArray(value)
+    ? value.filter(item => item !== null && typeof item === 'object' && !Array.isArray(item)) as T[]
+    : [];
+}
+
 export const CostCenterManagement: React.FC = () => {
   const [activeView, setActiveView] = useState<'costcenters' | 'elements' | 'activities' | 'allocations' | 'postings'>('costcenters');
   const [loading, setLoading] = useState(true);
-  const [costCenters, setCostCenters] = useState<any[]>([]);
-  const [costCenterTree, setCostCenterTree] = useState<any[]>([]);
-  const [budgetSummary, setBudgetSummary] = useState<any[]>([]);
-  const [elements, setElements] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
-  const [allocations, setAllocations] = useState<any[]>([]);
-  const [postings, setPostings] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [workCenters, setWorkCenters] = useState<any[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenterRecord[]>([]);
+  const [costCenterTree, setCostCenterTree] = useState<CostCenterRecord[]>([]);
+  const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryRecord[]>([]);
+  const [elements, setElements] = useState<CostElementRecord[]>([]);
+  const [activities, setActivities] = useState<ActivityRecord[]>([]);
+  const [allocations, setAllocations] = useState<AllocationRecord[]>([]);
+  const [postings, setPostings] = useState<PostingRecord[]>([]);
+  const [departments, setDepartments] = useState<DepartmentRecord[]>([]);
+  const [workCenters, setWorkCenters] = useState<WorkCenterRecord[]>([]);
   const [expandedCC, setExpandedCC] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
@@ -26,11 +102,11 @@ export const CostCenterManagement: React.FC = () => {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showAllocationModal, setShowAllocationModal] = useState(false);
   const [showPostingModal, setShowPostingModal] = useState(false);
-  const [editingCC, setEditingCC] = useState<any>(null);
-  const [editingElement, setEditingElement] = useState<any>(null);
-  const [editingActivity, setEditingActivity] = useState<any>(null);
-  const [editingAllocation, setEditingAllocation] = useState<any>(null);
-  const [editingPosting, setEditingPosting] = useState<any>(null);
+  const [editingCC, setEditingCC] = useState<CostCenterRecord | null>(null);
+  const [editingElement, setEditingElement] = useState<CostElementRecord | null>(null);
+  const [editingActivity, setEditingActivity] = useState<ActivityRecord | null>(null);
+  const [editingAllocation, setEditingAllocation] = useState<AllocationRecord | null>(null);
+  const [editingPosting, setEditingPosting] = useState<PostingRecord | null>(null);
 
   const stats = {
     totalCC: costCenters.length,
@@ -41,9 +117,7 @@ export const CostCenterManagement: React.FC = () => {
     usedBudget: budgetSummary.reduce((sum, b) => sum + (b.budgetUsed || 0), 0),
   };
 
-  useEffect(() => { loadData(); }, [activeView]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeView === 'costcenters') {
@@ -54,31 +128,34 @@ export const CostCenterManagement: React.FC = () => {
           departmentsApi.flat(),
           workCentersApi.list(),
         ]);
-        setCostCenters(ccRes.data?.data ?? []);
-        setCostCenterTree(treeRes.data?.data ?? []);
-        setBudgetSummary(budgetRes.data?.data ?? []);
-        setDepartments(deptRes.data?.data ?? []);
-        setWorkCenters(wcRes.data?.data ?? []);
+        setCostCenters(getRecords<CostCenterRecord>(ccRes.data?.data));
+        setCostCenterTree(getRecords<CostCenterRecord>(treeRes.data?.data));
+        setBudgetSummary(getRecords<BudgetSummaryRecord>(budgetRes.data?.data));
+        setDepartments(getRecords<DepartmentRecord>(deptRes.data?.data));
+        setWorkCenters(getRecords<WorkCenterRecord>(wcRes.data?.data));
       } else if (activeView === 'elements') {
         const res = await costElementsApi.list();
-        setElements(res.data?.data ?? []);
+        setElements(getRecords<CostElementRecord>(res.data?.data));
       } else if (activeView === 'activities') {
         const res = await activityTypesApi.list();
-        setActivities(res.data?.data ?? []);
+        setActivities(getRecords<ActivityRecord>(res.data?.data));
       } else if (activeView === 'allocations') {
         const res = await allocationRulesApi.list();
-        setAllocations(res.data?.data ?? []);
+        setAllocations(getRecords<AllocationRecord>(res.data?.data));
       } else if (activeView === 'postings') {
         const res = await costPostingsApi.list();
-        setPostings(res.data?.data ?? []);
+        setPostings(getRecords<PostingRecord>(res.data?.data));
       }
     } catch (err) { console.error('Failed to load:', err); }
     finally { setLoading(false); }
-  };
+  }, [activeView]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const toggleCC = (id: string) => {
     const newSet = new Set(expandedCC);
-    newSet.has(id) ? newSet.delete(id) : newSet.add(id);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
     setExpandedCC(newSet);
   };
 
@@ -99,7 +176,7 @@ export const CostCenterManagement: React.FC = () => {
     sales: { label: '銷售', color: 'var(--sky-400)' },
   };
 
-  const ccFields = (parentCCs: any[]): FormField[] => [
+  const ccFields = (parentCCs: CostCenterRecord[]): FormField[] => [
     { name: 'costCenterCode', label: '成本中心代碼', type: 'text', required: true, placeholder: '如: CC-001' },
     { name: 'costCenterName', label: '成本中心名稱', type: 'text', required: true, placeholder: '如: 生產製造中心' },
     { name: 'costCenterType', label: '類型', type: 'select', required: true, options: [
@@ -114,6 +191,7 @@ export const CostCenterManagement: React.FC = () => {
     { name: 'parentCostCenterId', label: '上級成本中心', type: 'select', options: [{ value: '', label: '無' }, ...parentCCs.map(c => ({ value: c.id, label: `${c.costCenterCode} - ${c.costCenterName}` }))] },
     { name: 'departmentId', label: '關聯部門', type: 'select', options: [{ value: '', label: '無' }, ...departments.map(d => ({ value: d.id, label: `${d.deptCode} - ${d.deptName}` }))] },
     { name: 'workCenterId', label: '關聯工作中心', type: 'select', options: [{ value: '', label: '無' }, ...workCenters.map(w => ({ value: w.id, label: `${w.workCenterCode} - ${w.workCenterName}` }))] },
+    { name: 'areaSquareMeters', label: '占用面積（平方公尺）', type: 'number', placeholder: '製造成本中心租金分攤依據' },
     { name: 'budgetLimit', label: '預算上限', type: 'number', placeholder: '0' },
     { name: 'effectiveFrom', label: '生效日期', type: 'date' },
     { name: 'effectiveTo', label: '失效日期', type: 'date' },
@@ -136,7 +214,7 @@ export const CostCenterManagement: React.FC = () => {
     { name: 'description', label: '說明', type: 'textarea' },
   ];
 
-  const activityFields = (ccs: any[]): FormField[] => [
+  const activityFields = (ccs: CostCenterRecord[]): FormField[] => [
     { name: 'activityCode', label: '作業代碼', type: 'text', required: true, placeholder: '如: MACH-HR' },
     { name: 'activityName', label: '作業名稱', type: 'text', required: true, placeholder: '如: 加工工時' },
     { name: 'costCenterId', label: '所屬成本中心', type: 'select', required: true, options: ccs.map(c => ({ value: c.id, label: `${c.costCenterCode} - ${c.costCenterName}` })) },
@@ -145,7 +223,7 @@ export const CostCenterManagement: React.FC = () => {
     { name: 'description', label: '說明', type: 'textarea' },
   ];
 
-  const allocationFields = (ccs: any[]): FormField[] => [
+  const allocationFields = (ccs: CostCenterRecord[]): FormField[] => [
     { name: 'sourceCostCenterId', label: '來源成本中心', type: 'select', required: true, options: ccs.map(c => ({ value: c.id, label: `${c.costCenterCode} - ${c.costCenterName}` })) },
     { name: 'targetCostCenterId', label: '目標成本中心', type: 'select', required: true, options: ccs.map(c => ({ value: c.id, label: `${c.costCenterCode} - ${c.costCenterName}` })) },
     { name: 'allocationBasis', label: '分配基準', type: 'select', required: true, options: [
@@ -159,7 +237,7 @@ export const CostCenterManagement: React.FC = () => {
     { name: 'description', label: '說明', type: 'textarea' },
   ];
 
-  const postingFields = (ccs: any[], els: any[]): FormField[] => [
+  const postingFields = (ccs: CostCenterRecord[], els: CostElementRecord[]): FormField[] => [
     { name: 'costCenterId', label: '成本中心', type: 'select', required: true, options: ccs.map(c => ({ value: c.id, label: `${c.costCenterCode} - ${c.costCenterName}` })) },
     { name: 'costElementId', label: '成本要素', type: 'select', required: true, options: els.map(e => ({ value: e.id, label: `${e.elementCode} - ${e.elementName}` })) },
     { name: 'postingDate', label: '分攤日期', type: 'date', required: true },
@@ -169,35 +247,35 @@ export const CostCenterManagement: React.FC = () => {
     { name: 'notes', label: '備註', type: 'textarea' },
   ];
 
-  const handleSaveCC = async (data: any) => {
+  const handleSaveCC = async (data: Record<string, unknown>) => {
     if (editingCC) await costCentersApi.update(editingCC.id, data);
     else await costCentersApi.create(data);
     queryClient.invalidateQueries();
     loadData();
   };
 
-  const handleSaveElement = async (data: any) => {
+  const handleSaveElement = async (data: Record<string, unknown>) => {
     if (editingElement) await costElementsApi.update(editingElement.id, data);
     else await costElementsApi.create(data);
     queryClient.invalidateQueries();
     loadData();
   };
 
-  const handleSaveActivity = async (data: any) => {
+  const handleSaveActivity = async (data: Record<string, unknown>) => {
     if (editingActivity) await activityTypesApi.update(editingActivity.id, data);
     else await activityTypesApi.create(data);
     queryClient.invalidateQueries();
     loadData();
   };
 
-  const handleSaveAllocation = async (data: any) => {
+  const handleSaveAllocation = async (data: Record<string, unknown>) => {
     if (editingAllocation) await allocationRulesApi.update(editingAllocation.id, data);
     else await allocationRulesApi.create(data);
     queryClient.invalidateQueries();
     loadData();
   };
 
-  const handleSavePosting = async (data: any) => {
+  const handleSavePosting = async (data: Record<string, unknown>) => {
     if (editingPosting) await costPostingsApi.update(editingPosting.id, data);
     else await costPostingsApi.create(data);
     queryClient.invalidateQueries();
@@ -238,7 +316,7 @@ export const CostCenterManagement: React.FC = () => {
     return 'var(--emerald-400)';
   };
 
-  const renderTreeNode = (node: any, level = 0) => {
+  const renderTreeNode = (node: CostCenterRecord, level = 0) => {
     const hasChildren = node.children?.length > 0;
     const isExpanded = expandedCC.has(node.id);
     const budget = budgetSummary.find(b => b.id === node.id);
@@ -259,6 +337,9 @@ export const CostCenterManagement: React.FC = () => {
             {node.costCenterCode}
           </span>
           <span className="tree-name">{node.costCenterName}</span>
+          {node.areaSquareMeters != null && (
+            <span className="text-xs text-secondary">{node.areaSquareMeters.toLocaleString()} m²</span>
+          )}
           {budget && (
             <div className="tree-budget">
               <span className="tree-budget-text">
@@ -277,7 +358,7 @@ export const CostCenterManagement: React.FC = () => {
             <button onClick={() => handleDeleteCC(node.id)} className="icon-action-btn text-danger" title="刪除"><Trash2 size={14} /></button>
           </div>
         </div>
-        {isExpanded && hasChildren && node.children.map((child: any) => renderTreeNode(child, level + 1))}
+        {isExpanded && hasChildren && node.children?.map(child => renderTreeNode(child, level + 1))}
       </div>
     );
   };
@@ -624,7 +705,7 @@ export const CostCenterManagement: React.FC = () => {
         title={editingCC ? '編輯成本中心' : '新增成本中心'}
         fields={ccFields(costCenters.filter(c => c.id !== editingCC?.id))}
         initialValues={editingCC || { effectiveFrom: new Date().toISOString().slice(0,10), isActive: true }}
-        onSubmit={handleSaveCC as (data: Record<string, unknown>) => Promise<void>}
+        onSubmit={handleSaveCC}
         onClose={() => { setShowCCModal(false); setEditingCC(null); }}
       />
 
@@ -633,7 +714,7 @@ export const CostCenterManagement: React.FC = () => {
         title={editingElement ? '編輯成本要素' : '新增成本要素'}
         fields={elementFields}
         initialValues={editingElement || { isActive: true }}
-        onSubmit={handleSaveElement as (data: Record<string, unknown>) => Promise<void>}
+        onSubmit={handleSaveElement}
         onClose={() => { setShowElementModal(false); setEditingElement(null); }}
       />
 
@@ -642,7 +723,7 @@ export const CostCenterManagement: React.FC = () => {
         title={editingActivity ? '編輯作業類型' : '新增作業類型'}
         fields={activityFields(costCenters)}
         initialValues={editingActivity || { isActive: true }}
-        onSubmit={handleSaveActivity as (data: Record<string, unknown>) => Promise<void>}
+        onSubmit={handleSaveActivity}
         onClose={() => { setShowActivityModal(false); setEditingActivity(null); }}
       />
 
@@ -671,7 +752,7 @@ export const CostCenterManagement: React.FC = () => {
         title="新增成本分攤"
         fields={postingFields(costCenters, elements)}
         initialValues={{ postingDate: new Date().toISOString().slice(0,10), quantity: 1 }}
-        onSubmit={handleSavePosting as (data: Record<string, unknown>) => Promise<void>}
+        onSubmit={handleSavePosting}
         onClose={() => { setShowPostingModal(false); setEditingPosting(null); }}
       />
     </div>

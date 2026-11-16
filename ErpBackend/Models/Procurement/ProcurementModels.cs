@@ -127,6 +127,7 @@ public class Rfq
     [ForeignKey(nameof(PrId))] public PurchaseRequisition? Pr { get; set; }
     public ICollection<RfqItem> Items { get; set; } = new List<RfqItem>();
     public ICollection<RfqSupplierResponse> SupplierResponses { get; set; } = new List<RfqSupplierResponse>();
+    public ICollection<RfqSupplierInvitation> SupplierInvitations { get; set; } = new List<RfqSupplierInvitation>();
 }
 
 public class RfqItem
@@ -153,11 +154,25 @@ public class RfqSupplierResponse
     [Column(TypeName = "decimal(14,2)")] public decimal Moq { get; set; }
     [MaxLength(50)] public string? TradeTerms { get; set; }
     [MaxLength(500)] public string? Notes { get; set; }
+    public DateTime? PromisedDeliveryDate { get; set; }
+    public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
     public bool IsSelected { get; set; }
 
     [ForeignKey(nameof(RfqId))] public Rfq Rfq { get; set; } = null!;
     [ForeignKey(nameof(SupplierId))] public Supplier? Supplier { get; set; }
     [ForeignKey(nameof(SkuId))] public Inventory.Sku? Sku { get; set; }
+}
+
+public class RfqSupplierInvitation
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid RfqId { get; set; }
+    public Guid SupplierId { get; set; }
+    [MaxLength(20)] public string Status { get; set; } = "Invited";
+    public DateTime InvitedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(RfqId))] public Rfq Rfq { get; set; } = null!;
+    [ForeignKey(nameof(SupplierId))] public Supplier Supplier { get; set; } = null!;
 }
 
 public class PurchaseOrder
@@ -198,6 +213,7 @@ public class PurchaseOrder
 
     [ForeignKey(nameof(SupplierId))] public Supplier Supplier { get; set; } = null!;
     public ICollection<PurchaseOrderItem> Items { get; set; } = new List<PurchaseOrderItem>();
+    public ICollection<PurchaseOrderSupplierResponse> SupplierResponses { get; set; } = new List<PurchaseOrderSupplierResponse>();
 }
 
 public class PurchaseOrderItem
@@ -219,6 +235,34 @@ public class PurchaseOrderItem
 
     [ForeignKey(nameof(PurchaseOrderId))] public PurchaseOrder PurchaseOrder { get; set; } = null!;
     [ForeignKey(nameof(SkuId))] public Models.Inventory.Sku? Sku { get; set; }
+}
+
+public class PurchaseOrderSupplierResponse
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid PurchaseOrderId { get; set; }
+    public Guid SupplierId { get; set; }
+    public Guid SupplierUserId { get; set; }
+    [Required, MaxLength(30)] public string ResponseType { get; set; } = null!;
+    [MaxLength(500)] public string? Reason { get; set; }
+    public int PurchaseOrderVersion { get; set; }
+    public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(PurchaseOrderId))] public PurchaseOrder PurchaseOrder { get; set; } = null!;
+    [ForeignKey(nameof(SupplierId))] public Supplier Supplier { get; set; } = null!;
+    public ICollection<PurchaseOrderSupplierResponseItem> Items { get; set; } = new List<PurchaseOrderSupplierResponseItem>();
+}
+
+public class PurchaseOrderSupplierResponseItem
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SupplierResponseId { get; set; }
+    public Guid PurchaseOrderItemId { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal? ProposedQuantity { get; set; }
+    public DateTime? ProposedDeliveryDate { get; set; }
+
+    [ForeignKey(nameof(SupplierResponseId))] public PurchaseOrderSupplierResponse SupplierResponse { get; set; } = null!;
+    [ForeignKey(nameof(PurchaseOrderItemId))] public PurchaseOrderItem PurchaseOrderItem { get; set; } = null!;
 }
 
 public class Asn
@@ -347,9 +391,6 @@ public class AccountsPayable
     [MaxLength(500)] public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [ForeignKey(nameof(SupplierId))] public Supplier? Supplier { get; set; }
-    [ForeignKey(nameof(PurchaseOrderId))] public PurchaseOrder? PurchaseOrder { get; set; }
-    [ForeignKey(nameof(GoodsReceiptId))] public GoodsReceipt? GoodsReceipt { get; set; }
     public ICollection<AccountsPayableItem> Items { get; set; } = new List<AccountsPayableItem>();
 }
 
@@ -363,7 +404,6 @@ public class AccountsPayableItem
     [Column(TypeName = "decimal(14,2)")] public decimal Amount { get; set; }
 
     [ForeignKey(nameof(AccountsPayableId))] public AccountsPayable AccountsPayable { get; set; } = null!;
-    [ForeignKey(nameof(SkuId))] public Inventory.Sku? Sku { get; set; }
 }
 
 public class PaymentBatch

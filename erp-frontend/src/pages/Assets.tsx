@@ -4,6 +4,29 @@ import { useAssets, useAssetCategories } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { assetsApi } from '../api/api';
+import type { AssetDto } from '../api/api';
+
+function getAccumulatedDepreciation(asset: AssetDto): number {
+  if (!('depreciations' in asset) || !Array.isArray(asset.depreciations))
+    return 0;
+
+  const records: unknown[] = asset.depreciations;
+  const latestRecord = records.reduce<{
+    period: string;
+    accumulatedDepreciation: number;
+  } | null>((latest, record) => {
+    if (typeof record !== 'object' || record === null
+      || !('period' in record) || typeof record.period !== 'string'
+      || !('accumulatedDepreciation' in record) || typeof record.accumulatedDepreciation !== 'number')
+      return latest;
+
+    return !latest || record.period > latest.period
+      ? { period: record.period, accumulatedDepreciation: record.accumulatedDepreciation }
+      : latest;
+  }, null);
+
+  return latestRecord?.accumulatedDepreciation ?? 0;
+}
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
   active: { label: '使用中', cls: 'active' },
@@ -31,7 +54,7 @@ export function Assets() {
   const { data: categoriesResp, isLoading: catLoading } = useAssetCategories();
 
   const assets = assetsResp?.data ?? [];
-  const categories = (categoriesResp?.data as any) ?? [];
+  const categories = categoriesResp?.data ?? [];
 
   const stats = [
     { label: '資產總數', value: assets.length, color: 'var(--cobalt-400)' },
@@ -75,12 +98,14 @@ export function Assets() {
             資產類別統計
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-            {categories.map((cat, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--navy-850)', borderRadius: 'var(--radius-md)' }}>
+            {categories.map(cat => (
+              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--navy-850)', borderRadius: 'var(--radius-md)' }}>
                 <Landmark size={14} style={{ color: 'var(--cobalt-400)', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-200)' }}>{cat.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--slate-500)' }}>{cat.count} 項</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-200)' }}>{cat.categoryName}</div>
+              <div style={{ fontSize: 11, color: 'var(--slate-500)' }}>
+                {assets.filter(asset => asset.categoryName === cat.categoryName).length} 項
+              </div>
                 </div>
               </div>
             ))}
@@ -144,7 +169,7 @@ export function Assets() {
                  {asset.acquisitionCost?.toLocaleString('zh-TW')}
                </td>
                 <td className="mono" style={{ fontSize: 12, color: 'var(--amber-300)' }}>
-                   {((asset as any).accumulatedDepreciation ?? 0).toLocaleString('zh-TW')}
+                   {getAccumulatedDepreciation(asset).toLocaleString('zh-TW')}
                  </td>
                   <td><span className={`status-badge status-${sc.cls}`}>{sc.label}</span></td>
                   <td>

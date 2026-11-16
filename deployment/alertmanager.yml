@@ -1,0 +1,121 @@
+# ============================================================
+# Alertmanager 配置 - ERP 生產環境告警通知
+#
+# 使用方式：
+#   1. 複製此檔案至 deployment/alertmanager.yml
+#   2. 填入實際的 Slack Webhook URL 與 SMTP 認證資訊
+#   3. 在 docker-compose 中將此檔案掛載到 alertmanager 容器
+# ============================================================
+
+global:
+  smtp_smarthost: 'smtp.prod.internal:587'
+  smtp_from: 'erp-alerts@yourdomain.com'
+  smtp_auth_username: 'erp-alerts'
+  smtp_auth_password: '<REPLACE_WITH_SMTP_PASSWORD>'
+
+route:
+  group_by: ['alertname', 'service', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'team-devops'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'team-devops-critical'
+    - match:
+        service: erp-api
+      receiver: 'team-backend'
+    - match:
+        service: erp-inventory
+      receiver: 'team-operations'
+    - match:
+        service: erp-ai-agent
+      receiver: 'team-ai'
+
+receivers:
+  - name: 'team-devops'
+    email_configs:
+      - to: 'devops@yourdomain.com'
+        subject: '[ERP] {{ .GroupLabels.alertname }} - {{ .CommonAnnotations.summary }}'
+        body: |
+          {{ range .Alerts }}
+          警告：{{ .Annotations.summary }}
+          說明：{{ .Annotations.description }}
+          嚴重度：{{ .Labels.severity }}
+          服務：{{ .Labels.service }}
+          開始時間：{{ .StartsAt }}
+          {{ end }}
+    slack_configs:
+      - api_url: '<REPLACE_WITH_SLACK_WEBHOOK_URL>'
+        channel: '#erp-alerts'
+        title: '[ERP] {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *警告：* {{ .Annotations.summary }}
+          *說明：* {{ .Annotations.description }}
+          *嚴重度：* {{ .Labels.severity }}
+          *服務：* {{ .Labels.service }}
+          *時間：* {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'team-devops-critical'
+    email_configs:
+      - to: 'devops-critical@yourdomain.com,cto@yourdomain.com'
+        subject: '[ERP CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          🚨 緊急告警：{{ .Annotations.summary }}
+          說明：{{ .Annotations.description }}
+          嚴重度：{{ .Labels.severity }}
+          服務：{{ .Labels.service }}
+          實例：{{ .Labels.instance }}
+          開始時間：{{ .StartsAt }}
+          {{ end }}
+    slack_configs:
+      - api_url: '<REPLACE_WITH_SLACK_WEBHOOK_URL>'
+        channel: '#erp-critical'
+        title: '🚨 [ERP CRITICAL] {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *🚨 緊急告警：* {{ .Annotations.summary }}
+          *說明：* {{ .Annotations.description }}
+          *嚴重度：* {{ .Labels.severity }}
+          *服務：* {{ .Labels.service }}
+          *實例：* {{ .Labels.instance }}
+          *時間：* {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'team-backend'
+    email_configs:
+      - to: 'backend-team@yourdomain.com'
+        subject: '[ERP Backend] {{ .CommonAnnotations.summary }}'
+    slack_configs:
+      - api_url: '<REPLACE_WITH_SLACK_WEBHOOK_URL>'
+        channel: '#erp-backend'
+        title: '[ERP Backend] {{ .GroupLabels.alertname }}'
+
+  - name: 'team-operations'
+    email_configs:
+      - to: 'operations@yourdomain.com'
+        subject: '[ERP Operations] {{ .CommonAnnotations.summary }}'
+    slack_configs:
+      - api_url: '<REPLACE_WITH_SLACK_WEBHOOK_URL>'
+        channel: '#erp-operations'
+        title: '[ERP Operations] {{ .GroupLabels.alertname }}'
+
+  - name: 'team-ai'
+    email_configs:
+      - to: 'ai-team@yourdomain.com'
+        subject: '[ERP AI Agent] {{ .CommonAnnotations.summary }}'
+    slack_configs:
+      - api_url: '<REPLACE_WITH_SLACK_WEBHOOK_URL>'
+        channel: '#erp-ai'
+        title: '[ERP AI Agent] {{ .GroupLabels.alertname }}'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']

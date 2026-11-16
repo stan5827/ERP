@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { useRole } from '../contexts/RoleContext';
+import { useRole } from '../contexts/useRole';
 
 interface ProtectedRouteProps {
   children: ReactNode;

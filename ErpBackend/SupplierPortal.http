@@ -1,0 +1,122 @@
+@baseUrl = http://localhost:5100
+@supplierAccessToken = replace-with-keycloak-access-token
+@employeeAccessToken = replace-with-employee-access-token
+@supplierId = replace-with-approved-supplier-guid
+@supplierUserId = replace-with-portal-user-guid
+
+### Get the authenticated supplier identity
+GET {{baseUrl}}/api/supplier-portal/session
+Authorization: Bearer {{supplierAccessToken}}
+
+### Invite a supplier portal user (employee permission: suppliers/edit)
+POST {{baseUrl}}/api/suppliers/{{supplierId}}/portal-users/invitations
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "vendor@example.com",
+  "contactName": "Vendor Contact",
+  "role": "sales"
+}
+
+### List portal users for a supplier (employee permission required)
+GET {{baseUrl}}/api/suppliers/{{supplierId}}/portal-users
+Authorization: Bearer {{employeeAccessToken}}
+
+### Retry a failed Keycloak invitation
+POST {{baseUrl}}/api/suppliers/portal-users/{{supplierUserId}}/retry
+Authorization: Bearer {{employeeAccessToken}}
+
+### Resend an outstanding Keycloak invitation
+POST {{baseUrl}}/api/suppliers/portal-users/{{supplierUserId}}/resend-invitation
+Authorization: Bearer {{employeeAccessToken}}
+
+### Cancel an invitation or deactivate a portal user
+DELETE {{baseUrl}}/api/suppliers/portal-users/{{supplierUserId}}
+Authorization: Bearer {{employeeAccessToken}}
+
+### Complete an invitation after Keycloak email/MFA setup
+POST {{baseUrl}}/api/supplier-portal/invitations/complete
+Authorization: Bearer {{supplierAccessToken}}
+
+### Legacy local-password creation endpoint is retired (410 Gone)
+POST {{baseUrl}}/api/suppliers/{{supplierId}}/portal-users
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{}
+
+### List RFQs assigned to the authenticated supplier
+GET {{baseUrl}}/api/supplier-portal/rfqs
+Authorization: Bearer {{supplierAccessToken}}
+
+### View an assigned RFQ and the authenticated supplier's current quotes
+@rfqId = replace-with-assigned-rfq-guid
+GET {{baseUrl}}/api/supplier-portal/rfqs/{{rfqId}}
+Authorization: Bearer {{supplierAccessToken}}
+
+### Submit or update quotes for assigned RFQ items
+POST {{baseUrl}}/api/supplier-portal/rfqs/{{rfqId}}/quotes
+Authorization: Bearer {{supplierAccessToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "skuId": "replace-with-rfq-item-sku-guid",
+      "unitPrice": 125.5,
+      "leadTimeDays": 14,
+      "minimumOrderQuantity": 10,
+      "promisedDeliveryDate": "2026-11-20T00:00:00Z",
+      "tradeTerms": "FOB",
+      "notes": "報價有效期限為 30 天"
+    }
+  ]
+}
+
+### List purchase orders issued to the authenticated supplier
+GET {{baseUrl}}/api/supplier-portal/purchase-orders
+Authorization: Bearer {{supplierAccessToken}}
+
+### View a purchase order and its response history
+@purchaseOrderId = replace-with-own-purchase-order-guid
+GET {{baseUrl}}/api/supplier-portal/purchase-orders/{{purchaseOrderId}}
+Authorization: Bearer {{supplierAccessToken}}
+
+### Accept a purchase order
+POST {{baseUrl}}/api/supplier-portal/purchase-orders/{{purchaseOrderId}}/responses
+Authorization: Bearer {{supplierAccessToken}}
+Content-Type: application/json
+
+{
+  "responseType": "accepted"
+}
+
+### Request a change to specific purchase-order lines
+POST {{baseUrl}}/api/supplier-portal/purchase-orders/{{purchaseOrderId}}/responses
+Authorization: Bearer {{supplierAccessToken}}
+Content-Type: application/json
+
+{
+  "responseType": "change_requested",
+  "reason": "此品項需配合產能調整交期",
+  "items": [
+    {
+      "purchaseOrderItemId": "replace-with-purchase-order-item-guid",
+      "proposedQuantity": 50,
+      "proposedDeliveryDate": "2026-11-25T00:00:00Z"
+    }
+  ]
+}
+
+### Assign an open RFQ to approved suppliers (employee token)
+@rfqAssignmentId = replace-with-rfq-guid
+PUT {{baseUrl}}/api/erp/rfqs/{{rfqAssignmentId}}/suppliers
+Authorization: Bearer {{employeeAccessToken}}
+Content-Type: application/json
+
+{
+  "supplierIds": [
+    "replace-with-approved-supplier-guid"
+  ]
+}

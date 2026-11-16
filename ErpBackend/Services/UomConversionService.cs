@@ -5,7 +5,22 @@ using ErpBackend.Models.Inventory;
 
 namespace ErpBackend.Services;
 
-public class UomConversionService
+public interface IUomConversionService
+{
+    Task<UomConversionResult> ConvertAsync(Guid skuId, decimal qty, string fromUomCode, string toUomCode);
+    Task<(decimal factor, string @operator)> GetConversionFactorAsync(Guid skuId, string fromUomCode, string toUomCode);
+    Task<UomConversionChainResult> ConvertViaChainAsync(Guid skuId, string fromUomCode, string toUomCode);
+    Task<decimal> ConvertToBaseUomAsync(Guid skuId, decimal qty, string uomCode);
+    Task<decimal> ConvertFromBaseUomAsync(Guid skuId, decimal qty, string targetUomCode);
+    Task<bool> ValidateConversionAsync(Guid skuId, string fromUomCode, string toUomCode);
+    Task<List<UomConversionDto>> GetConversionsAsync(bool? isActive = null, Guid? skuId = null);
+    Task<(UomConversionDto? dto, string status)> CreateConversionAsync(CreateUomConversionDto model);
+    Task<(UomConversionDto? dto, string status)> UpdateConversionAsync(Guid id, UpdateUomConversionDto model);
+    Task<(bool ok, string status)> DeleteConversionAsync(Guid id);
+    decimal Calculate(decimal qty, decimal factor, string @operator);
+}
+
+public class UomConversionService : IUomConversionService
 {
     private readonly ErpGeneralDbContext _db;
     private const int DefaultDecimalPlaces = 6;
@@ -328,5 +343,128 @@ public class UomConversionService
         {
             return false;
         }
+    }
+
+    private static UomConversionDto ToDto(UomConversion c) => new()
+    {
+        Id = c.Id,
+        SkuId = c.SkuId,
+        FromUomId = c.FromUomId,
+        FromUomCode = c.FromUom.UomCode,
+        FromUomName = c.FromUom.UomName,
+        ToUomId = c.ToUomId,
+        ToUomCode = c.ToUom.UomCode,
+        ToUomName = c.ToUom.UomName,
+        Factor = c.Factor,
+        Operator = c.Operator,
+        InverseFactor = c.InverseFactor,
+        IsActive = c.IsActive,
+        Description = c.Description,
+        IsGlobal = c.SkuId == null,
+    };
+
+    public async Task<List<UomConversionDto>> GetConversionsAsync(bool? isActive = null, Guid? skuId = null)
+    {
+        var query = _db.UomConversions
+            .Include(c => c.FromUom)
+            .Include(c => c.ToUom)
+            .AsQueryable();
+
+        if (isActive.HasValue)
+            query = query.Where(c => c.IsActive == isActive.Value);
+
+        if (skuId.HasValue)
+            query = query.Where(c => c.SkuId == skuId.Value || c.SkuId == null);
+
+        return await query
+            .OrderBy(c => c.FromUom.UomCode)
+            .ThenBy(c => c.ToUom.UomCode)
+            .Select(c => ToDto(c))
+            .ToListAsync();
+    }
+
+    public async Task<(UomConversionDto? dto, string status)> CreateConversionAsync(CreateUomConversionDto model)
+    {
+        if (model.FromUomId == model.ToUomId)
+            return (null, "invalid");
+
+        var fromUom = await _db.Uoms.FindAsync(model.FromUomId);
+        var toUom = await _db.Uoms.FindAsync(model.ToUomId);
+        if (fromUom == null || toUom == null)
+            return (null, "not_found");
+
+        var exists = await _db.UomConversions.AnyAsync(c =>
+            c.FromUomId == model.FromUomId &&
+            c.ToUomId == model.ToUomId &&
+            c.SkuId == model.SkuId);
+        if (exists)
+            return (null, "duplicate");
+
+        var conv = new UomConversion
+        {
+            SkuId = model.SkuId,
+            FromUomId = model.FromUomId,
+            ToUomId = model.ToUomId,
+            Factor = model.Factor,
+            Operator = model.Operator,
+            IsActive = model.IsActive,
+            Description = model.Description,
+        };
+
+        _db.UomConversions.Add(conv);
+        await _db.SaveChangesAsync();
+        await _db.Entry(conv).Reference(c => c.FromUom).LoadAsync();
+        await _db.Entry(conv).Reference(c => c.ToUom).LoadAsync();
+
+        return (ToDto(conv), "ok");
+    }
+
+    public async Task<(UomConversionDto? dto, string status)> UpdateConversionAsync(Guid id, UpdateUomConversionDto model)
+    {
+        var conv = await _db.UomConversions
+            .Include(c => c.FromUom)
+            .Include(c => c.ToUom)
+            .FirstOrDefaultAsync(c => c.Id == id);
+        if (conv == null)
+            return (null, "not_found");
+
+        if (model.FromUomId == model.ToUomId)
+            return (null, "invalid");
+
+        var fromUom = await _db.Uoms.FindAsync(model.FromUomId);
+        var toUom = await _db.Uoms.FindAsync(model.ToUomId);
+        if (fromUom == null || toUom == null)
+            return (null, "not_found");
+
+        var dup = await _db.UomConversions.AnyAsync(c =>
+            c.Id != id &&
+            c.FromUomId == model.FromUomId &&
+            c.ToUomId == model.ToUomId &&
+            c.SkuId == model.SkuId);
+        if (dup)
+            return (null, "duplicate");
+
+        conv.SkuId = model.SkuId;
+        conv.FromUomId = model.FromUomId;
+        conv.ToUomId = model.ToUomId;
+        conv.Factor = model.Factor;
+        conv.Operator = model.Operator;
+        conv.IsActive = model.IsActive;
+        conv.Description = model.Description;
+        conv.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return (ToDto(conv), "ok");
+    }
+
+    public async Task<(bool ok, string status)> DeleteConversionAsync(Guid id)
+    {
+        var conv = await _db.UomConversions.FindAsync(id);
+        if (conv == null)
+            return (false, "not_found");
+
+        _db.UomConversions.Remove(conv);
+        await _db.SaveChangesAsync();
+        return (true, "ok");
     }
 }

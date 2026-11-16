@@ -1,4 +1,4 @@
-/* Topbar 組件樣式 */
+﻿/* Topbar 組件樣式 */
 .topbar {
   position: fixed;
   top: 0;
@@ -27,23 +27,24 @@
 .topbar-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   font-family: var(--font-display);
   font-size: 13px;
 }
 
 .breadcrumb-parent {
-  color: var(--slate-500);
+  color: var(--slate-300);
   cursor: pointer;
+  font-weight: 500;
 }
 
-.breadcrumb-parent:hover { color: var(--slate-300); }
+.breadcrumb-parent:hover { color: var(--slate-100); }
 
-.breadcrumb-sep { color: var(--slate-600); }
+.breadcrumb-sep { color: var(--slate-400); }
 
 .breadcrumb-current {
-  color: var(--slate-200);
-  font-weight: 600;
+  color: var(--slate-100);
+  font-weight: 700;
 }
 
 .topbar-clock {
@@ -105,7 +106,7 @@
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   margin-left: auto;
 }
 
@@ -358,3 +359,77 @@
 .dropdown-item.danger:hover { background: rgba(232, 51, 82, 0.08); }
 
 .topbar-overlay { position: fixed; inset: 0; z-index: 150; }
+/* Theme picker specific styles */
+.theme-panel {
+  width: 280px;
+  padding: 12px 0;
+}
+
+.theme-panel .dropdown-header {
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.theme-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.theme-option {
+  background: var(--navy-700);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  text-align: center;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  flex: 1 1 calc(33.333% - 8px); /* 3 items per row */
+  min-width: 80px;
+}
+
+.theme-option:hover {
+  background: var(--navy-600);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.theme-option.active {
+  background: var(--cobalt-400);
+  border-color: var(--cobalt-400);
+  color: #fff;
+}
+
+.theme-option.active .theme-name,
+.theme-option.active .theme-check {
+  color: #fff;
+}
+
+.theme-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.theme-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.theme-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-200);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.theme-check {
+  font-size: 10px;
+  color: var(--emerald-400);
+}

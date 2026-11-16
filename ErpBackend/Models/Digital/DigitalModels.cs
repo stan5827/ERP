@@ -14,15 +14,12 @@ public class GhgEmissionSource
     [MaxLength(50)] public string? EnergyType { get; set; }
     [Column(TypeName = "decimal(12,6)")] public decimal EmissionFactor { get; set; }
     [Column(TypeName = "decimal(8,2)")] public decimal? GwpValue { get; set; }
-    public Guid? SkuId { get; set; }
-    public Guid? WorkCenterId { get; set; }
 }
 
 public class GhgEmissionRecord
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     public Guid SourceId { get; set; }
-    [ForeignKey(nameof(SourceId))] public GhgEmissionSource Source { get; set; } = null!;
     [MaxLength(7)] public string Period { get; set; } = null!;
     [Column(TypeName = "decimal(18,4)")] public decimal ActivityData { get; set; }
     [MaxLength(20)] public string? Unit { get; set; }

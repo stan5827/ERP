@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { Search, Plus, Download, Eye, AlertTriangle, CheckCircle, Clock, Loader2, User, Paperclip, History, FileText } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, Plus, Download, Eye, Clock, Loader2, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { useIqcReports, useSupplierComplaints, useSuppliers } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { qualityApi } from '../api/api';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { IqcInspectionDto } from '../api/system';
+import { ProcessQuality } from './ProcessQuality';
 
 const iqcResultConfig: Record<string, { label: string; cls: string }> = {
   pass: { label: '合格', cls: 'active' },
@@ -17,13 +20,6 @@ const complaintStatusConfig: Record<string, { label: string; cls: string }> = {
   open: { label: '待處理', cls: 'neutral' },
   investigating: { label: '調查中', cls: 'info' },
   resolved: { label: '已解決', cls: 'active' },
-  closed: { label: '已結案', cls: 'active' },
-};
-
-const ncrDispositionConfig: Record<string, { label: string; cls: string }> = {
-  hold: { label: '隔離中', cls: 'warning' },
-  released: { label: '已釋放', cls: 'active' },
-  scrapped: { label: '已報廢', cls: 'danger' },
   closed: { label: '已結案', cls: 'active' },
 };
 
@@ -45,34 +41,16 @@ const buildComplaintFields = (suppliers: Array<{ id: string; supplierName: strin
 export function Quality() {
   const [search, setSearch] = useState('');
   const [lotSearch, setLotSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'iqc' | 'complaints' | 'ncr' | 'trace'>('iqc');
-  const [showIqcModal, setShowIqcModal] = useState(false);
-  const [showComplaintModal, setShowComplaintModal] = useState(false);
-  const [showNcrOwnershipModal, setShowNcrOwnershipModal] = useState(false);
-  const [showComplaintOwnershipModal, setShowComplaintOwnershipModal] = useState(false);
-  const [showCapaOwnershipModal, setShowCapaOwnershipModal] = useState(false);
-  const [selectedNcrId, setSelectedNcrId] = useState<string | null>(null);
-  const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'iqc' | 'complaints' | 'trace' | 'process'>('iqc');
+  const [showAdd, setShowAdd] = useState(false);
+  const [selectedIqcId, setSelectedIqcId] = useState<string | null>(null);
   const { data: iqcResp, isLoading: iqcLoading } = useIqcReports();
   const { data: complaintResp, isLoading: complaintLoading } = useSupplierComplaints();
   const { data: suppliersResp } = useSuppliers();
-  const queryClient = useQueryClient();
-  const { data: pendingIqcResp } = useQuery({
-    queryKey: ['quality-pending-iqc'],
-    queryFn: () => qualityApi.pendingIqcReceipts().then(res => res.data)
-  });
-  const { data: ncrResp, isLoading: ncrLoading } = useQuery({
-    queryKey: ['quality-ncrs'],
-    queryFn: () => qualityApi.ncrs().then(res => res.data)
-  });
   const suppliers = (suppliersResp as { data?: Array<{ id: string; supplierName: string }> })?.data ?? [];
 
   const iqcReports = iqcResp?.data ?? [];
   const complaints = complaintResp?.data ?? [];
-  const pendingIqcReceipts = pendingIqcResp?.data ?? [];
-  const ncrs = ncrResp?.data ?? [];
-  const selectedNcr = ncrs.find(n => n.id === selectedNcrId) ?? null;
-  const selectedComplaint = complaints.find(c => c.id === selectedComplaintId) ?? null;
 
   const filteredIqc = iqcReports.filter(r =>
     r.reportNumber.includes(search) || (r.supplierName ?? '').includes(search)
@@ -82,124 +60,17 @@ export function Quality() {
     (c.supplierName ?? '').includes(search) ||
     (c.skuName ?? '').includes(search)
   );
-  const filteredNcrs = ncrs.filter(n =>
-    n.ncrNumber.includes(search) ||
-    (n.sourceNumber ?? '').includes(search) ||
-    (n.supplierName ?? '').includes(search) ||
-    (n.skuName ?? '').includes(search)
-  );
 
-  const isLoading = activeTab === 'iqc' ? iqcLoading : activeTab === 'complaints' ? complaintLoading : activeTab === 'ncr' ? ncrLoading : false;
+  const isLoading = activeTab === 'iqc' ? iqcLoading : complaintLoading;
 
   const stats = [
     { label: 'IQC 報告數', value: iqcReports.length, color: 'var(--cobalt-400)' },
-    { label: '待檢收貨', value: pendingIqcReceipts.length, color: 'var(--amber-400)' },
     { label: 'IQC 不合格', value: iqcReports.filter(r => r.result === 'fail').length, color: 'var(--crimson-400)' },
-    { label: '客訴待處理', value: complaints.filter(c => c.status === 'open').length, color: 'var(--violet-400)' },
-    { label: 'NCR 隔離中', value: ncrs.filter(n => (n.disposition ?? 'hold') === 'hold').length, color: 'var(--amber-400)' },
+    { label: '客訴待處理', value: complaints.filter(c => c.status === 'open').length, color: 'var(--amber-400)' },
     { label: '客訴總數', value: complaints.length, color: 'var(--emerald-400)' },
   ];
 
-  const refreshQualityData = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['quality-iqc'] }),
-      queryClient.invalidateQueries({ queryKey: ['quality-complaints'] }),
-      queryClient.invalidateQueries({ queryKey: ['quality-ncrs'] }),
-      queryClient.invalidateQueries({ queryKey: ['quality-pending-iqc'] }),
-      queryClient.invalidateQueries({ queryKey: ['accounts-payable'] }),
-      queryClient.invalidateQueries({ queryKey: ['goods-receipts'] }),
-    ]);
-  };
-
-  const createDefaultCapa = async (complaintId: string) => {
-    await qualityApi.createCapa(complaintId, {
-      d1Team: 'Quality / Procurement',
-      problemDescription: 'Auto-created CAPA from IQC failure',
-      interimContainment: 'IQC hold is active',
-      rootCause: 'Pending analysis',
-      permanentAction: 'Pending action plan',
-      verification: 'Pending verification',
-      prevention: 'Pending prevention plan',
-      closure: 'Open',
-    });
-    await refreshQualityData();
-  };
-
-  const closeDefaultCapa = async (complaintId: string) => {
-    await qualityApi.closeCapa(complaintId, {
-      closure: 'CAPA verified and closed',
-      verification: 'Closure reviewed by quality team',
-    });
-    await refreshQualityData();
-  };
-
-  const closeNcr = async (ncrId: string, disposition: string) => {
-    await qualityApi.closeNcr(ncrId, {
-      disposition,
-      releaseStock: true,
-      notes: disposition === 'scrapped' ? 'Scrap disposition processed' : 'Released from quality hold',
-    });
-    await refreshQualityData();
-  };
-
-  const updateNcrOwnership = async (data: Record<string, unknown>) => {
-    if (!selectedNcr) return;
-    await qualityApi.updateNcrOwnership(selectedNcr.id, {
-      responsiblePerson: data.responsiblePerson as string | undefined,
-      attachmentUrl: data.attachmentUrl as string | undefined,
-      notes: data.notes as string | undefined,
-    });
-    await refreshQualityData();
-    setShowNcrOwnershipModal(false);
-  };
-
-  const updateComplaintOwnership = async (data: Record<string, unknown>) => {
-    if (!selectedComplaint) return;
-    await qualityApi.updateComplaintOwnership(selectedComplaint.id, {
-      responsiblePerson: data.responsiblePerson as string | undefined,
-      attachmentUrl: data.attachmentUrl as string | undefined,
-      notes: data.notes as string | undefined,
-    });
-    await refreshQualityData();
-    setShowComplaintOwnershipModal(false);
-  };
-
-  const updateCapaOwnership = async (data: Record<string, unknown>) => {
-    if (!selectedComplaint) return;
-    await qualityApi.updateCapaOwnership(selectedComplaint.id, {
-      responsiblePerson: data.responsiblePerson as string | undefined,
-      attachmentUrl: data.attachmentUrl as string | undefined,
-      notes: data.notes as string | undefined,
-    });
-    await refreshQualityData();
-    setShowCapaOwnershipModal(false);
-  };
-
-  const renderTimeline = (timeline?: Array<{ id: string; actionType: string; actorName?: string; responsiblePerson?: string; notes?: string; attachmentUrl?: string; createdAt: string }>) => (
-    <div style={{ display: 'grid', gap: 10 }}>
-      {(timeline ?? []).length === 0 ? (
-        <div style={{ color: 'var(--slate-500)', fontSize: 12 }}>暫無審查紀錄</div>
-      ) : timeline!.map(entry => (
-        <div key={entry.id} style={{
-          padding: '12px 14px',
-          borderRadius: 10,
-          border: '1px solid var(--navy-800)',
-          background: 'rgba(7, 14, 28, 0.72)',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--slate-200)', fontWeight: 600 }}>{entry.actionType}</div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--slate-500)' }}>{entry.createdAt.slice(0, 19).replace('T', ' ')}</div>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--slate-400)', display: 'grid', gap: 4 }}>
-            <div>執行者：{entry.actorName ?? 'system'}</div>
-            <div>責任人：{entry.responsiblePerson ?? '未指定'}</div>
-            {entry.notes && <div>備註：{entry.notes}</div>}
-            {entry.attachmentUrl && <div>附件：{entry.attachmentUrl}</div>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  if (activeTab === 'process') return <ProcessQuality onBack={() => setActiveTab('iqc')} />;
 
   return (
     <div className="module-page page-enter">
@@ -210,15 +81,24 @@ export function Quality() {
         </div>
         <div className="module-page-actions">
           <button className="btn btn-ghost btn-sm"><Download size={13} />匯出</button>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => activeTab === 'complaints' ? setShowComplaintModal(true) : setShowIqcModal(true)}
-          >
-            <Plus size={13} />
-            {activeTab === 'complaints' ? '新增客訴' : '執行 IQC'}
-          </button>
+          {activeTab === 'complaints' && (
+            <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><Plus size={13} />新增客訴</button>
+          )}
         </div>
       </div>
+
+      <button
+        type="button"
+        className="quality-workbench-entry"
+        onClick={() => setActiveTab('process')}
+      >
+        <span className="quality-workbench-icon"><ClipboardCheck size={23} /></span>
+        <span className="quality-workbench-copy">
+          <strong>工藝檢驗工作台</strong>
+          <small>進入製程檢驗紀錄、FQC 成品檢驗及品質處置；可用操作依您的角色權限顯示。</small>
+        </span>
+        <span className="quality-workbench-action">開啟工作台 <ArrowRight size={16} /></span>
+      </button>
 
       <div className="module-stat-grid">
         {stats.map(s => (
@@ -255,12 +135,6 @@ export function Quality() {
             供應商客訴
           </button>
           <button
-            className={`tab-item ${activeTab === 'ncr' ? 'active' : ''}`}
-            onClick={() => setActiveTab('ncr')}
-          >
-            NCR 隔離
-          </button>
-          <button
             className={`tab-item ${activeTab === 'trace' ? 'active' : ''}`}
             onClick={() => setActiveTab('trace')}
           >
@@ -271,54 +145,51 @@ export function Quality() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {activeTab === 'iqc' ? (
-          <>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--navy-800)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 12, color: 'var(--slate-400)' }}>
-                待檢收貨 {pendingIqcReceipts.length} 筆
-              </div>
-              {pendingIqcReceipts.length > 0 && (
-                <button className="btn btn-outline btn-sm" onClick={() => setShowIqcModal(true)}>
-                  <CheckCircle size={13} />選擇收貨單執行 IQC
-                </button>
-              )}
-            </div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>報告編號</th>
-                  <th>供應商</th>
-                  <th>檢驗日期</th>
-                  <th>批號</th>
-                  <th>結果</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
-                    <Loader2 size={20} className="spin" style={{ animation: 'spin 1s linear infinite', display: 'inline', marginRight: 8 }} />載入中...
-                  </td></tr>
-                ) : filteredIqc.map(r => {
-                  const rc = iqcResultConfig[r.result] ?? { label: r.result, cls: 'neutral' };
-                  return (
-                    <tr key={r.id}>
-                      <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{r.reportNumber}</td>
-                      <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{r.supplierName ?? '—'}</td>
-                      <td className="mono" style={{ fontSize: 11, color: 'var(--slate-500)' }}>{(r.reportDate || r.inspectionDate || '').slice(0, 10)}</td>
-                      <td className="mono" style={{ fontSize: 11, color: 'var(--slate-500)' }}>{r.batchNumber || '—'}</td>
-                      <td><span className={`status-badge status-${rc.cls}`}>{rc.label}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="icon-action-btn" title="查看"><Eye size={13} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </>
-        ) : activeTab === 'complaints' ? (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>報告編號</th>
+                <th>收貨單 / 料號</th>
+                <th>批號 / 數量</th>
+                <th>供應商</th>
+                <th>檢驗日期</th>
+                <th>結果</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
+                  <Loader2 size={20} className="spin" style={{ animation: 'spin 1s linear infinite', display: 'inline', marginRight: 8 }} />載入中...
+                </td></tr>
+              ) : filteredIqc.length === 0 ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--slate-500)' }}>目前沒有 IQC 檢驗批；需檢物料收貨後會自動建立待檢單。</td></tr>
+              ) : filteredIqc.map(r => {
+                const rc = iqcResultConfig[r.result] ?? { label: r.result, cls: 'neutral' };
+                return (
+                  <tr key={r.id}>
+                    <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '12px' }}>{r.reportNumber}</td>
+                    <td>
+                      <div>{r.goodsReceiptNumber ?? '—'}</div>
+                      <div style={{ color: 'var(--slate-400)', fontSize: 11 }}>{r.skuName ?? '—'}</div>
+                    </td>
+                    <td>{r.batchNumber || '—'} / {r.receivedQty}</td>
+                    <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{r.supplierName ?? '—'}</td>
+                    <td className="mono" style={{ fontSize: 11, color: 'var(--slate-500)' }}>{r.inspectionDate}</td>
+                    <td><span className={`status-badge status-${rc.cls}`}>{rc.label}</span></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIqcId(r.id)}>
+                          <Eye size={13} />{r.result === 'pending' ? '執行檢驗' : '查看記錄'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
           <table className="data-table">
             <thead>
               <tr>
@@ -329,17 +200,12 @@ export function Quality() {
                 <th>PPM</th>
                 <th>優先度</th>
                 <th>狀態</th>
-                <th>責任人</th>
-                <th>附件</th>
-                <th>結案原因</th>
-                <th>CAPA 狀態</th>
-                <th>CAPA 責任人</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={13} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
                   <Loader2 size={20} className="spin" style={{ animation: 'spin 1s linear infinite', display: 'inline', marginRight: 8 }} />載入中...
                 </td></tr>
               ) : filteredComplaints.map(c => {
@@ -347,7 +213,7 @@ export function Quality() {
                 const pc = priorityConfig[c.priority] ?? { label: c.priority, cls: 'neutral' };
                 return (
                   <tr key={c.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{c.complaintNumber}</td>
+                    <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '12px' }}>{c.complaintNumber}</td>
                     <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{c.supplierName ?? '—'}</td>
                     <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.skuName ?? '—'}</td>
                     <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.defectType ?? '—'}</td>
@@ -359,47 +225,14 @@ export function Quality() {
                     </td>
                     <td><span className={`status-badge status-${pc.cls}`}>{pc.label}</span></td>
                     <td><span className={`status-badge status-${sc.cls}`}>{sc.label}</span></td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.responsiblePerson ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.attachmentUrl ? <span className="mono">{c.attachmentUrl}</span> : '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.closureReason ?? '—'}</td>
-                    <td><span className={`status-badge status-${(c.capaStatus === 'closed' ? 'active' : c.capaStatus === 'open' ? 'warning' : 'neutral')}`}>{c.capaStatus ?? '—'}</span></td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.capaResponsiblePerson ?? '—'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="icon-action-btn" title="查看" onClick={() => {
-                          setSelectedComplaintId(c.id);
-                          setActiveTab('complaints');
-                        }}><Eye size={13} /></button>
-                        <button className="icon-action-btn" title="補責任人 / 附件" style={{ color: 'var(--cobalt-300)' }} onClick={() => {
-                          setSelectedComplaintId(c.id);
-                          setShowComplaintOwnershipModal(true);
-                        }}>
-                          <User size={13} />
-                        </button>
+                        <button className="icon-action-btn" title="查看"><Eye size={13} /></button>
                         {c.status === 'open' && (
-                          <button className="icon-action-btn" title="建立 CAPA" style={{ color: 'var(--cobalt-300)' }} onClick={async () => {
-                            setSelectedComplaintId(c.id);
-                            await createDefaultCapa(c.id);
-                          }}>
+                          <button className="icon-action-btn" title="開始調查" style={{ color: 'var(--cobalt-300)' }}>
                             <Clock size={13} />
                           </button>
                         )}
-                        {c.status !== 'closed' && (
-                          <button className="icon-action-btn" title="結案 CAPA" style={{ color: 'var(--emerald-300)' }} onClick={async () => {
-                            setSelectedComplaintId(c.id);
-                            await closeDefaultCapa(c.id);
-                          }}>
-                            <CheckCircle size={13} />
-                          </button>
-                        )}
-                        {c.status === 'investigating' && (
-                          <button className="icon-action-btn" title="CAPA 維護" style={{ color: 'var(--amber-300)' }} onClick={() => {
-                            setSelectedComplaintId(c.id);
-                            setShowCapaOwnershipModal(true);
-                          }}>
-                            <FileText size={13} />
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -407,163 +240,8 @@ export function Quality() {
               })}
             </tbody>
           </table>
-        ) : activeTab === 'ncr' ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>NCR 編號</th>
-                <th>來源單號</th>
-                <th>供應商</th>
-                <th>品項</th>
-                <th>不良數量</th>
-                <th>處置</th>
-                <th>責任人</th>
-                <th>附件</th>
-                <th>結案原因</th>
-                <th>建立時間</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
-                  <Loader2 size={20} className="spin" style={{ animation: 'spin 1s linear infinite', display: 'inline', marginRight: 8 }} />載入中...
-                </td></tr>
-              ) : filteredNcrs.map(n => {
-                const dc = ncrDispositionConfig[n.disposition ?? 'hold'] ?? { label: n.disposition ?? 'hold', cls: 'neutral' };
-                return (
-                  <tr key={n.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{n.ncrNumber}</td>
-                    <td className="mono" style={{ fontSize: 12, color: 'var(--slate-400)' }}>{n.sourceNumber ?? '—'}</td>
-                    <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{n.supplierName ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{n.skuName ?? '—'}</td>
-                    <td className="mono" style={{ color: 'var(--amber-300)', fontWeight: 600 }}>{n.defectQty.toLocaleString()}</td>
-                    <td><span className={`status-badge status-${dc.cls}`}>{dc.label}</span></td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{n.responsiblePerson ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{n.attachmentUrl ? <span className="mono">{n.attachmentUrl}</span> : '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{n.closureReason ?? '—'}</td>
-                    <td className="mono" style={{ fontSize: 11, color: 'var(--slate-500)' }}>{n.createdAt.slice(0, 10)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="icon-action-btn" title="查看" onClick={() => {
-                          setSelectedNcrId(n.id);
-                          setActiveTab('ncr');
-                        }}>
-                          <Eye size={13} />
-                        </button>
-                        <button className="icon-action-btn" title="補責任人 / 附件" style={{ color: 'var(--cobalt-300)' }} onClick={() => {
-                          setSelectedNcrId(n.id);
-                          setShowNcrOwnershipModal(true);
-                        }}>
-                          <User size={13} />
-                        </button>
-                        {n.disposition !== 'released' && n.disposition !== 'scrapped' && (
-                          <button className="icon-action-btn" title="釋放庫存" style={{ color: 'var(--emerald-300)' }} onClick={async () => {
-                            await closeNcr(n.id, 'released');
-                          }}>
-                            <CheckCircle size={13} />
-                          </button>
-                        )}
-                        <button className="icon-action-btn" title="報廢處置" style={{ color: 'var(--crimson-300)' }} onClick={async () => {
-                          await closeNcr(n.id, 'scrapped');
-                        }}>
-                          <AlertTriangle size={13} />
-                        </button>
-                        <button className="icon-action-btn" title="查看"><Eye size={13} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : null}
+        )}
       </div>
-
-      {(activeTab === 'ncr' && selectedNcr) && (
-        <div className="glass-card" style={{ overflow: 'hidden' }}>
-          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--navy-800)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--slate-500)', marginBottom: 4 }}>NCR 詳情</div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--slate-100)' }}>{selectedNcr.ncrNumber}</h3>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-outline btn-sm" onClick={() => setShowNcrOwnershipModal(true)}><User size={13} />更新責任人 / 附件</button>
-              <button className="btn btn-outline btn-sm" onClick={() => setSelectedNcrId(null)}>關閉詳情</button>
-            </div>
-          </div>
-          <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-            <div className="stat-card"><div className="stat-label">來源單號</div><div className="stat-value">{selectedNcr.sourceNumber ?? '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">責任人</div><div className="stat-value">{selectedNcr.responsiblePerson ?? '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">附件</div><div className="stat-value" style={{ fontSize: 12 }}>{selectedNcr.attachmentUrl ?? '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">結案原因</div><div className="stat-value" style={{ fontSize: 12 }}>{selectedNcr.closureReason ?? '—'}</div></div>
-          </div>
-          <div style={{ padding: '0 20px 20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 16 }}>
-              <div className="glass-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 12, color: 'var(--slate-400)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}><History size={13} />審查軌跡</div>
-                {renderTimeline(selectedNcr.timeline)}
-              </div>
-              <div className="glass-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 12, color: 'var(--slate-400)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}><Paperclip size={13} />摘要</div>
-                <div style={{ display: 'grid', gap: 10, fontSize: 12, color: 'var(--slate-300)' }}>
-                  <div><span style={{ color: 'var(--slate-500)' }}>缺陷：</span>{selectedNcr.defectType ?? '—'}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>不良數量：</span>{selectedNcr.defectQty.toLocaleString()}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>成本影響：</span>{selectedNcr.costImpact.toLocaleString()}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>描述：</span>{selectedNcr.defectDescription ?? '—'}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {(activeTab === 'complaints' && selectedComplaint) && (
-        <div className="glass-card" style={{ overflow: 'hidden' }}>
-          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--navy-800)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--slate-500)', marginBottom: 4 }}>客訴詳情</div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--slate-100)' }}>{selectedComplaint.complaintNumber}</h3>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-outline btn-sm" onClick={() => setShowComplaintOwnershipModal(true)}><User size={13} />更新責任人 / 附件</button>
-              <button className="btn btn-outline btn-sm" onClick={() => setShowCapaOwnershipModal(true)}><FileText size={13} />CAPA 維護</button>
-              <button className="btn btn-outline btn-sm" onClick={() => setSelectedComplaintId(null)}>關閉詳情</button>
-            </div>
-          </div>
-          <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-            <div className="stat-card"><div className="stat-label">供應商</div><div className="stat-value">{selectedComplaint.supplierName ?? '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">責任人</div><div className="stat-value">{selectedComplaint.responsiblePerson ?? '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">附件</div><div className="stat-value" style={{ fontSize: 12 }}>{selectedComplaint.attachmentUrl ?? '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">結案原因</div><div className="stat-value" style={{ fontSize: 12 }}>{selectedComplaint.closureReason ?? '—'}</div></div>
-          </div>
-          <div style={{ padding: '0 20px 20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 16 }}>
-              <div className="glass-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 12, color: 'var(--slate-400)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}><History size={13} />審查軌跡</div>
-                {renderTimeline(selectedComplaint.timeline)}
-              </div>
-              <div className="glass-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 12, color: 'var(--slate-400)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}><Paperclip size={13} />摘要</div>
-                <div style={{ display: 'grid', gap: 10, fontSize: 12, color: 'var(--slate-300)' }}>
-                  <div><span style={{ color: 'var(--slate-500)' }}>品項：</span>{selectedComplaint.skuName ?? '—'}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>缺陷類型：</span>{selectedComplaint.defectType ?? '—'}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>PPM：</span>{selectedComplaint.ppm.toLocaleString()}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>狀態：</span>{selectedComplaint.status}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>CAPA 編號：</span>{selectedComplaint.capaNumber ?? '—'}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>CAPA 狀態：</span>{selectedComplaint.capaStatus ?? '—'}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>CAPA 責任人：</span>{selectedComplaint.capaResponsiblePerson ?? '—'}</div>
-                  <div><span style={{ color: 'var(--slate-500)' }}>CAPA 結案原因：</span>{selectedComplaint.capaClosureReason ?? '—'}</div>
-                </div>
-              </div>
-              <div className="glass-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 12, color: 'var(--slate-400)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}><History size={13} />CAPA 軌跡</div>
-                {renderTimeline(selectedComplaint.capaTimeline)}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {activeTab === 'trace' && (
         <div className="glass-card">
@@ -639,12 +317,22 @@ export function Quality() {
       )}
 
       <style>{`
+        .quality-workbench-entry { display: flex; align-items: center; gap: 16px; width: 100%; padding: 18px 20px; color: var(--slate-100); text-align: left; background: linear-gradient(110deg, rgba(37, 99, 235, .18), rgba(15, 23, 42, .72)); border: 1px solid rgba(59, 130, 246, .42); border-radius: var(--radius-lg, 12px); cursor: pointer; transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); }
+        .quality-workbench-entry:hover { border-color: var(--cobalt-400); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(15, 23, 42, .2); }
+        .quality-workbench-icon { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; color: var(--cobalt-300); background: rgba(37, 99, 235, .18); border-radius: 12px; }
+        .quality-workbench-copy { display: grid; gap: 5px; flex: 1; }
+        .quality-workbench-copy strong { font-size: 15px; font-weight: 700; }
+        .quality-workbench-copy small { color: var(--slate-400); font-size: 12px; line-height: 1.5; }
+        .quality-workbench-action { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: linear-gradient(135deg, #3b82f6, #7c3aed); border: 1px solid rgba(255,255,255,.2); border-radius: 9px; box-shadow: 0 4px 12px rgba(37,99,235,.28); font-size: 14px; font-weight: 700; white-space: nowrap; transition: background .2s ease, box-shadow .2s ease, transform .2s ease; }
+        .quality-workbench-entry:hover .quality-workbench-action { background: linear-gradient(135deg, #2563eb, #6d28d9); box-shadow: 0 6px 16px rgba(37,99,235,.36); transform: translateX(2px); }
+        .quality-workbench-entry:focus-visible { outline: 3px solid rgba(96,165,250,.75); outline-offset: 3px; }
+        @media (max-width: 640px) { .quality-workbench-entry { align-items: flex-start; padding: 14px; } .quality-workbench-action { display: none; } }
         .module-page { display: flex; flex-direction: column; gap: 16px; }
         .module-page-header { display: flex; align-items: flex-start; justify-content: space-between; }
         .module-page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--slate-100); }
         .module-page-desc { font-size: 12px; color: var(--slate-500); margin-top: 2px; font-family: var(--font-mono); }
         .module-page-actions { display: flex; gap: 8px; }
-        .module-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .module-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
         .module-stat-card { padding: 14px 16px; }
         .module-stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--slate-500); margin-bottom: 8px; font-family: var(--font-display); }
         .module-stat-value { font-size: 24px; font-weight: 700; letter-spacing: -0.04em; }
@@ -660,60 +348,8 @@ export function Quality() {
       `}</style>
 
       <FormModal
-        open={showIqcModal}
-        onClose={() => setShowIqcModal(false)}
-        title="執行 IQC"
-        fields={[
-          {
-            name: 'goodsReceiptId',
-            label: '收貨單',
-            type: 'select',
-            required: true,
-            options: pendingIqcReceipts.map((receipt) => ({
-              value: receipt.id,
-              label: `[${receipt.grNumber}] ${receipt.supplierName || '未指定供應商'}`
-            })),
-            description: '選擇待檢的收貨單，完成 IQC 後會同步更新收貨狀態與應付帳款匹配。'
-          },
-          {
-            name: 'result',
-            label: '檢驗結果',
-            type: 'select',
-            required: true,
-            options: [
-              { value: 'pass', label: '合格' },
-              { value: 'conditional', label: '條件通過' },
-              { value: 'fail', label: '不合格' }
-            ]
-          },
-          { name: 'sampleQty', label: '抽樣數量', type: 'number', required: true, min: 0, defaultValue: 0 },
-          { name: 'defectQty', label: '不良數量', type: 'number', required: true, min: 0, defaultValue: 0 },
-          { name: 'lotNumber', label: '批號', type: 'text', placeholder: '可選填 Lot No.' },
-          { name: 'notes', label: '檢驗備註', type: 'textarea', placeholder: '例如：外觀抽檢、尺寸驗證結果...' },
-        ]}
-        onSubmit={async (data) => {
-          await qualityApi.createIqcReport({
-            goodsReceiptId: data.goodsReceiptId,
-            result: data.result,
-            sampleQty: Number(data.sampleQty || 0),
-            defectQty: Number(data.defectQty || 0),
-            lotNumber: data.lotNumber,
-            notes: data.notes,
-          });
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['quality-iqc'] }),
-            queryClient.invalidateQueries({ queryKey: ['quality-complaints'] }),
-            queryClient.invalidateQueries({ queryKey: ['quality-pending-iqc'] }),
-            queryClient.invalidateQueries({ queryKey: ['accounts-payable'] }),
-            queryClient.invalidateQueries({ queryKey: ['goods-receipts'] }),
-          ]);
-          setShowIqcModal(false);
-        }}
-      />
-
-      <FormModal
-        open={showComplaintModal}
-        onClose={() => setShowComplaintModal(false)}
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
         title="新增客訴報告"
         fields={buildComplaintFields(suppliers)}
         onSubmit={async (data) => {
@@ -722,46 +358,169 @@ export function Quality() {
             return;
           }
           await qualityApi.createComplaint(data);
-          await queryClient.invalidateQueries({ queryKey: ['quality-complaints'] });
-          setShowComplaintModal(false);
         }}
       />
-
-      <FormModal
-        open={showNcrOwnershipModal}
-        onClose={() => setShowNcrOwnershipModal(false)}
-        title="NCR 審查資訊"
-        fields={[
-          { name: 'responsiblePerson', label: '責任人', type: 'text', defaultValue: selectedNcr?.responsiblePerson ?? '' },
-          { name: 'attachmentUrl', label: '附件網址', type: 'text', defaultValue: selectedNcr?.attachmentUrl ?? '', placeholder: '附件或證據連結' },
-          { name: 'notes', label: '審查備註', type: 'textarea', defaultValue: selectedNcr?.closureReason ?? '' },
-        ]}
-        onSubmit={updateNcrOwnership}
-      />
-
-      <FormModal
-        open={showComplaintOwnershipModal}
-        onClose={() => setShowComplaintOwnershipModal(false)}
-        title="客訴審查資訊"
-        fields={[
-          { name: 'responsiblePerson', label: '責任人', type: 'text', defaultValue: selectedComplaint?.responsiblePerson ?? '' },
-          { name: 'attachmentUrl', label: '附件網址', type: 'text', defaultValue: selectedComplaint?.attachmentUrl ?? '', placeholder: '附件或證據連結' },
-          { name: 'notes', label: '審查備註', type: 'textarea', defaultValue: selectedComplaint?.closureReason ?? '' },
-        ]}
-        onSubmit={updateComplaintOwnership}
-      />
-
-      <FormModal
-        open={showCapaOwnershipModal}
-        onClose={() => setShowCapaOwnershipModal(false)}
-        title="CAPA 審查資訊"
-        fields={[
-          { name: 'responsiblePerson', label: '責任人', type: 'text', defaultValue: selectedComplaint?.responsiblePerson ?? '' },
-          { name: 'attachmentUrl', label: '附件網址', type: 'text', defaultValue: selectedComplaint?.attachmentUrl ?? '', placeholder: 'CAPA 佐證或附件' },
-          { name: 'notes', label: '結案原因 / 備註', type: 'textarea', defaultValue: selectedComplaint?.closureReason ?? '' },
-        ]}
-        onSubmit={updateCapaOwnership}
-      />
+      {selectedIqcId && (
+        <IqcInspectionModal
+          id={selectedIqcId}
+          onClose={() => setSelectedIqcId(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function IqcInspectionModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [result, setResult] = useState<'pass' | 'fail'>('pass');
+  const [sampleSize, setSampleSize] = useState(1);
+  const [acceptNumber, setAcceptNumber] = useState(0);
+  const [rejectNumber, setRejectNumber] = useState(0);
+  const [items, setItems] = useState([{
+    inspectionItem: '',
+    specification: '',
+    lowerLimit: '',
+    upperLimit: '',
+    measuredValue: '',
+    result: 'pass' as 'pass' | 'fail',
+  }]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape')
+        onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['iqc-inspection', id],
+    queryFn: async () => {
+      const response = await qualityApi.iqcInspection(id);
+      if (!response.data?.success || !response.data.data) {
+        throw new Error(response.data?.message || '載入 IQC 檢驗單失敗');
+      }
+      return response.data.data;
+    },
+  });
+  const inspection: IqcInspectionDto | undefined = data;
+  const completeMutation = useMutation({
+    mutationFn: () => qualityApi.completeIqcInspection(id, {
+      result,
+      sampleSize,
+      acceptNumber,
+      rejectNumber,
+      items: items.map(item => ({
+        ...item,
+        lowerLimit: item.lowerLimit === '' ? undefined : Number(item.lowerLimit),
+        upperLimit: item.upperLimit === '' ? undefined : Number(item.upperLimit),
+      })),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quality-iqc'] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-atp'] });
+      onClose();
+      alert(result === 'pass' ? '檢驗合格，庫存已放行至良品儲位' : '已記錄不合格，庫存維持隔離並待 MRB 處理');
+    },
+    onError: (mutationError: Error) => alert(mutationError.message || '提交 IQC 判定失敗'),
+  });
+
+  const addItem = () => setItems(current => [...current, {
+    inspectionItem: '',
+    specification: '',
+    lowerLimit: '',
+    upperLimit: '',
+    measuredValue: '',
+    result: 'pass' as 'pass' | 'fail',
+  }]);
+
+  const updateItem = (index: number, field: keyof typeof items[number], value: string) =>
+    setItems(current => current.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, [field]: value } : item
+    ));
+
+  const canSubmit = inspection?.result === 'pending' && !completeMutation.isPending;
+
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,8,15,0.85)' }} onClick={onClose} />
+      <div
+        className="glass-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="iqc-inspection-title"
+        style={{ position: 'relative', width: 900, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 id="iqc-inspection-title">進料檢驗：{inspection?.reportNumber ?? '載入中'}</h3>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>關閉</button>
+        </div>
+        {isLoading ? <div style={{ padding: 30, textAlign: 'center' }}>載入中...</div> : error ? (
+          <div role="alert" style={{ color: 'var(--crimson-300)' }}>{(error as Error).message}</div>
+        ) : inspection && (
+          <>
+            <div className="glass-card" style={{ padding: 14, marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              <span>收貨單：{inspection.goodsReceiptNumber}</span>
+              <span>物料：{inspection.skuNumber} · {inspection.skuName}</span>
+              <span>供應商：{inspection.supplierName || '—'}</span>
+              <span>批號：{inspection.lotNumber || '—'}</span>
+              <span>收貨數量：{inspection.receivedQty}</span>
+              <span>檢驗後良品儲位：{inspection.releaseBinLocationCode || '—'}</span>
+            </div>
+            {inspection.result !== 'pending' ? (
+              <>
+                <div style={{ marginBottom: 12 }}>判定結果：{inspection.result === 'pass' ? '合格' : '不合格'}；抽樣數：{inspection.sampleSize}；不良數：{inspection.rejectNumber}</div>
+                {inspection.result === 'fail' && <div role="status" style={{ color: 'var(--amber-300)', marginBottom: 12 }}>物料仍在隔離狀態，退貨／返工／特採須依後續 MRB 流程處理。</div>}
+                <table className="data-table">
+                  <thead><tr><th>檢驗項目</th><th>規格</th><th>下限</th><th>上限</th><th>實測值</th><th>判定</th></tr></thead>
+                  <tbody>{inspection.items.map(item => <tr key={item.id}>
+                    <td>{item.inspectionItem}</td><td>{item.specification}</td><td>{item.lowerLimit ?? '—'}</td>
+                    <td>{item.upperLimit ?? '—'}</td><td>{item.measuredValue}</td><td>{item.result === 'pass' ? '合格' : '不合格'}</td>
+                  </tr>)}</tbody>
+                </table>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                  <label>抽樣數<input className="form-input" type="number" min="1" max={inspection.receivedQty} value={sampleSize} onChange={event => setSampleSize(Number(event.target.value))} /></label>
+                  <label>允收數<input className="form-input" type="number" min="0" value={acceptNumber} onChange={event => setAcceptNumber(Number(event.target.value))} /></label>
+                  <label>拒收數<input className="form-input" type="number" min="0" value={rejectNumber} onChange={event => setRejectNumber(Number(event.target.value))} /></label>
+                  <label>整批判定<select className="form-input" value={result} onChange={event => setResult(event.target.value as 'pass' | 'fail')}><option value="pass">合格</option><option value="fail">不合格</option></select></label>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong>檢驗項目與實測記錄</strong>
+                  <button className="btn btn-ghost btn-sm" onClick={addItem}><Plus size={13} />新增項目</button>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table">
+                    <thead><tr><th>檢驗項目</th><th>規格 / 方法</th><th>下限</th><th>上限</th><th>實測值</th><th>判定</th></tr></thead>
+                    <tbody>{items.map((item, index) => <tr key={index}>
+                      <td><input className="form-input" value={item.inspectionItem} onChange={event => updateItem(index, 'inspectionItem', event.target.value)} /></td>
+                      <td><input className="form-input" value={item.specification} onChange={event => updateItem(index, 'specification', event.target.value)} /></td>
+                      <td><input className="form-input" type="number" value={item.lowerLimit} onChange={event => updateItem(index, 'lowerLimit', event.target.value)} /></td>
+                      <td><input className="form-input" type="number" value={item.upperLimit} onChange={event => updateItem(index, 'upperLimit', event.target.value)} /></td>
+                      <td><input className="form-input" value={item.measuredValue} onChange={event => updateItem(index, 'measuredValue', event.target.value)} /></td>
+                      <td><select className="form-input" value={item.result} onChange={event => updateItem(index, 'result', event.target.value)}><option value="pass">合格</option><option value="fail">不合格</option></select></td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+                <div role="note" style={{ color: 'var(--amber-300)', marginTop: 12, fontSize: 12 }}>
+                  尚未完成判定前，待檢庫存不計入可用量。判定不合格後仍會隔離，後續需依 MRB 決議處置。
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                  <button className="btn btn-primary" disabled={!canSubmit} onClick={() => completeMutation.mutate()}>
+                    {completeMutation.isPending ? '提交中...' : '提交檢驗判定'}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }

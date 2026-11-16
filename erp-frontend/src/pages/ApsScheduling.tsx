@@ -1,33 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apsApi, mrpApi } from '../api/api';
-import type { ProductionScheduleDto, ScheduleTaskDto, CapacityLoadDto, GanttTaskDto, MrpPlannedOrderDto } from '../api/api';
-import { Play, RefreshCw, AlertTriangle, Settings, Package, Calendar, ArrowLeft } from 'lucide-react';
+import type { ProductionScheduleDto, CapacityLoadDto, GanttTaskDto, MrpPlannedOrderDto, ScheduleConstraintDto } from '../api/api';
+import { Play, RefreshCw, AlertTriangle, Package, Calendar, ArrowLeft } from 'lucide-react';
 import './ApsScheduling.css';
 
 interface ApsSchedulingProps {
   onNavigate?: (module: string) => void;
 }
 
+interface ApsConstraintDto extends ScheduleConstraintDto {
+  affectedTask?: string;
+  resourceName?: string;
+}
+
 export const ApsScheduling: React.FC<ApsSchedulingProps> = ({ onNavigate }) => {
   const [schedules, setSchedules] = useState<ProductionScheduleDto[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<ProductionScheduleDto | null>(null);
   const [capacityLoads, setCapacityLoads] = useState<CapacityLoadDto[]>([]);
-  const [constraints, setConstraints] = useState<any[]>([]);
+  const [constraints, setConstraints] = useState<ApsConstraintDto[]>([]);
   const [ganttData, setGanttData] = useState<GanttTaskDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [view, setView] = useState<'list' | 'gantt' | 'capacity' | 'mrp'>('list');
   const [showConstraintModal, setShowConstraintModal] = useState(false);
-  const [selectedConstraint, setSelectedConstraint] = useState<any>(null);
+  const [selectedConstraint, setSelectedConstraint] = useState<ApsConstraintDto | null>(null);
   const [resolving, setResolving] = useState(false);
   const [mrpPlannedOrders, setMrpPlannedOrders] = useState<MrpPlannedOrderDto[]>([]);
   const [loadingMrpOrders, setLoadingMrpOrders] = useState(false);
+  const hasLoadedSchedules = useRef(false);
 
-  useEffect(() => {
-    loadSchedules();
+  const handleSelectSchedule = useCallback(async (schedule: ProductionScheduleDto) => {
+    setSelectedSchedule(schedule);
+    try {
+      const [loadRes, constraintRes] = await Promise.all([
+        apsApi.capacityLoads(schedule.id),
+        apsApi.constraints(schedule.id)
+      ]);
+      if (loadRes.data?.success) setCapacityLoads(loadRes.data.data || []);
+      if (constraintRes.data?.success) setConstraints(constraintRes.data.data || []);
+    } catch (error) {
+      console.error('Failed to load schedule details:', error);
+    }
   }, []);
 
-  const loadSchedules = async () => {
+  const loadSchedules = useCallback(async () => {
     setLoading(true);
     try {
       const response = await apsApi.schedules({ pageSize: 20 });
@@ -42,21 +58,13 @@ export const ApsScheduling: React.FC<ApsSchedulingProps> = ({ onNavigate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleSelectSchedule, selectedSchedule]);
 
-  const handleSelectSchedule = async (schedule: ProductionScheduleDto) => {
-    setSelectedSchedule(schedule);
-    try {
-      const [loadRes, constraintRes] = await Promise.all([
-        apsApi.capacityLoads(schedule.id),
-        apsApi.constraints(schedule.id)
-      ]);
-      if (loadRes.data?.success) setCapacityLoads(loadRes.data.data || []);
-      if (constraintRes.data?.success) setConstraints(constraintRes.data.data || []);
-    } catch (error) {
-      console.error('Failed to load schedule details:', error);
-    }
-  };
+  useEffect(() => {
+    if (hasLoadedSchedules.current) return;
+    hasLoadedSchedules.current = true;
+    void loadSchedules();
+  }, [loadSchedules]);
 
   const handleGenerateSchedule = async () => {
     setGenerating(true);
@@ -79,26 +87,6 @@ export const ApsScheduling: React.FC<ApsSchedulingProps> = ({ onNavigate }) => {
       alert('排程生成失敗');
     } finally {
       setGenerating(false);
-    }
-  };
-
-  const handleOptimize = async () => {
-    if (!selectedSchedule) return;
-    
-    try {
-      const response = await apsApi.optimizeSchedule(selectedSchedule.id, {
-        primaryGoal: 'meet_deadlines',
-        respectPriority: true,
-        allowRescheduling: true
-      });
-      
-      if (response.data?.success) {
-        alert('排程優化完成！');
-        handleSelectSchedule(response.data.data!);
-      }
-    } catch (error) {
-      console.error('Failed to optimize schedule:', error);
-      alert('排程優化失敗');
     }
   };
 
@@ -139,7 +127,7 @@ export const ApsScheduling: React.FC<ApsSchedulingProps> = ({ onNavigate }) => {
 
   const generateTimelineDates = (start: string, end: string) => {
     const dates = [];
-    let curr = new Date(start);
+    const curr = new Date(start);
     const endD = new Date(end);
     curr.setHours(0,0,0,0);
     // ensure we add till end to show the full last day grid
@@ -231,7 +219,7 @@ export const ApsScheduling: React.FC<ApsSchedulingProps> = ({ onNavigate }) => {
     }
   };
 
-  const openConstraintModal = (constraint: any) => {
+  const openConstraintModal = (constraint: ApsConstraintDto) => {
     setSelectedConstraint(constraint);
     setShowConstraintModal(true);
   };

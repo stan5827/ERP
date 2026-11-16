@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using ErpBackend.Models.HR;
 using ErpBackend.Models.Inventory;
+using ErpBackend.Models.QA;
 
 namespace ErpBackend.Models.MES;
 
@@ -148,8 +150,10 @@ public class WorkOrder
     public Guid? BomId { get; set; }
     [MaxLength(20)] public string? BomVersion { get; set; }
     public Guid? SalesOrderId { get; set; }
+    [MaxLength(20)] public string? ProductionUomCode { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal PlannedQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ActualQty { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal ReceivedQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ScrapQty { get; set; }
     public DateTime? PlannedStartDate { get; set; }
     public DateTime? PlannedEndDate { get; set; }
@@ -184,15 +188,19 @@ public class WorkOrderMaterial
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     public Guid WorkOrderId { get; set; }
     public Guid SkuId { get; set; }
+    public Guid? FqcInspectionLotId { get; set; }
     [Column(TypeName = "decimal(14,4)")] public decimal BomStandardQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal RequiredQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal IssuedQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ReturnedQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ShortageQty { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal ClosedShortageQty { get; set; }
+    [MaxLength(20)] public string? Unit { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "pending";
 
     [ForeignKey(nameof(WorkOrderId))] public WorkOrder WorkOrder { get; set; } = null!;
     [ForeignKey(nameof(SkuId))] public Sku Sku { get; set; } = null!;
+    [ForeignKey(nameof(FqcInspectionLotId))] public FqcInspectionLot? FqcInspectionLot { get; set; }
 }
 
 public class WorkOrderOperation
@@ -231,16 +239,88 @@ public class WipReport
     [Column(TypeName = "decimal(14,2)")] public decimal ScrapQty { get; set; }
     [Column(TypeName = "decimal(8,2)")] public decimal ActualManHours { get; set; }
     [Column(TypeName = "decimal(8,2)")] public decimal ActualMachineHours { get; set; }
+    [Column(TypeName = "decimal(8,2)")] public decimal SetupHours { get; set; }
+    [Column(TypeName = "decimal(8,2)")] public decimal RunHours { get; set; }
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
+    [MaxLength(50)] public string? MachineCode { get; set; }
     [MaxLength(50)] public string? MaterialLotNumber { get; set; }
+    [MaxLength(50)] public string? FinishedLotNumber { get; set; }
+    [MaxLength(2000)] public string? Remarks { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal? EnergyConsumption { get; set; }
     public bool HasAnomaly { get; set; }
     [MaxLength(50)] public string? AnomalyType { get; set; }
     public string? AiDiagnosis { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [MaxLength(20)] public string ReportType { get; set; } = "individual";
+    [MaxLength(20)] public string Status { get; set; } = "submitted";
+    public Guid? SubmittedByUserId { get; set; }
+    public Guid? ReviewedByUserId { get; set; }
+    public DateTime? SubmittedAt { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    [MaxLength(1000)] public string? ReviewComments { get; set; }
+    [MaxLength(1000)] public string? ProxyReason { get; set; }
 
     [ForeignKey(nameof(WorkOrderId))] public WorkOrder? WorkOrder { get; set; }
+    public ICollection<WipReportEquipmentHour> EquipmentHours { get; set; } = new List<WipReportEquipmentHour>();
+    public ICollection<WipReportParticipant> Participants { get; set; } = new List<WipReportParticipant>();
+    public ICollection<WipReportAuditEvent> AuditEvents { get; set; } = new List<WipReportAuditEvent>();
+}
+
+public class WipReportParticipant
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid WipReportId { get; set; }
+    public Guid EmployeeId { get; set; }
+    [MaxLength(20)] public string Role { get; set; } = "participant";
+    [Column(TypeName = "decimal(8,2)")] public decimal ActualManHours { get; set; }
+
+    [ForeignKey(nameof(WipReportId))] public WipReport WipReport { get; set; } = null!;
+    [ForeignKey(nameof(EmployeeId))] public Employee Employee { get; set; } = null!;
+}
+
+public class WipReportAuditEvent
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid WipReportId { get; set; }
+    public Guid ActorUserId { get; set; }
+    [Required, MaxLength(30)] public string Action { get; set; } = null!;
+    [MaxLength(1000)] public string? Reason { get; set; }
+    public string? ChangesJson { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(WipReportId))] public WipReport WipReport { get; set; } = null!;
+}
+
+public class WipReportEquipmentHour
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid WipReportId { get; set; }
+    public Guid EquipmentId { get; set; }
+    [Column(TypeName = "decimal(8,2)")] public decimal MachineHours { get; set; }
+
+    [ForeignKey(nameof(WipReportId))] public WipReport WipReport { get; set; } = null!;
+    [ForeignKey(nameof(EquipmentId))] public Equipment Equipment { get; set; } = null!;
+}
+
+public class EquipmentUsageRecord
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid WorkOrderId { get; set; }
+    public int OperationSeq { get; set; }
+    public Guid EquipmentId { get; set; }
+    public Guid RecordedByEmployeeId { get; set; }
+    public Guid RecordedByUserId { get; set; }
+    [MaxLength(20)] public string? ShiftClass { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    [Column(TypeName = "decimal(8,2)")] public decimal MachineHours { get; set; }
+    [MaxLength(1000)] public string? Remarks { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(WorkOrderId))] public WorkOrder WorkOrder { get; set; } = null!;
+    [ForeignKey(nameof(EquipmentId))] public Equipment Equipment { get; set; } = null!;
+    [ForeignKey(nameof(RecordedByEmployeeId))] public Employee RecordedByEmployee { get; set; } = null!;
 }
 
 public class ScrapRecord
@@ -248,11 +328,37 @@ public class ScrapRecord
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     public Guid WorkOrderId { get; set; }
     public Guid SkuId { get; set; }
+    public Guid? FqcInspectionLotId { get; set; }
+    [MaxLength(30)] public string? ScrapNumber { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ScrapQty { get; set; }
+    [MaxLength(2)] public string? ScrapReasonCode { get; set; }
     [MaxLength(500)] public string? Reason { get; set; }
     [MaxLength(30)] public string? DispositionCode { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal CostAmount { get; set; }
+    [MaxLength(30)] public string? ScrapStatus { get; set; }
+    [MaxLength(100)] public string? DispositionBy { get; set; }
+    public DateTime? DispositionAt { get; set; }
+    public Guid? RequestedByUserId { get; set; }
+    [MaxLength(100)] public string? RequestedByName { get; set; }
+    public DateTime? SubmittedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(FqcInspectionLotId))] public FqcInspectionLot? FqcInspectionLot { get; set; }
+    public ICollection<FqcScrapApprovalEvent> ApprovalEvents { get; set; } = new List<FqcScrapApprovalEvent>();
+}
+
+public class FqcScrapApprovalEvent
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ScrapRecordId { get; set; }
+    [Required, MaxLength(20)] public string Stage { get; set; } = null!;
+    [Required, MaxLength(20)] public string Decision { get; set; } = null!;
+    public Guid ActorUserId { get; set; }
+    [Required, MaxLength(100)] public string ActorName { get; set; } = null!;
+    [MaxLength(1000)] public string? Comments { get; set; }
+    public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(ScrapRecordId))] public ScrapRecord ScrapRecord { get; set; } = null!;
 }
 
 /// <summary>

@@ -1,18 +1,21 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.HR;
+using ErpBackend.Filters;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
+[Authorize]
 public class PayrollController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly IPayrollService _payrollService;
+    private readonly IPayrollPolicyService _payrollPolicyService;
 
-    public PayrollController(ErpGeneralDbContext db)
+    public PayrollController(IPayrollService payrollService, IPayrollPolicyService payrollPolicyService)
     {
-        _db = db;
+        _payrollService = payrollService;
+        _payrollPolicyService = payrollPolicyService;
     }
 
     [HttpGet]
@@ -25,206 +28,175 @@ public class PayrollController : BaseController
         var page = GetPage();
         var pageSize = GetPageSize();
 
-        var query = _db.Payrolls
-            .Include(p => p.Employee)
-            .AsQueryable();
-
-        if (!string.IsNullOrEmpty(employeeId) && Guid.TryParse(employeeId, out var empGuid))
-            query = query.Where(p => p.EmployeeId == empGuid);
-
-        if (!string.IsNullOrEmpty(startDate) && DateTime.TryParse(startDate, out var start))
-            query = query.Where(p => p.PeriodStart >= start);
-
-        if (!string.IsNullOrEmpty(endDate) && DateTime.TryParse(endDate, out var end))
-            query = query.Where(p => p.PeriodEnd <= end);
-
-        if (!string.IsNullOrEmpty(status))
-            query = query.Where(p => p.Status == status);
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(p => p.PeriodStart)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var dtos = items.Select(p => new PayrollDto
-        {
-            Id = p.Id,
-            EmployeeId = p.EmployeeId,
-            EmployeeName = p.Employee?.ChineseName,
-            PeriodStart = p.PeriodStart,
-            PeriodEnd = p.PeriodEnd,
-            BasicSalary = p.BasicSalary,
-            GrossPay = p.GrossPay,
-            TotalDeductions = p.TotalDeductions,
-            NetPay = p.NetPay,
-            Status = p.Status,
-            PaymentDate = p.PaymentDate,
-            CreatedAt = p.CreatedAt
-        }).ToList();
-
-        return Ok(dtos, totalCount: totalCount);
+        var (items, totalCount) = await _payrollService.GetPayrollRecordsAsync(employeeId, startDate, endDate, status, page, pageSize);
+        return Ok(items, totalCount: totalCount);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<PayrollDto>>> GetPayrollRecord(Guid id)
     {
-        var p = await _db.Payrolls
-            .Include(pay => pay.Employee)
-            .FirstOrDefaultAsync(pay => pay.Id == id);
-
-        if (p == null) return NotFound(ApiHelper.Fail("Payroll record not found"));
-
-        var dto = new PayrollDto
-        {
-            Id = p.Id,
-            EmployeeId = p.EmployeeId,
-            EmployeeName = p.Employee?.ChineseName,
-            PeriodStart = p.PeriodStart,
-            PeriodEnd = p.PeriodEnd,
-            BasicSalary = p.BasicSalary,
-            InsuranceBase = p.InsuranceBase,
-            PensionBase = p.PensionBase,
-            ScheduledDays = p.ScheduledDays,
-            ActualWorkingDays = p.ActualWorkingDays,
-            TotalLateMinutes = p.TotalLateMinutes,
-            TotalEarlyMinutes = p.TotalEarlyMinutes,
-            AnomalyDays = p.AnomalyDays,
-            TotalOt1Hours = p.TotalOt1Hours,
-            TotalOt2Hours = p.TotalOt2Hours,
-            TotalOt3Hours = p.TotalOt3Hours,
-            Ot1Pay = p.Ot1Pay,
-            Ot2Pay = p.Ot2Pay,
-            Ot3Pay = p.Ot3Pay,
-            TotalLeaveHours = p.TotalLeaveHours,
-            AnnualLeaveHours = p.AnnualLeaveHours,
-            PersonalLeaveHours = p.PersonalLeaveHours,
-            SickLeaveHours = p.SickLeaveHours,
-            FullAttendanceFlag = p.FullAttendanceFlag,
-            LateDeduction = p.LateDeduction,
-            EarlyDeduction = p.EarlyDeduction,
-            AnomalyPenalty = p.AnomalyPenalty,
-            OtherDeductions = p.OtherDeductions,
-            OvertimePay = p.OvertimePay,
-            Bonus = p.Bonus,
-            AttendanceBonus = p.AttendanceBonus,
-            LaborInsuranceDeduction = p.LaborInsuranceDeduction,
-            HealthInsuranceDeduction = p.HealthInsuranceDeduction,
-            PensionDeduction = p.PensionDeduction,
-            WithholdingTax = p.WithholdingTax,
-            GrossPay = p.GrossPay,
-            TotalDeductions = p.TotalDeductions,
-            EmployerContributions = p.EmployerContributions,
-            NetPay = p.NetPay,
-            Status = p.Status,
-            PaymentDate = p.PaymentDate,
-            PaymentBankAccount = p.PaymentBankAccount,
-            PayrollSlipNo = p.PayrollSlipNo,
-            CostAllocation = p.CostAllocation,
-            Notes = p.Notes,
-            CreatedAt = p.CreatedAt
-        };
-
+        var dto = await _payrollService.GetPayrollRecordAsync(id);
+        if (dto == null) return NotFound(ApiResponse<PayrollDto>.Fail("Payroll record not found"));
         return Ok(dto);
     }
 
     [HttpPost("calculate")]
     public async Task<ActionResult<ApiResponse<PayrollDto>>> CalculatePayroll([FromBody] CalculatePayrollRequest req)
     {
-        var employee = await _db.Employees.FindAsync(req.EmployeeId);
-        if (employee == null) return BadRequest(ApiHelper.Fail("Employee not found"));
-
-        var attendanceQuery = _db.AttendanceRecords
-            .Where(a => a.EmployeeId == req.EmployeeId && a.Date >= req.PeriodStart && a.Date <= req.PeriodEnd);
-
-        var attendance = await attendanceQuery.ToListAsync();
-        var totalLateMinutes = attendance.Sum(a => a.LateMinutes);
-        var totalEarlyMinutes = attendance.Sum(a => a.EarlyLeaveMinutes);
-        var actualDays = attendance.Count(a => a.Status == "present");
-
-        var leaveQuery = _db.LeaveRequests
-            .Where(l => l.EmployeeId == req.EmployeeId && l.StartDate >= req.PeriodStart && l.EndDate <= req.PeriodEnd && l.Status == "approved");
-
-        var leaves = await leaveQuery.ToListAsync();
-        var leaveHours = leaves.Sum(l => l.TotalHours);
-
-        var basicSalary = 0m;
-
-        var grossPay = basicSalary;
-
-        var payroll = new Payroll
-        {
-            Id = Guid.NewGuid(),
-            EmployeeId = req.EmployeeId,
-            PeriodStart = req.PeriodStart,
-            PeriodEnd = req.PeriodEnd,
-            BasicSalary = basicSalary,
-            InsuranceBase = basicSalary,
-            PensionBase = basicSalary,
-            ScheduledDays = 22,
-            ActualWorkingDays = actualDays,
-            TotalLateMinutes = totalLateMinutes,
-            TotalEarlyMinutes = totalEarlyMinutes,
-            AnomalyDays = attendance.Count(a => a.LateFlag || a.EarlyLeaveFlag || a.ClockingAnomalyFlag),
-            TotalLeaveHours = leaveHours,
-            Status = "calculated",
-            CalculatedAt = DateTime.UtcNow
-        };
-
-        _db.Payrolls.Add(payroll);
-        await _db.SaveChangesAsync();
-
-        var dto = new PayrollDto
-        {
-            Id = payroll.Id,
-            EmployeeId = payroll.EmployeeId,
-            EmployeeName = employee.ChineseName,
-            PeriodStart = payroll.PeriodStart,
-            PeriodEnd = payroll.PeriodEnd,
-            BasicSalary = payroll.BasicSalary,
-            GrossPay = payroll.GrossPay,
-            TotalDeductions = payroll.TotalDeductions,
-            NetPay = payroll.NetPay,
-            Status = payroll.Status,
-            CreatedAt = payroll.CreatedAt
-        };
-
+        var (dto, status) = await _payrollService.CalculatePayrollAsync(req);
+        if (status == "calculation_not_configured")
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                ApiResponse<PayrollDto>.Fail(
+                    "Payroll calculation is unavailable until approved rules and statutory tables are configured"));
+        if (dto == null) return BadRequest(ApiResponse<PayrollDto>.Fail("Employee not found"));
         return Ok(dto);
     }
 
     [HttpPatch("{id}/approve")]
     public async Task<ActionResult<ApiResponse>> ApprovePayroll(Guid id)
     {
-        var payroll = await _db.Payrolls.FindAsync(id);
-        if (payroll == null) return NotFound(ApiHelper.Fail("Payroll not found"));
-
-        payroll.Status = "approved";
-        await _db.SaveChangesAsync();
-
-        return ApiResponse.Ok("Payroll approved");
+        var success = await _payrollService.ApprovePayrollAsync(id);
+        if (!success) return NotFound(new ApiResponse { Success = false, Message = "Payroll not found" });
+        return new OkObjectResult(new ApiResponse { Success = true, Message = "Payroll approved" });
     }
 
     [HttpGet("summary")]
     public async Task<ActionResult<ApiResponse<PayrollSummaryDto>>> GetPayrollSummary([FromQuery] DateTime periodStart, [FromQuery] DateTime periodEnd)
     {
-        var payrolls = await _db.Payrolls
-            .Where(p => p.PeriodStart == periodStart && p.PeriodEnd == periodEnd && p.Status != "draft")
-            .ToListAsync();
-
-        var summary = new PayrollSummaryDto
-        {
-            PeriodStart = periodStart,
-            PeriodEnd = periodEnd,
-            EmployeeCount = payrolls.Count,
-            TotalBasicSalary = payrolls.Sum(p => p.BasicSalary),
-            TotalGrossPay = payrolls.Sum(p => p.GrossPay),
-            TotalDeductions = payrolls.Sum(p => p.TotalDeductions),
-            TotalNetPay = payrolls.Sum(p => p.NetPay),
-            TotalEmployerContributions = payrolls.Sum(p => p.EmployerContributions)
-        };
-
+        var summary = await _payrollService.GetPayrollSummaryAsync(periodStart, periodEnd);
+        if (summary == null) return NotFound(ApiResponse<PayrollSummaryDto>.Fail("No payroll records found"));
         return Ok(summary);
     }
-}
 
+    [HttpGet("policies")]
+    [PermissionAuthorize("hr", "view")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<PayrollPolicyVersionDto>>>> GetPayrollPolicies(
+        CancellationToken cancellationToken)
+        => Ok(await _payrollPolicyService.GetPoliciesAsync(cancellationToken));
+
+    [HttpGet("policies/pending-finance-review")]
+    [PermissionAuthorize("finance", "approve")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<PayrollPolicyVersionDto>>>> GetPendingFinanceReview(
+        CancellationToken cancellationToken)
+        => Ok(await _payrollPolicyService.GetPendingFinanceReviewAsync(cancellationToken));
+
+    [HttpGet("policies/{id:guid}")]
+    [PermissionAuthorize("hr", "view")]
+    public async Task<ActionResult<ApiResponse<PayrollPolicyVersionDto>>> GetPayrollPolicy(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var policy = await _payrollPolicyService.GetPolicyAsync(id, cancellationToken);
+        return policy == null
+            ? NotFound(ApiResponse<PayrollPolicyVersionDto>.Fail("Payroll policy not found"))
+            : Ok(policy);
+    }
+
+    [HttpPost("policies")]
+    [PermissionAuthorize("hr", "create")]
+    public async Task<ActionResult<ApiResponse<PayrollPolicyVersionDto>>> CreatePayrollPolicyDraft(
+        [FromBody] SavePayrollPolicyRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _payrollPolicyService.CreateDraftAsync(request, GetUserId(), cancellationToken);
+        if (result.Policy == null)
+            return PolicyOperationError(result);
+        return StatusCode(
+            StatusCodes.Status201Created,
+            ApiResponse<PayrollPolicyVersionDto>.Ok(result.Policy, "Draft saved; payroll calculation remains disabled"));
+    }
+
+    [HttpPut("policies/{id:guid}")]
+    [PermissionAuthorize("hr", "edit")]
+    public async Task<ActionResult<ApiResponse<PayrollPolicyVersionDto>>> UpdatePayrollPolicyDraft(
+        Guid id,
+        [FromBody] SavePayrollPolicyRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _payrollPolicyService.UpdateDraftAsync(id, request, GetUserId(), cancellationToken);
+        return result.Policy == null
+            ? PolicyOperationError(result)
+            : Ok(result.Policy, "Draft updated; payroll calculation remains disabled");
+    }
+
+    [HttpPost("policies/{id:guid}/submit")]
+    [PermissionAuthorize("hr", "approve")]
+    public async Task<ActionResult<ApiResponse<PayrollPolicyVersionDto>>> SubmitPayrollPolicy(
+        Guid id,
+        [FromBody] SubmitPayrollPolicyRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _payrollPolicyService.SubmitAsync(
+            id,
+            GetUserId(),
+            request.ConfirmedOfficialSources,
+            cancellationToken);
+        return result.Policy == null
+            ? PolicyOperationError(result)
+            : Ok(result.Policy, "Submitted for independent Finance review; payroll calculation remains disabled");
+    }
+
+    [HttpPost("policies/{id:guid}/approve")]
+    [PermissionAuthorize("finance", "approve")]
+    public async Task<ActionResult<ApiResponse<PayrollPolicyVersionDto>>> ApprovePayrollPolicy(
+        Guid id,
+        [FromBody] ReviewPayrollPolicyRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _payrollPolicyService.ApproveAsync(
+            id,
+            GetUserId(),
+            request.ConfirmedOfficialSources,
+            request.Comment,
+            cancellationToken);
+        return result.Policy == null
+            ? PolicyOperationError(result)
+            : Ok(result.Policy, "Policy approved for recordkeeping only; payroll calculation remains disabled");
+    }
+
+    [HttpPost("policies/{id:guid}/reject")]
+    [PermissionAuthorize("finance", "approve")]
+    public async Task<ActionResult<ApiResponse<PayrollPolicyVersionDto>>> RejectPayrollPolicy(
+        Guid id,
+        [FromBody] ReviewPayrollPolicyRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _payrollPolicyService.RejectAsync(id, GetUserId(), request.Comment ?? string.Empty, cancellationToken);
+        return result.Policy == null
+            ? PolicyOperationError(result)
+            : Ok(result.Policy, "Policy returned; payroll calculation remains disabled");
+    }
+
+    private ActionResult<ApiResponse<PayrollPolicyVersionDto>> PolicyOperationError(PayrollPolicyOperationResultDto result)
+    {
+        if (result.Error == "invalid_actor")
+            return Unauthorized(ApiResponse<PayrollPolicyVersionDto>.Fail("An authenticated user ID is required"));
+        if (result.Error == "not_found")
+            return NotFound(ApiResponse<PayrollPolicyVersionDto>.Fail("Payroll policy not found"));
+        if (result.Error == "policy_incomplete")
+            return Conflict(new
+            {
+                success = false,
+                message = "Required policy sections are missing",
+                missingFields = result.MissingFields
+            });
+        if (result.Error == "policy_json_must_be_a_json_object")
+            return BadRequest(ApiResponse<PayrollPolicyVersionDto>.Fail("Policy JSON must be a valid JSON object"));
+        if (result.Error == "effective_date_required")
+            return BadRequest(ApiResponse<PayrollPolicyVersionDto>.Fail("Payroll policy effective date is required"));
+        if (result.Error == "approval_document_reference_required")
+            return BadRequest(ApiResponse<PayrollPolicyVersionDto>.Fail("HR approval document reference is required"));
+        if (result.Error == "reviewer_must_be_independent")
+            return Conflict(ApiResponse<PayrollPolicyVersionDto>.Fail("Finance reviewer must be different from the creator and HR submitter"));
+        if (result.Error == "review_comment_required")
+            return BadRequest(ApiResponse<PayrollPolicyVersionDto>.Fail("A review comment is required for Finance approval or rejection"));
+        if (result.Error == "official_sources_not_confirmed")
+            return Conflict(ApiResponse<PayrollPolicyVersionDto>.Fail("Official policy source documents must be confirmed before review"));
+        if (result.Error == "policy_is_immutable")
+            return Conflict(ApiResponse<PayrollPolicyVersionDto>.Fail("Only draft payroll policies can be edited"));
+        if (result.Error == "version_code_already_exists")
+            return Conflict(ApiResponse<PayrollPolicyVersionDto>.Fail("Payroll policy version code already exists"));
+        return Conflict(ApiResponse<PayrollPolicyVersionDto>.Fail("Payroll policy is not in a state that allows this action"));
+    }
+}

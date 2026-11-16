@@ -77,11 +77,3 @@ public class MpsController : BaseController
         return Ok(status);
     }
 }
-
-public class MpsExceptionDto
-{
-    public Guid Id { get; set; }
-    public string Severity { get; set; } = null!;
-    public string Message { get; set; } = null!;
-    public DateTime CreatedAt { get; set; }
-}

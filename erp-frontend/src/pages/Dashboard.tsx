@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
-  TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Megaphone, 
-  UserPlus, ClipboardCheck, FileDown, Calendar, ChevronLeft, 
-  ChevronRight, Zap, Clock, ArrowRight, CalendarDays, X, 
-  ShieldCheck, Users, Briefcase, Activity, Sparkles
+  TrendingUp, TrendingDown, AlertTriangle, Megaphone,
+  UserPlus, ClipboardCheck, FileDown,
+  ChevronRight,
+  ShieldCheck, Users, Briefcase, Activity, Sparkles, Package
 } from 'lucide-react';
-import { useDashboard, useCalendarRange } from '../hooks/useApi';
-import type { DashboardKpi, WorkOrderSummary, CalendarEventDto } from '../api/api';
+import { useDashboard } from '../hooks/useApi';
+import type { DashboardKpi } from '../api/api';
 import type { ModuleId } from '../types/index.ts';
 import './styles/Dashboard-Luxury.css';
 
@@ -25,16 +25,28 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100, damping: 20 } }
 } as const;
 
-function PremiumKpiCard({ kpi, index }: { kpi: DashboardKpi; index: number }) {
+function PremiumKpiCard({ kpi }: { kpi: DashboardKpi }) {
   const isPositive = kpi.changeDirection === 'up';
   const color = isPositive ? 'var(--lux-emerald)' : '#ef4444';
   
-  const iconMap: Record<string, any> = {
+  const iconMap: Record<string, React.ReactNode> = {
     'Total Employees': <Users size={20} />,
     'Today Attendance': <Activity size={20} />,
     'Pending Approvals': <ClipboardCheck size={20} />,
+    'Low Stock Alerts': <Package size={20} />,
+    '員工總數': <Users size={20} />,
+    '今日出勤': <Activity size={20} />,
+    '待審核項目': <ClipboardCheck size={20} />,
+    '低庫存警示': <Package size={20} />,
     'Active Alerts': <AlertTriangle size={20} />,
   };
+  const titleMap: Record<string, string> = {
+    'total employees': '員工總數',
+    'today attendance': '今日出勤',
+    'pending approvals': '待審核項目',
+    'low stock alerts': '低庫存警示',
+  };
+  const title = titleMap[kpi.title.trim().toLocaleLowerCase()] ?? kpi.title;
 
   return (
     <motion.div 
@@ -45,7 +57,7 @@ function PremiumKpiCard({ kpi, index }: { kpi: DashboardKpi; index: number }) {
       <div className="lux-stat-icon" style={{ color: 'var(--lux-gold)' }}>
         {iconMap[kpi.title] || <TrendingUp size={20} />}
       </div>
-      <div className="lux-stat-label">{kpi.title}</div>
+      <div className="lux-stat-label">{title}</div>
       <div className="lux-stat-value-container">
         <span className="lux-stat-value">{kpi.value}</span>
         {kpi.unit && <span className="lux-stat-unit">{kpi.unit}</span>}
@@ -61,40 +73,18 @@ function PremiumKpiCard({ kpi, index }: { kpi: DashboardKpi; index: number }) {
   );
 }
 
-function WorkOrderItemPremium({ wo }: { wo: WorkOrderSummary }) {
-  const progress = wo.plannedQty > 0 ? Math.round((wo.completedQty / wo.plannedQty) * 100) : 0;
-  return (
-    <div className="wo-item-premium">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--cobalt-400)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>#{wo.woNumber}</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--slate-100)', marginTop: 2 }}>{wo.productName}</div>
-        </div>
-        <div className={`status-badge status-${wo.status === 'completed' ? 'active' : 'warning'}`}>
-          {wo.status === 'completed' ? '已完成' : '執行中'}
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="progress-bar" style={{ height: 4 }}>
-          <motion.div 
-            className="progress-fill" 
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={{ duration: 1, delay: 0.5 }}
-          />
-        </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-300)', minWidth: 35 }}>{progress}%</span>
-      </div>
-    </div>
-  );
+interface DashboardTooltipProps {
+  active?: boolean;
+  payload?: Array<{ color?: string; value?: string | number; name?: string | number }>;
+  label?: string | number;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: DashboardTooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="lux-tooltip">
       <div className="lux-tooltip-label">{label}</div>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <div key={i} className="lux-tooltip-item">
           <div className="lux-tooltip-dot" style={{ background: p.color }} />
           <span className="lux-tooltip-value">{p.value}</span>
@@ -106,11 +96,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function Dashboard({ onNavigate }: { onNavigate?: (id: ModuleId) => void }) {
-  const { data: resp, isLoading } = useDashboard();
+  const { data: resp, isLoading, isFetching, refetch } = useDashboard();
   const data = resp?.data;
   const navigate = onNavigate || (() => {});
-
-  const [hoveredAction, setHoveredAction] = useState<number | null>(null);
 
   if (isLoading) return <div className="dashboard-loading">
     <motion.div 
@@ -120,7 +108,19 @@ export function Dashboard({ onNavigate }: { onNavigate?: (id: ModuleId) => void 
     />
   </div>;
 
-  if (!data) return <div className="dashboard-error">無法載入系統資料</div>;
+  if (!data) return (
+    <div className="dashboard-error">
+      無法載入系統資料
+      <button
+        type="button"
+        disabled={isFetching}
+        onClick={() => void refetch()}
+        style={{ marginLeft: 12 }}
+      >
+        {isFetching ? '載入中...' : '重新載入'}
+      </button>
+    </div>
+  );
 
   return (
     <motion.div 
@@ -149,7 +149,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (id: ModuleId) => void 
       {/* KPI 卡片區 */}
       <div className="lux-stats-grid">
         {data.kpiCards.map((kpi, i) => (
-          <PremiumKpiCard key={i} kpi={kpi} index={i} />
+          <PremiumKpiCard key={i} kpi={kpi} />
         ))}
       </div>
 
@@ -247,7 +247,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (id: ModuleId) => void 
                 { icon: <Briefcase size={18} />, label: '產能排程', id: 'aps' },
                 { icon: <FileDown size={18} />, label: '結算中心', id: 'actual_costing' },
               ].map((item, i) => (
-                <button key={i} className="lux-action-btn" onClick={() => navigate(item.id as any)}>
+              <button key={i} className="lux-action-btn" onClick={() => navigate(item.id as ModuleId)}>
                   <div className="lux-action-icon">{item.icon}</div>
                   <span className="lux-action-label">{item.label}</span>
                 </button>

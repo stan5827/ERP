@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { substituteApi, skusApi, SubstituteGroupDto, SubstituteItemDto, SkuDto } from '../api/api';
+import { substituteApi, skusApi, SubstituteGroupDto, SkuDto } from '../api/api';
 import { Plus, Edit2, Trash2, Search, Save, X } from 'lucide-react';
+
+type SubstituteItemForm = {
+  skuId: string;
+  priority: number;
+  conversionRate: number;
+  isPrimary: boolean;
+};
 
 export const SubstituteManagement: React.FC = () => {
   const [groups, setGroups] = useState<SubstituteGroupDto[]>([]);
@@ -16,7 +23,7 @@ export const SubstituteManagement: React.FC = () => {
     substitutionType: 'full',
     allowAutoSubstitute: true,
     isBidirectional: true,
-    items: [] as Array<{ skuId: string; priority: number; conversionRate: number; isPrimary: boolean }>
+    items: [] as SubstituteItemForm[]
   });
 
   useEffect(() => {
@@ -113,7 +120,11 @@ export const SubstituteManagement: React.FC = () => {
     });
   };
 
-  const updateItem = (index: number, field: string, value: any) => {
+  const updateItem = <K extends keyof SubstituteItemForm>(
+    index: number,
+    field: K,
+    value: SubstituteItemForm[K],
+  ) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
     setFormData({ ...formData, items: newItems });

@@ -1,9 +1,14 @@
+using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using ErpBackend.Data;
+using ErpBackend.DTOs;
 using ErpBackend.Models.System;
+using ErpBackend.Services;
 
 namespace ErpBackend.Filters;
 
@@ -12,11 +17,16 @@ public class PermissionAuthorizeAttribute : Attribute
 {
     public string Module { get; set; } = null!;
     public string Action { get; set; } = null!;
+    public string[] AdditionalPermissionCodes { get; }
 
-    public PermissionAuthorizeAttribute(string module, string action)
+    public PermissionAuthorizeAttribute(
+        string module,
+        string action,
+        params string[] additionalPermissionCodes)
     {
         Module = module;
         Action = action;
+        AdditionalPermissionCodes = additionalPermissionCodes;
     }
 }
 
@@ -24,61 +34,148 @@ public class PermissionAuthorizeFilter : IAsyncAuthorizationFilter
 {
     private readonly ErpGeneralDbContext _db;
     private readonly ILogger<PermissionAuthorizeFilter> _logger;
+    private readonly IAgentDisclosureAuditService? _agentDisclosureAudit;
 
-    public PermissionAuthorizeFilter(ErpGeneralDbContext db, ILogger<PermissionAuthorizeFilter> logger)
+    public PermissionAuthorizeFilter(
+        ErpGeneralDbContext db,
+        ILogger<PermissionAuthorizeFilter> logger,
+        IAgentDisclosureAuditService? agentDisclosureAudit = null)
     {
         _db = db;
         _logger = logger;
+        _agentDisclosureAudit = agentDisclosureAudit;
     }
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
-        // 取得控制器或方法上的權限屬性
         var endpoint = context.HttpContext.GetEndpoint();
-        if (endpoint == null)
-        {
+        if (endpoint == null || endpoint.Metadata.GetMetadata<IAllowAnonymous>() != null)
             return;
-        }
 
-        var permissionAttr = endpoint.Metadata.GetMetadata<PermissionAuthorizeAttribute>();
-        if (permissionAttr == null)
+        if (endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
+            .Any(data => string.Equals(data.Policy, "SupplierPortal", StringComparison.Ordinal)
+                || string.Equals(data.Policy, "SupplierPortalInvitationCompletion", StringComparison.Ordinal)))
+            return;
+
+        if (context.HttpContext.User.Identity?.IsAuthenticated != true)
         {
-            return; // 沒有權限要求，放行
-        }
-
-        // 取得目前登入的使用者 ID
-        var userIdClaim = context.HttpContext.User.FindFirst("sub")?.Value 
-            ?? context.HttpContext.User.FindFirst("user_id")?.Value;
-
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
+            await RecordAgentAuthorizationDenialAsync(context, null, "unauthenticated");
             context.Result = new UnauthorizedObjectResult(new { message = "請先登入系統" });
             return;
         }
 
-        // 取得使用者的權限清單
-        var userPermissions = await _db.UserRoles
-            .Where(ur => ur.UserId == userId)
-            .SelectMany(ur => _db.RolePermissions
-                .Where(rp => rp.RoleId == ur.RoleId)
-                .Select(rp => rp.Permission.PermissionCode))
-            .Distinct()
-            .ToListAsync();
+        var actionDescriptor = context.ActionDescriptor as ControllerActionDescriptor;
+        var controllerName = actionDescriptor?.ControllerName + "Controller";
+        var actionName = actionDescriptor?.ActionName ?? string.Empty;
 
-        // 檢查是否有權限 (格式: Module.Action)
-        var requiredPermission = $"{permissionAttr.Module}.{permissionAttr.Action}";
-        
-        if (!userPermissions.Contains("admin.*") && !userPermissions.Contains(requiredPermission))
+        if (string.Equals(controllerName, "AuthController", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(actionName, "ChangePassword", StringComparison.OrdinalIgnoreCase))
+            return;
+        if (string.Equals(controllerName, "SystemSettingsController", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(actionName, "GetCurrentUserModules", StringComparison.OrdinalIgnoreCase))
+            return;
+        if (string.Equals(controllerName, "SystemSettingsController", StringComparison.OrdinalIgnoreCase)
+            && (string.Equals(actionName, "GetUserTheme", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actionName, "UpdateUserTheme", StringComparison.OrdinalIgnoreCase)))
+            return;
+        // ESS endpoints enforce the employee_id claim and scope each operation to that employee.
+        if (string.Equals(controllerName, "EmployeeEssController", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var permissionAttr = endpoint.Metadata.GetMetadata<PermissionAuthorizeAttribute>();
+        string moduleId;
+        string action;
+        if (permissionAttr != null)
+        {
+            moduleId = permissionAttr.Module;
+            action = permissionAttr.Action;
+        }
+        else if (!PermissionCatalog.TryGetModule(controllerName ?? string.Empty, out moduleId))
+        {
+            _logger.LogWarning("Denied access to unmapped controller {Controller}", controllerName);
+            context.Result = new ForbidResult();
+            return;
+        }
+        else
+        {
+            action = PermissionCatalog.ResolveAction(
+                context.HttpContext.Request.Method,
+                actionName);
+        }
+
+        var userIdClaim = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? context.HttpContext.User.FindFirst("sub")?.Value
+            ?? context.HttpContext.User.FindFirst("user_id")?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            await RecordAgentAuthorizationDenialAsync(context, null, "user_id_claim_missing_or_invalid");
+            context.Result = new UnauthorizedObjectResult(new { message = "請先登入系統" });
+            return;
+        }
+
+        if (context.HttpContext.User.IsInRole("Admin"))
+            return;
+
+        var userPermissions = await _db.UserRoles
+            .Where(userRole => userRole.UserId == userId && userRole.Role.IsActive)
+            .SelectMany(userRole => userRole.Role.RolePermissions)
+            .Where(rolePermission => rolePermission.Permission.IsActive)
+            .Select(rolePermission => rolePermission.Permission.PermissionCode)
+            .Distinct()
+            .ToListAsync(context.HttpContext.RequestAborted);
+        var grantedCodes = userPermissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var requiredPermission = PermissionCatalog.GetActionCode(moduleId, action);
+        var hasResourceAccess = PermissionCatalog
+            .GetResourcesForAction(controllerName ?? string.Empty, actionName)
+            .Any(resource =>
+                (grantedCodes.Contains(PermissionCatalog.GetResourcePageCode(resource))
+                    && string.Equals(action, "view", StringComparison.OrdinalIgnoreCase))
+                || grantedCodes.Contains(PermissionCatalog.GetResourceActionCode(resource, action)));
+        var hasAccess = grantedCodes.Contains(moduleId)
+            || (string.Equals(action, "view", StringComparison.OrdinalIgnoreCase)
+                && grantedCodes.Contains($"{moduleId}:page"))
+            || grantedCodes.Contains(requiredPermission)
+            || hasResourceAccess
+            || ((moduleId is "productengineering" or "processengineering")
+                && grantedCodes.Contains(PermissionCatalog.GetActionCode("engineering", action)))
+            || (permissionAttr?.AdditionalPermissionCodes.Any(grantedCodes.Contains) ?? false);
+
+        if (!hasAccess)
         {
             _logger.LogWarning("User {UserId} denied access to {Permission}", userId, requiredPermission);
+            await RecordAgentAuthorizationDenialAsync(context, userId, "module_permission_denied");
             context.Result = new ForbidResult();
         }
+    }
+
+    private Task RecordAgentAuthorizationDenialAsync(
+        AuthorizationFilterContext context,
+        Guid? actorUserId,
+        string reason)
+    {
+        var controllerName = (context.ActionDescriptor as ControllerActionDescriptor)?.ControllerName;
+        if (!string.Equals(controllerName, "AgentWip", StringComparison.OrdinalIgnoreCase)
+            || _agentDisclosureAudit is null)
+            return Task.CompletedTask;
+
+        return _agentDisclosureAudit.RecordAsync(
+            new AgentDisclosureAuditEntryDto(
+                actorUserId,
+                context.HttpContext.TraceIdentifier,
+                "permission_blocked",
+                reason,
+                null,
+                [],
+                context.HttpContext.Connection.RemoteIpAddress?.ToString(),
+                context.HttpContext.Request.Headers.UserAgent.ToString()),
+            context.HttpContext.RequestAborted);
     }
 }
 
 // 記錄所有 API 操作的 Audit Log Filter
-public class AuditLogFilter : IActionFilter
+public class AuditLogFilter : IAsyncActionFilter
 {
+    private const int MaxActionLength = 50;
     private readonly ErpGeneralDbContext _db;
     private readonly ILogger<AuditLogFilter> _logger;
 
@@ -88,17 +185,25 @@ public class AuditLogFilter : IActionFilter
         _logger = logger;
     }
 
-    public void OnActionExecuting(ActionExecutingContext context)
+    public async Task OnActionExecutionAsync(
+        ActionExecutingContext context,
+        ActionExecutionDelegate next)
     {
         context.HttpContext.Items["RequestStartTime"] = DateTime.UtcNow;
-    }
+        await next();
+        if (context.HttpContext.Items[AgentDisclosureAuditService.AuditRecordedItemKey] is true)
+            return;
 
-    public void OnActionExecuted(ActionExecutedContext context)
-    {
+        if (context.HttpContext.GetEndpoint()?.Metadata.GetOrderedMetadata<IAuthorizeData>()
+            .Any(data => string.Equals(data.Policy, "SupplierPortal", StringComparison.Ordinal)
+                || string.Equals(data.Policy, "SupplierPortalInvitationCompletion", StringComparison.Ordinal)) == true)
+            return;
+
         var startTime = (DateTime?)context.HttpContext.Items["RequestStartTime"];
         if (startTime == null) return;
 
-        var userIdClaim = context.HttpContext.User.FindFirst("sub")?.Value 
+        var userIdClaim = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? context.HttpContext.User.FindFirst("sub")?.Value
             ?? context.HttpContext.User.FindFirst("user_id")?.Value;
 
         if (!string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var userId))
@@ -120,10 +225,13 @@ public class AuditLogFilter : IActionFilter
 
             if (action != null && path.StartsWithSegments("/api"))
             {
+                var actionDescription = $"{action} {path}";
                 var log = new AuditLog
                 {
                     UserId = userId,
-                    Action = $"{action} {path}",
+                    Action = actionDescription.Length <= MaxActionLength
+                        ? actionDescription
+                        : actionDescription[..MaxActionLength],
                     TableName = ExtractTableName(path),
                     IpAddress = context.HttpContext.Connection.RemoteIpAddress?.ToString(),
                     UserAgent = context.HttpContext.Request.Headers["User-Agent"].FirstOrDefault(),
@@ -131,7 +239,18 @@ public class AuditLogFilter : IActionFilter
                 };
 
                 _db.AuditLogs.Add(log);
-                _ = _db.SaveChangesAsync(); // Fire and forget
+                try
+                {
+                    await _db.SaveChangesAsync(context.HttpContext.RequestAborted);
+                }
+                catch (OperationCanceledException) when (context.HttpContext.RequestAborted.IsCancellationRequested)
+                {
+                    _logger.LogWarning("Audit log write was canceled after the request was aborted for {Path}.", path);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to write audit log for {Path}.", path);
+                }
             }
         }
     }

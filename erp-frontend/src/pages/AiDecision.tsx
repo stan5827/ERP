@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { 
   TrendingUp, TrendingDown, AlertTriangle, Package, ShoppingCart, 
-  Clock, Zap, CheckCircle, Truck, Factory, ArrowRight, Brain, 
-  Lightbulb, Target, Activity, BarChart3, Gauge, Cpu, Sparkles 
+  Zap, ArrowRight, Brain, Target, Cpu, Sparkles
 } from 'lucide-react';
 
 interface Forecast {
@@ -27,6 +26,11 @@ interface Recommendation {
   reason: string;
   estimatedDeliveryDays: number;
   estimatedCost: number;
+}
+
+interface ForecastChartDatum {
+  period: string;
+  [skuName: string]: string | number;
 }
 
 const containerVariants = {
@@ -60,7 +64,7 @@ export function AiDecision() {
     { skuId: 'RAW-003', skuName: '原料C', currentStock: 1200, safetyStock: 400, reorderPoint: 500, recommendedQty: 0, urgency: 'low', reason: '庫存充足，無需補貨', estimatedDeliveryDays: 0, estimatedCost: 0 },
   ];
 
-  const chartData = forecasts.reduce((acc: any[], f) => {
+  const chartData = forecasts.reduce<ForecastChartDatum[]>((acc, f) => {
     const existing = acc.find(a => a.period === f.period);
     if (existing) {
       existing[f.skuName] = f.forecastQty;
@@ -69,6 +73,13 @@ export function AiDecision() {
     }
     return acc;
   }, []);
+
+  const tabs = [
+    { id: 'forecast', label: '需求預測', icon: <TrendingUp size={16} /> },
+    { id: 'procurement', label: '採購建議', icon: <ShoppingCart size={16} /> },
+    { id: 'orders', label: '訂單分析', icon: <Target size={16} /> },
+    { id: 'insights', label: '工廠洞察', icon: <Zap size={16} /> },
+  ] as const;
 
   return (
     <motion.div 
@@ -100,15 +111,10 @@ export function AiDecision() {
 
       {/* 標籤切換 */}
       <motion.div variants={itemVariants} className="tab-list" style={{ maxWidth: 600, marginBottom: 32, padding: 6, gap: 8, border: '1px solid var(--premium-border)' }}>
-        {[
-          { id: 'forecast', label: '需求預測', icon: <TrendingUp size={16} /> },
-          { id: 'procurement', label: '採購建議', icon: <ShoppingCart size={16} /> },
-          { id: 'orders', label: '訂單分析', icon: <Target size={16} /> },
-          { id: 'insights', label: '工廠洞察', icon: <Zap size={16} /> },
-        ].map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
             className={`tab-item ${activeTab === tab.id ? 'active' : ''}`}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40 }}
           >

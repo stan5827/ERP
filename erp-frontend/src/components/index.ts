@@ -2,7 +2,8 @@
 export { Loading, Skeleton, SkeletonText, SkeletonCard, SkeletonTable, EmptyState } from './Uicomponents';
 
 // Toast Notifications
-export { ToastProviderWithInit, ToastContainer, toast, useToast } from '../hooks/useToast';
+export { ToastProviderWithInit, ToastContainer } from '../hooks/useToast';
+export { toast, useToast } from '../hooks/toastContext';
 
 // Form Components
 export { Input, Textarea, Select, Checkbox, RadioGroup, Switch } from './FormComponents';
@@ -11,7 +12,8 @@ export { Input, Textarea, Select, Checkbox, RadioGroup, Switch } from './FormCom
 export { DataTable, type Column } from './DataTable';
 
 // Confirm Dialog
-export { ConfirmDialog, useConfirmDialog } from './ConfirmDialog';
+export { ConfirmDialog } from './ConfirmDialog';
+export { useConfirmDialog } from './useConfirmDialog';
 
 // Keyboard Hooks
 export { useKeyboardShortcuts, useErpKeyboardShortcuts, useFocusTrap, useAutoFocus, useListNavigation } from '../hooks/useKeyboard';

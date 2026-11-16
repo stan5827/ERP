@@ -5,6 +5,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ErpBackend.Services;
 
+public interface ICostingService
+{
+    Task<CostCenterReportDto> GetCostCenterReportAsync(Guid costCenterId, DateTime? fromDate = null, DateTime? toDate = null);
+    Task<decimal> CalculateActivityCostAsync(Guid activityTypeId, decimal quantity);
+    Task<Dictionary<Guid, decimal>> AllocateCostsAsync(Guid sourceCostCenterId, DateTime periodEnd);
+    Task<decimal> GetWorkCenterTotalRateAsync(Guid workCenterId);
+    Task<bool> LinkWorkCenterToCostCenterAsync(Guid workCenterId, Guid costCenterId);
+    Task<WorkCenterCostDto> SetWorkCenterRatesAsync(CreateWorkCenterCostRequest request);
+    Task UpdateBudgetUsedAsync(Guid costCenterId, decimal amount);
+    
+    // Actual Costing Collection
+    Task RecordMaterialActualAsync(Guid woId, Guid skuId, decimal qty, decimal unitCost, string? lotNo = null, Guid? trxId = null);
+    Task RecordLaborActualAsync(Guid woId, Guid reportId, int opSeq, decimal hours, decimal rate, Guid? employeeId = null);
+    Task RecordMachineActualAsync(Guid woId, Guid reportId, int opSeq, decimal hours, decimal rate, Guid? workCenterId = null, decimal overheadRate = 0);
+}
+
 public class CostingService : ICostingService
 {
     private readonly ErpGeneralDbContext _db;
@@ -12,49 +28,6 @@ public class CostingService : ICostingService
     public CostingService(ErpGeneralDbContext db)
     {
         _db = db;
-    }
-
-    public Task<StandardCostBreakdownDto> CalculateStandardCostAsync(Guid workOrderId)
-    {
-        return Task.FromResult(new StandardCostBreakdownDto
-        {
-            MaterialCost = 100,
-            LaborCost = 50,
-            MachineCost = 20
-        });
-    }
-
-    public async Task<WorkOrderCostAnalysisDto> GetActualCostAnalysisAsync(Guid workOrderId)
-    {
-        var materials = await _db.WorkOrderMaterialActuals.Where(m => m.WorkOrderId == workOrderId).SumAsync(m => m.TotalAmount);
-        var labor = await _db.WorkOrderLaborActuals.Where(l => l.WorkOrderId == workOrderId).SumAsync(l => l.TotalAmount);
-        var machine = await _db.WorkOrderMachineActuals.Where(m => m.WorkOrderId == workOrderId).SumAsync(m => m.TotalAmount);
-
-        return new WorkOrderCostAnalysisDto
-        {
-            WorkOrderId = workOrderId,
-            ActualMaterialCost = materials,
-            ActualLaborCost = labor,
-            ActualOverheadCost = machine,
-            TotalActualCost = materials + labor + machine
-        };
-    }
-
-    public async Task<WorkOrderCost> SettleWorkOrderAsync(Guid workOrderId)
-    {
-        var analysis = await GetActualCostAnalysisAsync(workOrderId);
-        var cost = new WorkOrderCost
-        {
-            WorkOrderId = workOrderId,
-            MaterialCost = analysis.ActualMaterialCost,
-            LaborCost = analysis.ActualLaborCost,
-            OverheadCost = analysis.ActualOverheadCost,
-            TotalCost = analysis.TotalActualCost,
-            SettlementDate = DateTime.UtcNow
-        };
-        _db.WorkOrderCosts.Add(cost);
-        await _db.SaveChangesAsync();
-        return cost;
     }
 
     public async Task<CostCenterReportDto> GetCostCenterReportAsync(Guid costCenterId, DateTime? fromDate = null, DateTime? toDate = null)
@@ -205,7 +178,7 @@ public class CostingService : ICostingService
         }
     }
 
-    public async Task RecordMaterialActualAsync(Guid woId, Guid skuId, decimal qty, decimal unitCost, string? lotNo = null)
+    public async Task RecordMaterialActualAsync(Guid woId, Guid skuId, decimal qty, decimal unitCost, string? lotNo = null, Guid? trxId = null)
     {
         var actual = new WorkOrderMaterialActual
         {
@@ -215,6 +188,7 @@ public class CostingService : ICostingService
             UnitCost = unitCost,
             TotalAmount = qty * unitCost,
             LotNumber = lotNo,
+            InventoryTransactionId = trxId,
             TransactionDate = DateTime.UtcNow
         };
         _db.WorkOrderMaterialActuals.Add(actual);
@@ -238,7 +212,7 @@ public class CostingService : ICostingService
         await _db.SaveChangesAsync();
     }
 
-    public async Task RecordMachineActualAsync(Guid woId, Guid reportId, int opSeq, decimal hours, decimal rate, Guid? workCenterId = null)
+    public async Task RecordMachineActualAsync(Guid woId, Guid reportId, int opSeq, decimal hours, decimal rate, Guid? workCenterId = null, decimal overheadRate = 0)
     {
         var actual = new WorkOrderMachineActual
         {
@@ -248,31 +222,13 @@ public class CostingService : ICostingService
             WorkCenterId = workCenterId,
             ActualHours = hours,
             MachineRate = rate,
+            OverheadRate = overheadRate,
+            OverheadAmount = hours * overheadRate,
             TotalAmount = hours * rate,
             CreatedAt = DateTime.UtcNow
         };
         _db.WorkOrderMachineActuals.Add(actual);
         await _db.SaveChangesAsync();
-    }
-
-    public Task<List<CategoryCostAnalysisDto>> GetCategoryAnalysisAsync(DateTime startDate, DateTime endDate)
-    {
-        return Task.FromResult(new List<CategoryCostAnalysisDto>());
-    }
-
-    public Task<List<DepartmentVarianceDto>> GetDepartmentVarianceAsync(DateTime startDate, DateTime endDate)
-    {
-        return Task.FromResult(new List<DepartmentVarianceDto>());
-    }
-
-    public Task<List<CostTrendPointDto>> GetCostTrendAsync(DateTime startDate, DateTime endDate)
-    {
-        return Task.FromResult(new List<CostTrendPointDto>());
-    }
-
-    public Task SettleAllCompletedWorkOrdersAsync(Guid? jobId = null)
-    {
-        return Task.CompletedTask;
     }
 }
 

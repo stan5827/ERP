@@ -1,0 +1,8 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_KEYCLOAK_AUTHORITY?: string;
+  readonly VITE_KEYCLOAK_CLIENT_ID?: string;
+  readonly VITE_KEYCLOAK_SCOPE?: string;
+  readonly VITE_API_BASE_URL?: string;
+}

@@ -1,0 +1,102 @@
+@apiBase = http://localhost:5100/api/erp
+@authToken = replace-with-a-valid-access-token
+@workOrderId = 00000000-0000-0000-0000-000000000020
+@reportId = 00000000-0000-0000-0000-000000000021
+@equipmentId = 00000000-0000-0000-0000-000000000010
+
+### Submit one individual report for an operation
+POST {{apiBase}}/wipreports/submit
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "woNumber": "WO-REPLACE-ME",
+  "operationSeq": 10,
+  "reportType": "individual",
+  "teamMemberEmployeeIds": [],
+  "teamMemberHours": [],
+  "shiftClass": "day",
+  "completedQty": 25,
+  "defectQty": 0,
+  "scrapQty": 0,
+  "manHours": 2.5,
+  "machineHours": 0,
+  "setupHours": 0.5,
+  "runHours": 2,
+  "startTime": "2026-10-24T08:00:00Z",
+  "endTime": "2026-10-24T10:30:00Z",
+  "remarks": "Individual shift report"
+}
+
+### List reports submitted by or involving the authenticated employee
+GET {{apiBase}}/wipreports/my
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### List pending reports for a reviewer (requires manufacturing.approve)
+GET {{apiBase}}/wipreports/review-queue
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Approve a report (submitter cannot approve their own report)
+POST {{apiBase}}/wipreports/{{reportId}}/approve
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "comments": "Quantity and shift confirmed"
+}
+
+### Return a report for correction (reason is required)
+POST {{apiBase}}/wipreports/{{reportId}}/return
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "comments": "Please verify the reported good quantity"
+}
+
+### Correct and resubmit a returned report (same work order and operation)
+POST {{apiBase}}/wipreports/{{reportId}}/resubmit
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "woNumber": "WO-REPLACE-ME",
+  "operationSeq": 10,
+  "reportType": "individual",
+  "teamMemberEmployeeIds": [],
+  "teamMemberHours": [],
+  "shiftClass": "day",
+  "completedQty": 24,
+  "defectQty": 0,
+  "scrapQty": 0,
+  "manHours": 2.5,
+  "machineHours": 0,
+  "setupHours": 0.5,
+  "runHours": 2,
+  "startTime": "2026-10-24T08:00:00Z",
+  "endTime": "2026-10-24T10:30:00Z",
+  "remarks": "Corrected after review"
+}
+
+### Record equipment hours separately from production output
+POST {{apiBase}}/wipreports/equipment-usage
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "workOrderId": "{{workOrderId}}",
+  "operationSeq": 10,
+  "equipmentId": "{{equipmentId}}",
+  "machineHours": 2.5,
+  "shiftClass": "day",
+  "startTime": "2026-10-24T08:00:00Z",
+  "endTime": "2026-10-24T10:30:00Z",
+  "remarks": "Machine usage recorded independently"
+}
+
+### List equipment usage records for a work order
+GET {{apiBase}}/wipreports/work-orders/{{workOrderId}}/equipment-usage
+Authorization: Bearer {{authToken}}
+Accept: application/json

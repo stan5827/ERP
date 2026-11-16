@@ -1,19 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.QA;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
 [Route("api/erp/quality/[controller]")]
 public class IqcReportsController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly IIqcReportService _iqcReportService;
 
-    public IqcReportsController(ErpGeneralDbContext db)
+    public IqcReportsController(IIqcReportService iqcReportService)
     {
-        _db = db;
+        _iqcReportService = iqcReportService;
     }
 
     [HttpGet]
@@ -22,34 +21,57 @@ public class IqcReportsController : BaseController
         var page = GetPage();
         var pageSize = GetPageSize();
 
-        var query = _db.IqcReports.AsQueryable();
+        var (items, totalCount) = await _iqcReportService.GetReportsAsync(result, page, pageSize);
 
-        if (!string.IsNullOrEmpty(result))
-            query = query.Where(r => r.Result == result);
+        return Ok(items, totalCount: totalCount);
+    }
 
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(r => r.InspectionDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<IqcInspectionResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<IqcInspectionResponseDto>>> GetInspectionAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var inspection = await _iqcReportService.GetInspectionAsync(id, cancellationToken);
+        return inspection is null
+            ? NotFound(ApiResponse.Fail("找不到 IQC 檢驗單"))
+            : Ok(inspection);
+    }
 
-        var dtos = items.Select(r => new IqcReportDto
+    [Authorize]
+    [HttpPost("{id:guid}/decision")]
+    [ProducesResponseType(typeof(ApiResponse<IqcInspectionResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ApiResponse<IqcInspectionResponseDto>>> CompleteInspectionAsync(
+        Guid id,
+        [FromBody] CompleteIqcInspectionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var inspectorId = GetUserId();
+        if (inspectorId == Guid.Empty)
+            return Unauthorized(ApiResponse.Fail("無法識別檢驗人員"));
+
+        try
         {
-            Id = r.Id,
-            ReportNumber = r.ReportNumber,
-            // SkuId = r.SkuId,
-            // SkuName = r.Sku?.SkuName,
-            BatchNumber = r.LotNumber,
-            SampleQty = r.SampleSize,
-            DefectQty = r.RejectNumber,
-            Result = r.Result,
-            ReportDate = r.InspectionDate
-        }).ToList();
-
-        return Ok(dtos, totalCount: totalCount);
+            var result = await _iqcReportService.CompleteInspectionAsync(
+                id, request, inspectorId, cancellationToken);
+            return Ok(result, "IQC 檢驗結果已記錄");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse.Fail(ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ApiResponse.Fail(ex.Message));
+        }
     }
 }
-
-
-

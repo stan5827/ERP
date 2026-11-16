@@ -1,21 +1,24 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.Procurement;
+using ErpBackend.Filters;
 using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
 public class SuppliersController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly ISupplierService _supplierService;
     private readonly ISupplierRatingService _ratingService;
+    private readonly ISupplierPortalInvitationService _portalInvitationService;
 
-    public SuppliersController(ErpGeneralDbContext db, ISupplierRatingService ratingService)
+    public SuppliersController(
+        ISupplierService supplierService,
+        ISupplierRatingService ratingService,
+        ISupplierPortalInvitationService portalInvitationService)
     {
-        _db = db;
+        _supplierService = supplierService;
         _ratingService = ratingService;
+        _portalInvitationService = portalInvitationService;
     }
 
     [HttpGet]
@@ -23,209 +26,203 @@ public class SuppliersController : BaseController
     {
         var page = GetPage();
         var pageSize = GetPageSize();
-
-        var query = _db.Suppliers.AsQueryable();
-
-        if (!string.IsNullOrEmpty(searchTerm))
-            query = query.Where(s => s.SupplierName.Contains(searchTerm) || s.SupplierCode.Contains(searchTerm));
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderBy(s => s.SupplierCode)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-            
-        var dtos = items.Select(s => new SupplierDto
-        {
-            Id = s.Id,
-            SupplierCode = s.SupplierCode,
-            SupplierName = s.SupplierName,
-            TaxId = s.TaxId,
-            ContactPerson = s.ContactPerson,
-            Phone = s.Phone,
-            Email = s.Email,
-            Status = "ACTIVE",
-            Rating = s.Rating,
-            Currency = s.Currency ?? "TWD",
-            CreatedAt = s.CreatedAt
-        }).ToList();
-
-        return Ok(dtos, $"第 {page} 頁，共 {totalCount} 筆", totalCount);
+        var (items, totalCount) = await _supplierService.GetSuppliersAsync(searchTerm, page, pageSize);
+        return Ok(items, $"第 {page} 頁，共 {totalCount} 筆", totalCount);
     }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<SupplierDto>>> GetSupplier(Guid id)
     {
-        var s = await _db.Suppliers.FindAsync(id);
-        if (s == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        return Ok(new SupplierDto
-        {
-            Id = s.Id,
-            SupplierCode = s.SupplierCode,
-            SupplierName = s.SupplierName,
-            TaxId = s.TaxId,
-            ContactPerson = s.ContactPerson,
-            Phone = s.Phone,
-            Email = s.Email,
-            Status = s.Status,
-            Rating = s.Rating,
-            Currency = s.Currency,
-            CreatedAt = s.CreatedAt
-        });
+        var dto = await _supplierService.GetSupplierAsync(id);
+        if (dto == null) return NotFound(ApiResponse.Fail("供應商不存在"));
+        return Ok(dto);
     }
 
     [HttpPost]
     public async Task<ActionResult<ApiResponse<SupplierDto>>> CreateSupplier(CreateSupplierRequest request)
     {
-        if (await _db.Suppliers.AnyAsync(s => s.SupplierCode == request.SupplierCode))
-            return BadRequest(ApiResponse.Fail("供應商編號已存在"));
-
-        var supplier = new Supplier
+        try
         {
-            SupplierCode = request.SupplierCode,
-            SupplierName = request.SupplierName,
-            TaxId = request.TaxId,
-            ContactPerson = request.ContactPerson,
-            Phone = request.Phone,
-            Email = request.Email,
-            Address = request.Address,
-            InvoiceAddress = request.InvoiceAddress,
-            DeliveryAddress = request.DeliveryAddress,
-            PaymentTerms = request.PaymentTerms,
-            Currency = request.Currency ?? "TWD",
-            Status = "ACTIVE"
-        };
-
-        _db.Suppliers.Add(supplier);
-        await _db.SaveChangesAsync();
-
-        return Ok(new SupplierDto
+            var dto = await _supplierService.CreateSupplierAsync(request);
+            return Ok(dto);
+        }
+        catch (InvalidOperationException ex)
         {
-            Id = supplier.Id,
-            SupplierCode = supplier.SupplierCode,
-            SupplierName = supplier.SupplierName,
-            TaxId = supplier.TaxId,
-            ContactPerson = supplier.ContactPerson,
-            Phone = supplier.Phone,
-            Email = supplier.Email,
-            Status = supplier.Status,
-            Currency = supplier.Currency,
-            CreatedAt = supplier.CreatedAt
-        });
+            return BadRequest(ApiResponse.Fail(ex.Message));
+        }
     }
 
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse>> UpdateSupplier(Guid id, CreateSupplierRequest request)
     {
-        var supplier = await _db.Suppliers.FindAsync(id);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        supplier.SupplierName = request.SupplierName;
-        supplier.TaxId = request.TaxId;
-        supplier.ContactPerson = request.ContactPerson;
-        supplier.Phone = request.Phone;
-        supplier.Email = request.Email;
-        supplier.Address = request.Address;
-        supplier.InvoiceAddress = request.InvoiceAddress;
-        supplier.DeliveryAddress = request.DeliveryAddress;
-        supplier.PaymentTerms = request.PaymentTerms;
-        supplier.Currency = request.Currency ?? "TWD";
-        supplier.UpdatedAt = DateTime.UtcNow;
-
-        await _db.SaveChangesAsync();
-        return Ok("更新成功");
+        try
+        {
+            await _supplierService.UpdateSupplierAsync(id, request);
+            return Ok("更新成功");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse>> DeleteSupplier(Guid id)
     {
-        var supplier = await _db.Suppliers.FindAsync(id);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        _db.Suppliers.Remove(supplier);
-        await _db.SaveChangesAsync();
-        return Ok("刪除成功");
+        try
+        {
+            await _supplierService.DeleteSupplierAsync(id);
+            return Ok("刪除成功");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
     }
 
     // ========== Portal User Endpoints ==========
 
     [HttpGet("{supplierId}/portal-users")]
-    public async Task<ActionResult<ApiResponse<List<SupplierPortalUserDto>>>> GetPortalUsers(Guid supplierId)
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<SupplierPortalUserStatusResponseDto>>>> GetPortalUsers(
+        Guid supplierId,
+        CancellationToken cancellationToken)
     {
-        var users = await _db.Set<ErpBackend.Models.Portal.SupplierUser>()
-            .Where(u => u.SupplierId == supplierId)
-            .OrderBy(u => u.Username)
-            .Select(u => new SupplierPortalUserDto
-            {
-                Id = u.Id,
-                Username = u.Username,
-                ContactName = u.ContactName,
-                Email = u.Email,
-                Role = u.Role,
-                IsActive = u.IsActive,
-                LastLoginAt = u.LastLoginAt,
-                CreatedAt = u.CreatedAt
-            })
-            .ToListAsync();
-
+        var users = await _portalInvitationService.GetUsersAsync(supplierId, cancellationToken);
         return Ok(users);
     }
 
     [HttpPost("{supplierId}/portal-users")]
-    public async Task<ActionResult<ApiResponse>> CreatePortalUser(Guid supplierId, CreateSupplierPortalUserRequest request)
+    [PermissionAuthorize("suppliers", "edit")]
+    public ActionResult<ApiResponse> CreatePortalUser(Guid supplierId)
     {
-        var supplier = await _db.Suppliers.FindAsync(supplierId);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
+        return StatusCode(
+            StatusCodes.Status410Gone,
+            ApiResponse.Fail("本地密碼帳號管理已停用，請改用 Keycloak 邀請流程。"));
+    }
 
-        if (await _db.Set<ErpBackend.Models.Portal.SupplierUser>().AnyAsync(u => u.Username == request.Username))
-            return BadRequest(ApiResponse.Fail("帳號已存在"));
-
-        var user = new ErpBackend.Models.Portal.SupplierUser
+    /// <summary>Creates a Keycloak invitation for an approved supplier contact.</summary>
+    [HttpPost("{supplierId}/portal-users/invitations")]
+    [PermissionAuthorize("suppliers", "edit")]
+    [ProducesResponseType(typeof(ApiResponse<SupplierPortalInvitationResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<ApiResponse<SupplierPortalInvitationResponseDto>>> InvitePortalUser(
+        Guid supplierId,
+        CreateSupplierPortalInvitationRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            SupplierId = supplierId,
-            Username = request.Username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            ContactName = request.ContactName,
-            Email = request.Email,
-            Role = request.Role,
-            IsActive = true
-        };
+            var result = await _portalInvitationService.InviteAsync(
+                supplierId,
+                request,
+                GetUserId(),
+                cancellationToken);
+            return Ok(result, "Keycloak 邀請已寄出。");
+        }
+        catch (ArgumentException ex) { return BadRequest(ApiResponse.Fail(ex.Message)); }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeycloakSupplierIdentityException ex) when (ex.ErrorCode == "ExistingIdentityNotLinked")
+        {
+            return Conflict(ApiResponse.Fail(
+                "此 Email 已存在於 WIP Keycloak，但未綁定這筆 ERP 邀請。基於帳號安全，系統不會自動連結既有帳號。請改用未註冊的 Email，或先確認並處理 Keycloak 中的既有測試帳號後，再重試此邀請。"));
+        }
+        catch (KeycloakSupplierIdentityException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse.Fail("Keycloak 邀請服務暫時無法完成，請稍後重試。"));
+        }
+    }
 
-        _db.Add(user);
-        await _db.SaveChangesAsync();
+    /// <summary>Retries Keycloak provisioning after a failed invitation attempt.</summary>
+    [HttpPost("portal-users/{userId}/retry")]
+    [PermissionAuthorize("suppliers", "edit")]
+    public async Task<ActionResult<ApiResponse<SupplierPortalInvitationResponseDto>>> RetryPortalInvitation(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _portalInvitationService.RetryAsync(userId, GetUserId(), cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex) { return BadRequest(ApiResponse.Fail(ex.Message)); }
+        catch (InvalidOperationException ex) { return BadRequest(ApiResponse.Fail(ex.Message)); }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeycloakSupplierIdentityException ex) when (ex.ErrorCode == "ExistingIdentityNotLinked")
+        {
+            return Conflict(ApiResponse.Fail(
+                "此 Email 已存在於 WIP Keycloak，但未綁定這筆 ERP 邀請。基於帳號安全，系統不會自動連結既有帳號。請改用未註冊的 Email，或先確認並處理 Keycloak 中的既有測試帳號後，再重試此邀請。"));
+        }
+        catch (KeycloakSupplierIdentityException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse.Fail("Keycloak 邀請服務暫時無法完成，請稍後重試。"));
+        }
+    }
 
-        return Ok("建立成功");
+    /// <summary>Resends an outstanding Keycloak invitation.</summary>
+    [HttpPost("portal-users/{userId}/resend-invitation")]
+    [PermissionAuthorize("suppliers", "edit")]
+    public async Task<ActionResult<ApiResponse<SupplierPortalInvitationResponseDto>>> ResendPortalInvitation(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _portalInvitationService.ResendAsync(userId, GetUserId(), cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) { return BadRequest(ApiResponse.Fail(ex.Message)); }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeycloakSupplierIdentityException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse.Fail("Keycloak 邀請服務暫時無法完成，請稍後重試。"));
+        }
+    }
+
+    /// <summary>Revokes a supplier portal invitation or account.</summary>
+    [HttpDelete("portal-users/{userId}")]
+    [PermissionAuthorize("suppliers", "edit")]
+    public async Task<ActionResult<ApiResponse>> CancelPortalInvitation(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _portalInvitationService.CancelAsync(userId, GetUserId(), cancellationToken);
+            return Ok("供應商入口帳號已停用。");
+        }
+        catch (InvalidOperationException ex) { return BadRequest(ApiResponse.Fail(ex.Message)); }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeycloakSupplierIdentityException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse.Fail("ERP 已停用帳號，但 Keycloak 撤銷尚待重試。"));
+        }
     }
 
     [HttpPut("portal-users/{userId}")]
-    public async Task<ActionResult<ApiResponse>> UpdatePortalUser(Guid userId, CreateSupplierPortalUserRequest request)
+    [PermissionAuthorize("suppliers", "edit")]
+    public ActionResult<ApiResponse> UpdatePortalUser(Guid userId)
     {
-        var user = await _db.Set<ErpBackend.Models.Portal.SupplierUser>().FindAsync(userId);
-        if (user == null) return NotFound(ApiResponse.Fail("帳號不存在"));
-
-        user.ContactName = request.ContactName;
-        user.Email = request.Email;
-        user.Role = request.Role;
-        
-        if (!string.IsNullOrEmpty(request.Password))
-        {
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
-        }
-
-        await _db.SaveChangesAsync();
-        return Ok("更新成功");
-    }
-
-    [HttpDelete("portal-users/{userId}")]
-    public async Task<ActionResult<ApiResponse>> DeletePortalUser(Guid userId)
-    {
-        var user = await _db.Set<ErpBackend.Models.Portal.SupplierUser>().FindAsync(userId);
-        if (user == null) return NotFound(ApiResponse.Fail("帳號不存在"));
-
-        _db.Remove(user);
-        await _db.SaveChangesAsync();
-        return Ok("刪除成功");
+        return StatusCode(
+            StatusCodes.Status410Gone,
+            ApiResponse.Fail("本地密碼帳號管理已停用，請使用 Keycloak 邀請與撤銷流程。"));
     }
 
     [HttpGet("{id}/rating")]
@@ -289,7 +286,6 @@ public class SuppliersController : BaseController
                 CalculatedAt = r.CalculationDate,
                 PeriodMonths = r.PeriodMonths
             }).ToList();
-
             return Ok(dtos);
         }
         catch (Exception ex)
@@ -315,60 +311,66 @@ public class SuppliersController : BaseController
     [HttpPost("{id}/submit-for-approval")]
     public async Task<ActionResult<ApiResponse>> SubmitSupplierForApproval(Guid id)
     {
-        var supplier = await _db.Suppliers.FindAsync(id);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        if (supplier.ApprovalStatus == "APPROVED")
-            return BadRequest(ApiResponse.Fail("供應商已通過審批"));
-
-        supplier.ApprovalStatus = "UNDER_REVIEW";
-        await _db.SaveChangesAsync();
-        return Ok("已送出審批");
+        try
+        {
+            await _supplierService.SubmitForApprovalAsync(id);
+            return Ok("已送出審批");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
     }
 
     [HttpPost("{id}/approve")]
+    [PermissionAuthorize("suppliers", "approve")]
     public async Task<ActionResult<ApiResponse>> ApproveSupplier(Guid id, [FromBody] SupplierApprovalRequest req)
     {
-        var supplier = await _db.Suppliers.FindAsync(id);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        if (supplier.ApprovalStatus == "APPROVED")
-            return BadRequest(ApiResponse.Fail("供應商已通過審批"));
-
-        supplier.ApprovalStatus = "APPROVED";
-        supplier.Status = "ACTIVE";
-        supplier.ApprovedBy = req.EmployeeId;
-        supplier.ApprovedAt = DateTime.UtcNow;
-        supplier.ApprovalNotes = req.Comments;
-
-        await _db.SaveChangesAsync();
-        return Ok("供應商已核准");
+        try
+        {
+            req.EmployeeId = GetEmployeeId();
+            await _supplierService.ApproveSupplierAsync(id, req);
+            return Ok("供應商已核准");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse.Fail(ex.Message));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
     }
 
     [HttpPost("{id}/reject")]
     public async Task<ActionResult<ApiResponse>> RejectSupplier(Guid id, [FromBody] SupplierApprovalRequest req)
     {
-        var supplier = await _db.Suppliers.FindAsync(id);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        supplier.ApprovalStatus = "REJECTED";
-        supplier.ApprovalNotes = req.Comments;
-
-        await _db.SaveChangesAsync();
-        return Ok("供應商已駁回");
+        try
+        {
+            await _supplierService.RejectSupplierAsync(id, req);
+            return Ok("供應商已駁回");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
     }
 
     [HttpPost("{id}/deactivate")]
     public async Task<ActionResult<ApiResponse>> DeactivateSupplier(Guid id, [FromBody] SupplierApprovalRequest req)
     {
-        var supplier = await _db.Suppliers.FindAsync(id);
-        if (supplier == null) return NotFound(ApiResponse.Fail("供應商不存在"));
-
-        supplier.Status = "INACTIVE";
-        supplier.ApprovalNotes = req.Comments;
-
-        await _db.SaveChangesAsync();
-        return Ok("供應商已停用");
+        try
+        {
+            await _supplierService.DeactivateSupplierAsync(id, req);
+            return Ok("供應商已停用");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse.Fail(ex.Message));
+        }
     }
 }
-

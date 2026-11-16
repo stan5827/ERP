@@ -10,10 +10,17 @@ public class SupplierUser
     public Guid SupplierId { get; set; }
     [Required, MaxLength(50)] public string Username { get; set; } = null!;
     [Required] public string PasswordHash { get; set; } = null!;
+    [MaxLength(255)] public string? IdentityProviderSubject { get; set; }
     [MaxLength(50)] public string? ContactName { get; set; }
     [MaxLength(200)] public string? Email { get; set; }
     [MaxLength(30)] public string Role { get; set; } = "viewer";
     public bool IsActive { get; set; } = true;
+    [MaxLength(30)] public string PortalInvitationStatus { get; set; } = "NotInvited";
+    public Guid? InvitationCorrelationId { get; set; }
+    public DateTime? InvitationExpiresAt { get; set; }
+    public DateTime? InvitationSentAt { get; set; }
+    public int InvitationAttemptCount { get; set; }
+    [MaxLength(100)] public string? InvitationLastError { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -137,4 +144,3 @@ public class SupplierAsnItem
 
     [ForeignKey(nameof(AsnId))] public SupplierAsn Asn { get; set; } = null!;
 }
-

@@ -1,171 +1,83 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.Sales;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
-public class CreateCashReceiptRequest
-{
-    public DateTime ReceiptDate { get; set; }
-    public Guid CustomerId { get; set; }
-    public string PaymentMethod { get; set; } = "wire";
-    public decimal ReceivedAmount { get; set; }
-    public decimal DiscountAmount { get; set; }
-    public Guid? BankAccountId { get; set; }
-    public string? ReferenceNumber { get; set; }
-    public string? Notes { get; set; }
-    public List<CreateCashReceiptAllocationRequest> Allocations { get; set; } = new();
-}
-
-public class CreateCashReceiptAllocationRequest
-{
-    public Guid SalesInvoiceId { get; set; }
-    public decimal AllocatedAmount { get; set; }
-}
-
+[Authorize]
+[Route("api/erp/cash-receipts")]
 public class CashReceiptsController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly ICashReceiptService _cashReceiptService;
 
-    public CashReceiptsController(ErpGeneralDbContext db)
-    {
-        _db = db;
-    }
+    public CashReceiptsController(ICashReceiptService cashReceiptService) => _cashReceiptService = cashReceiptService;
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<CashReceipt>>>> GetCashReceipts(
-        [FromQuery] Guid? customerId)
+    public async Task<ActionResult<ApiResponse<List<CashReceiptDto>>>> GetCashReceipts([FromQuery] Guid? customerId)
     {
         var page = GetPage();
         var pageSize = GetPageSize();
 
-        var query = _db.CashReceipts.Include(cr => cr.Allocations).AsQueryable();
-
-        if (customerId.HasValue)
-            query = query.Where(cr => cr.CustomerId == customerId.Value);
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(cr => cr.ReceiptDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        return Ok(items, totalCount: totalCount);
+        var items = await _cashReceiptService.GetCashReceiptsAsync(customerId, page, pageSize);
+        return Ok(items, totalCount: items.Count);
     }
 
-    /// <summary>
-    /// «Ø¥ß¦¬´Ú³æ¨Ã¶i¦æµo²¼®Ö¾P
-    /// ·í²Ö¿n¤w¥I´ÚÃB¹Fµo²¼Á`ÃB®É¡A±Nµo²¼ª¬ºA§ó´«¬° paid
-    /// </summary>
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<CashReceipt>>> CreateCashReceipt([FromBody] CreateCashReceiptRequest req)
+    public async Task<ActionResult<ApiResponse<CashReceiptDto>>> CreateCashReceipt([FromBody] CreateCashReceiptRequest req)
     {
-        if (req.Allocations.Count == 0)
-            return BadRequest(ApiHelper.FailOf<CashReceipt>("»Ý­n¦Ü¤Ö¤@µ§µo²¼®Ö¾P©ú²Ó"));
-
-        var totalAllocated = req.Allocations.Sum(a => a.AllocatedAmount);
-        if (totalAllocated > req.ReceivedAmount)
-            return BadRequest(ApiHelper.FailOf<CashReceipt>("®Ö¾PÁ`ª÷ÃB¶W¹L¥»¦¸¦¬´Úª÷ÃB"));
-
-        // ÅçÃÒ¨Ã·Ç³Æ®Ö¾Pµo²¼
-        var invoicesToUpdate = new List<(SalesInvoice invoice, decimal amount)>();
-        foreach (var alloc in req.Allocations)
+        var (dto, status) = await _cashReceiptService.CreateAsync(req);
+        return status switch
         {
-            var invoice = await _db.SalesInvoices.FindAsync(alloc.SalesInvoiceId);
-            if (invoice == null)
-                return BadRequest(ApiHelper.FailOf<CashReceipt>($"§ä¤£¨ìµo²¼ {alloc.SalesInvoiceId}"));
-            if (invoice.CustomerId != req.CustomerId)
-                return BadRequest(ApiHelper.FailOf<CashReceipt>($"µo²¼ {invoice.InvoiceNumber} ¤£ÄÝ©ó¦¹«È¤á"));
-            if (invoice.Status != "approved")
-                return BadRequest(ApiHelper.FailOf<CashReceipt>($"µo²¼ {invoice.InvoiceNumber} ª¬ºA¬° {invoice.Status} («D¤w®Ö­ã)¡AµLªk¦¬´Ú"));
-
-            var outstanding = invoice.TotalAmount - invoice.PaidAmount;
-            if (alloc.AllocatedAmount > outstanding)
-                return BadRequest(ApiHelper.FailOf<CashReceipt>($"µo²¼ {invoice.InvoiceNumber} «Ý¦¬¾lÃB {outstanding}¡A®Ö¾Pª÷ÃB¤£À³¶W¹L¦¹ª÷ÃB"));
-
-            invoicesToUpdate.Add((invoice, alloc.AllocatedAmount));
-        }
-
-        await using var tx = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            var receiptNumber = $"CR-{DateTime.UtcNow:yyyyMMddHHmmss}";
-            var entity = new CashReceipt
+            "invalid" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("ï¿½Ý­nï¿½Ü¤Ö¤@ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½Ö¾Pï¿½ï¿½ï¿½ï¿½")),
+            "insufficient" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("ï¿½Ö¾Pï¿½`ï¿½ï¿½ï¿½Bï¿½Wï¿½Lï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úªï¿½ï¿½B")),
+            "receipt_amount_mismatch" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ²–å¸³ç¾é‡‘ä¸å¯è¶…éŽå¯¦æ”¶é‡‘é¡ï¼Œä¸”æŠ˜è®“ç¸½é¡å¿…é ˆç­‰æ–¼å„ç™¼ç¥¨æŠ˜è®“åˆ†é…")),
+            "cash_account_mapping_required" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ”¶æ¬¾å¸³æˆ¶å°šæœªå°æ‡‰æœ‰æ•ˆçš„ç¾é‡‘ï¼éŠ€è¡Œç¸½å¸³ç§‘ç›®")),
+            "ar_account_missing" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æœªè¨­å®šæœ‰æ•ˆçš„æ‡‰æ”¶å¸³æ¬¾ç§‘ç›® 1131")),
+            "unapplied_account_mapping_required" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æœªè¨­å®šæœ‰æ•ˆçš„å®¢æˆ¶é æ”¶æ¬¾ï¼æœªæ²–æ¬¾ç¸½å¸³ç§‘ç›®æ˜ å°„")),
+            "discount_policy_pending" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æŠ˜è®“éŽå¸³æš«åœï¼Œå¾…è²¡å‹™ç¢ºèªéŠ·é …ç¨…é¡è™•ç†æ”¿ç­–")),
+            "currency_mismatch" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ”¶æ¬¾ã€éŠ€è¡Œå¸³æˆ¶èˆ‡ç™¼ç¥¨å¹£åˆ¥å¿…é ˆä¸€è‡´")),
+            "not_found_invoice" => BadRequest(ApiHelper.FailOf<CashReceiptDto>($"ï¿½ä¤£ï¿½ï¿½oï¿½ï¿½")),
+            "customer_mismatch" => BadRequest(ApiHelper.FailOf<CashReceiptDto>($"ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½Ý©ó¦¹«È¤ï¿½")),
+            "invoice_not_approved" => BadRequest(ApiHelper.FailOf<CashReceiptDto>($"ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½Dï¿½wï¿½Ö­ï¿½Aï¿½Lï¿½kï¿½ï¿½ï¿½ï¿½")),
+            "over_allocation" => BadRequest(ApiHelper.FailOf<CashReceiptDto>($"ï¿½Ö¾Pï¿½ï¿½ï¿½Bï¿½ï¿½ï¿½ï¿½ï¿½Wï¿½Lï¿½Ý¦ï¿½ï¿½lï¿½B")),
+            _ => Ok(dto!, status switch
             {
-                ReceiptNumber = receiptNumber,
-                ReceiptDate = req.ReceiptDate,
-                CustomerId = req.CustomerId,
-                PaymentMethod = req.PaymentMethod,
-                ReceivedAmount = req.ReceivedAmount,
-                DiscountAmount = req.DiscountAmount,
-                BankAccountId = req.BankAccountId,
-                ReferenceNumber = req.ReferenceNumber,
-                Notes = req.Notes,
-            };
-
-            foreach (var alloc in req.Allocations)
-            {
-                entity.Allocations.Add(new CashReceiptAllocation
-                {
-                    SalesInvoiceId = alloc.SalesInvoiceId,
-                    AllocatedAmount = alloc.AllocatedAmount,
-                });
-            }
-
-            _db.CashReceipts.Add(entity);
-
-            // §ó·sµo²¼¤w¥IÃB¡A­Y¹FÁ`ÃB«h¼Ð°O¤w¤ä¥I
-            var paidInvoices = new List<string>();
-            foreach (var (invoice, amount) in invoicesToUpdate)
-            {
-                invoice.PaidAmount += amount;
-                if (invoice.PaidAmount >= invoice.TotalAmount)
-                {
-                    invoice.Status = "paid";
-                    paidInvoices.Add(invoice.InvoiceNumber);
-                }
-            }
-
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
-
-            var msg = paidInvoices.Any()
-                ? $"¦¬´Ú§¹¦¨¡A¥B¥H¤Uµo²¼¤wµ²²M¡G{string.Join(", ", paidInvoices)}"
-                : "¦¬´Ú§¹¦¨¡A¤w§ó·s±b´Ú";
-
-            return Ok(entity, msg);
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync();
-            return StatusCode(500, ApiHelper.Fail($"¦¬´Ú§@·~¥¢±Ñ¡G{ex.Message}"));
-        }
+                "paid" => "Receipt created; one or more invoices are fully settled",
+                "unapplied" => "Receipt created with an unapplied balance",
+                _ => "Receipt created"
+            })
+        };
     }
 
-    /// <summary>
-    /// Àò¨ú«Ý¦¬´Úµo²¼¡A¨Ñ«Ø¥ß¦¬´Ú³æ®É¿ï¾Ü
-    /// </summary>
-    [HttpGet("pending-invoices/{customerId}")]
-    public async Task<ActionResult<ApiResponse<object>>> GetPendingInvoices(Guid customerId)
+    [HttpPost("{receiptId:guid}/apply-unapplied")]
+    public async Task<ActionResult<ApiResponse<CashReceiptDto>>> ApplyUnapplied(
+        Guid receiptId,
+        [FromBody] ApplyCashReceiptUnappliedRequestDto req)
     {
-        var invoices = await _db.SalesInvoices
-            .Where(i => i.CustomerId == customerId && i.Status == "approved")
-            .Select(i => new
-            {
-                i.Id,
-                i.InvoiceNumber,
-                i.InvoiceDate,
-                i.DueDate,
-                i.TotalAmount,
-                i.PaidAmount,
-                Outstanding = i.TotalAmount - i.PaidAmount,
-            })
-            .OrderBy(i => i.InvoiceDate)
-            .ToListAsync();
+        var (dto, status) = await _cashReceiptService.ApplyUnappliedAsync(receiptId, req);
+        return status switch
+        {
+            "invalid" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("ç™¼ç¥¨èˆ‡æ²–è½‰é‡‘é¡å¿…é ˆæœ‰æ•ˆï¼Œé‡‘é¡é ˆå¤§æ–¼é›¶")),
+            "not_found_receipt" => NotFound(ApiHelper.FailOf<CashReceiptDto>("Cash receipt not found")),
+            "not_found_invoice" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("Sales invoice not found")),
+            "over_unapplied" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ²–è½‰é‡‘é¡è¶…éŽæ”¶æ¬¾å–®æœªæ²–æ¬¾é¤˜é¡")),
+            "over_allocation" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ²–è½‰é‡‘é¡è¶…éŽç™¼ç¥¨æœªæ”¶é¤˜é¡")),
+            "customer_mismatch" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ”¶æ¬¾å®¢æˆ¶èˆ‡ç™¼ç¥¨å®¢æˆ¶ä¸ä¸€è‡´")),
+            "invoice_not_approved" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("ç™¼ç¥¨å°šæœªæ ¸å‡†ï¼Œç„¡æ³•æ²–è½‰")),
+            "currency_mismatch" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æ”¶æ¬¾èˆ‡ç™¼ç¥¨å¹£åˆ¥å¿…é ˆä¸€è‡´")),
+            "unapplied_account_mapping_required" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æœªè¨­å®šæœ‰æ•ˆçš„å®¢æˆ¶é æ”¶æ¬¾ï¼æœªæ²–æ¬¾ç¸½å¸³ç§‘ç›®æ˜ å°„")),
+            "ar_account_missing" => BadRequest(ApiHelper.FailOf<CashReceiptDto>("æœªè¨­å®šæœ‰æ•ˆçš„æ‡‰æ”¶å¸³æ¬¾ç§‘ç›® 1131")),
+            _ => Ok(dto!, status == "paid"
+                ? "Unapplied balance applied; invoice fully settled"
+                : "Unapplied balance applied")
+        };
+    }
 
-        return Ok<object>(invoices);
+    [HttpGet("pending-invoices/{customerId}")]
+    public async Task<ActionResult<ApiResponse<List<PendingInvoiceDto>>>> GetPendingInvoices(Guid customerId)
+    {
+        var invoices = await _cashReceiptService.GetPendingInvoicesAsync(customerId);
+        return Ok(invoices);
     }
 }

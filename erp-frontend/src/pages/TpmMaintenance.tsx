@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, AlertTriangle, CheckCircle, Clock, Wrench, Package, Truck, Calendar, Activity, Play, XCircle, Loader2, X } from 'lucide-react';
-import { equipmentApi, workCentersApi, suppliersApi, api } from '../api/api';
+import React, { useCallback, useState, useEffect } from 'react';
+import { Search, Plus, AlertTriangle, CheckCircle, Clock, Wrench, Package, Activity, Play, Loader2, X } from 'lucide-react';
+import { equipmentApi, workCentersApi, suppliersApi } from '../api/api';
+import { useCurrentUser } from '../hooks/useApi';
 import './TpmMaintenance.css';
 
 interface Equipment {
@@ -57,8 +58,72 @@ interface Supplier {
   supplierName: string;
 }
 
+interface EquipmentStats {
+  totalCount: number;
+  repairCount: number;
+  warningCount: number;
+  monthlyMaintenanceCost: number;
+}
+
+interface EquipmentCreateData {
+  equipmentCode: string;
+  equipmentName: string;
+  equipmentType?: string;
+  workCenterId?: string;
+  serialNumber?: string;
+  model?: string;
+  manufacturer?: string;
+  supplierId?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+}
+
+interface MaintenanceCreateData {
+  equipmentId: string;
+  maintenanceType?: string;
+  startTime: string;
+  endTime?: string;
+  performedBy?: string;
+  workDescription?: string;
+  laborHours: number;
+  partsCost?: number;
+  result?: string;
+}
+
+interface DowntimeCreateData {
+  equipmentId: string;
+  workOrderId?: string;
+  startTime: string;
+  downtimeType?: string;
+  cause?: string;
+  description?: string;
+  reportedBy?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isEquipmentStats(value: unknown): value is EquipmentStats {
+  return isRecord(value)
+    && typeof value.totalCount === 'number'
+    && typeof value.repairCount === 'number'
+    && typeof value.warningCount === 'number'
+    && typeof value.monthlyMaintenanceCost === 'number';
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isRecord(error)) {
+    const response = isRecord(error.response) ? error.response : undefined;
+    const data = isRecord(response?.data) ? response.data : undefined;
+    if (typeof data?.message === 'string') return data.message;
+    if (typeof error.message === 'string') return error.message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 const equipmentTypeConfig: Record<string, { label: string; color: string }> = {
-  machine: { label: '加工設備', color: 'var(--cobalt-400)' },
+  machine: { label: '加工設備', color: 'var(--theme-text)' },
   inspection: { label: '檢測設備', color: 'var(--emerald-400)' },
   assembly: { label: '組裝設備', color: 'var(--amber-400)' },
   others: { label: '其他設備', color: 'var(--slate-400)' },
@@ -74,23 +139,23 @@ const maintenanceTypeConfig: Record<string, { label: string; cls: string }> = {
 type DialogType = 'equipment' | 'maintenance' | 'downtime' | null;
 
 export const TpmMaintenance: React.FC = () => {
+  const currentUser = useCurrentUser();
+  const canCreateTpmRecords = currentUser?.roles.includes('Admin')
+    || currentUser?.permissions.includes('tpm:create')
+    || currentUser?.permissions.includes('admin.*')
+    || false;
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'equipment' | 'maintenance' | 'downtime'>('equipment');
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
   const [downtime, setDowntime] = useState<DowntimeRecord[]>([]);
-  const [stats, setStats] = useState<any>({});
+  const [stats, setStats] = useState<Partial<EquipmentStats>>({});
   const [loading, setLoading] = useState(true);
   
   const [openDialog, setOpenDialog] = useState<DialogType>(null);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
 
   useEffect(() => {
     loadWorkCenters();
@@ -117,7 +182,7 @@ export const TpmMaintenance: React.FC = () => {
     }
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeTab === 'equipment') {
@@ -126,7 +191,14 @@ export const TpmMaintenance: React.FC = () => {
           equipmentApi.stats(),
         ]);
         setEquipment(eqRes.data?.data ?? []);
-        setStats(statsRes.data?.data ?? {});
+        const statsData: unknown = statsRes.data?.data;
+        if (statsData == null) {
+          setStats({});
+        } else if (isEquipmentStats(statsData)) {
+          setStats(statsData);
+        } else {
+          throw new Error('設備統計資料格式無效');
+        }
       } else if (activeTab === 'maintenance') {
         const res = await equipmentApi.maintenanceRecords();
         setMaintenance(res.data?.data ?? []);
@@ -139,7 +211,11 @@ export const TpmMaintenance: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const filteredEquipment = equipment.filter(e =>
     e.equipmentCode.includes(search) || e.equipmentName.includes(search)
@@ -152,49 +228,50 @@ export const TpmMaintenance: React.FC = () => {
     { label: '本月維修成本', value: stats.monthlyMaintenanceCost != null ? `$${stats.monthlyMaintenanceCost.toLocaleString()}` : '$0', icon: Activity, color: 'var(--emerald-400)' },
   ];
 
-  const handleCreateEquipment = async (data: any) => {
+  const handleCreateEquipment = async (data: EquipmentCreateData) => {
     setSubmitting(true);
     try {
       await equipmentApi.create(data);
       await loadData();
       setOpenDialog(null);
       alert('設備建立成功！');
-    } catch (err: any) {
-      alert('建立失敗：' + (err.message || String(err)));
+    } catch (err: unknown) {
+      alert('建立失敗：' + getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleCreateMaintenance = async (data: any) => {
+  const handleCreateMaintenance = async (data: MaintenanceCreateData) => {
     setSubmitting(true);
     try {
       await equipmentApi.createMaintenanceRecord(data);
       await loadData();
       setOpenDialog(null);
       alert('維修記錄建立成功！');
-    } catch (err: any) {
-      alert('建立失敗：' + (err.message || String(err)));
+    } catch (err: unknown) {
+      alert('建立失敗：' + getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleCreateDowntime = async (data: any) => {
+  const handleCreateDowntime = async (data: DowntimeCreateData) => {
     setSubmitting(true);
     try {
       await equipmentApi.createDowntime(data);
       await loadData();
       setOpenDialog(null);
       alert('異常停機建立成功！');
-    } catch (err: any) {
-      alert('建立失敗：' + (err.message || String(err)));
+    } catch (err: unknown) {
+      alert('建立失敗：' + getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   };
 
   const getAddButton = () => {
+    if (!canCreateTpmRecords) return null;
     if (activeTab === 'equipment') {
       return (
         <button className="btn btn-primary btn-sm" onClick={() => setOpenDialog('equipment')}>
@@ -294,7 +371,7 @@ export const TpmMaintenance: React.FC = () => {
                 const tc = equipmentTypeConfig[e.equipmentType] ?? equipmentTypeConfig.others;
                 return (
                   <tr key={e.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{e.equipmentCode}</td>
+                    <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '12px' }}>{e.equipmentCode}</td>
                     <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{e.equipmentName}</td>
                     <td><span style={{ color: tc.color, fontSize: 12 }}>{tc.label}</span></td>
                     <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{e.workCenterName ?? '—'}</td>
@@ -453,14 +530,15 @@ interface DialogProps {
   workCenters: WorkCenter[];
   suppliers: Supplier[];
   submitting: boolean;
-  onSubmitEquipment: (data: Record<string, unknown>) => Promise<void>;
-  onSubmitMaintenance: (data: Record<string, unknown>) => Promise<void>;
-  onSubmitDowntime: (data: Record<string, unknown>) => Promise<void>;
+  onSubmitEquipment: (data: EquipmentCreateData) => Promise<void>;
+  onSubmitMaintenance: (data: MaintenanceCreateData) => Promise<void>;
+  onSubmitDowntime: (data: DowntimeCreateData) => Promise<void>;
 }
 
 function Dialog({ type, onClose, equipment, workCenters, suppliers, submitting, onSubmitEquipment, onSubmitMaintenance, onSubmitDowntime }: DialogProps) {
+  const dialogId = React.useId().replace(/[^a-zA-Z0-9-]/g, '');
   const [equipmentForm, setEquipmentForm] = useState({
-    equipmentCode: `EQ-${Date.now()}`,
+    equipmentCode: `EQ-${dialogId}`,
     equipmentName: '',
     equipmentType: 'machine',
     workCenterId: '',

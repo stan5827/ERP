@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import { leaveRequestsApi } from '../services/api';
 import { COLORS } from '../constants/config';
 import { LeaveRequest, LeaveBalance, LEAVE_TYPES } from '../types';
 
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
@@ -28,11 +28,7 @@ export const LeaveScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'requests' | 'balances'>('balances');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [requestsRes, balancesRes] = await Promise.all([
         leaveRequestsApi.list({ pageSize: '20' }),
@@ -47,7 +43,13 @@ export const LeaveScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [loadData])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -128,43 +130,48 @@ export const LeaveScreen: React.FC = () => {
               <Text style={styles.emptyText}>尚無假期資料</Text>
             </View>
           ) : (
-            balances.map((balance, index) => (
-              <View key={index} style={styles.balanceCard}>
-                <View style={styles.balanceHeader}>
-                  <Text style={styles.leaveTypeLabel}>{getLeaveTypeLabel(balance.leaveType)}</Text>
-                  <Text style={styles.balanceYear}>{balance.year} 年度</Text>
+            balances.map((balance, index) => {
+              const usedPercent = balance.totalDays > 0
+                ? Math.min(100, Math.round((balance.usedDays / balance.totalDays) * 100))
+                : 0;
+              return (
+                <View key={index} style={styles.balanceCard}>
+                  <View style={styles.balanceHeader}>
+                    <Text style={styles.leaveTypeLabel}>{getLeaveTypeLabel(balance.leaveType)}</Text>
+                    <Text style={styles.balanceYear}>{balance.year} 年度</Text>
+                  </View>
+
+                  <View style={styles.balanceRow}>
+                    <View style={styles.balanceItem}>
+                      <Text style={styles.balanceValue}>{balance.totalDays}</Text>
+                      <Text style={styles.balanceLabel}>總天數</Text>
+                    </View>
+                    <View style={styles.balanceItem}>
+                      <Text style={[styles.balanceValue, { color: COLORS.danger }]}>{balance.usedDays}</Text>
+                      <Text style={styles.balanceLabel}>已使用</Text>
+                    </View>
+                    <View style={styles.balanceItem}>
+                      <Text style={[styles.balanceValue, { color: COLORS.success }]}>{balance.remainingDays}</Text>
+                      <Text style={styles.balanceLabel}>剩餘</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${usedPercent}%` },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.progressText}>
+                      已使用 {usedPercent}%
+                    </Text>
+                  </View>
                 </View>
-                
-                <View style={styles.balanceRow}>
-                  <View style={styles.balanceItem}>
-                    <Text style={styles.balanceValue}>{balance.totalDays}</Text>
-                    <Text style={styles.balanceLabel}>總天數</Text>
-                  </View>
-                  <View style={styles.balanceItem}>
-                    <Text style={[styles.balanceValue, { color: COLORS.danger }]}>{balance.usedDays}</Text>
-                    <Text style={styles.balanceLabel}>已使用</Text>
-                  </View>
-                  <View style={styles.balanceItem}>
-                    <Text style={[styles.balanceValue, { color: COLORS.success }]}>{balance.remainingDays}</Text>
-                    <Text style={styles.balanceLabel}>剩餘</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${(balance.usedDays / balance.totalDays) * 100}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    已使用 {Math.round((balance.usedDays / balance.totalDays) * 100)}%
-                  </Text>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       ) : (

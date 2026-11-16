@@ -1,4 +1,5 @@
 using Xunit;
+using ErpBackend.DTOs;
 
 namespace ErpBackend.IntegrationTests;
 
@@ -34,7 +35,7 @@ public class ServiceDefinitionTests
     [Fact]
     public void LlmConfig_HasRequiredProperties()
     {
-        var config = new ErpBackend.Services.LlmConfig
+        var config = new LlmConfig
         {
             Provider = "openai",
             ApiKey = "test-key",
@@ -67,7 +68,7 @@ public class ServiceDefinitionTests
     [Fact]
     public void PlanningRequest_HasRequiredProperties()
     {
-        var request = new ErpBackend.Services.PlanningRequest
+        var request = new PlanningRequest
         {
             TaskDescription = "test task",
             Context = "test context"
@@ -80,7 +81,7 @@ public class ServiceDefinitionTests
     [Fact]
     public void ExecutionRequest_HasDefaultValues()
     {
-        var request = new ErpBackend.Services.ExecutionRequest();
+        var request = new ExecutionRequest();
         
         Assert.False(request.ParallelExecution);
     }
@@ -88,7 +89,7 @@ public class ServiceDefinitionTests
     [Fact]
     public void ReviewRequest_HasDefaultValues()
     {
-        var request = new ErpBackend.Services.ReviewRequest();
+        var request = new ReviewRequest();
         
         Assert.True(request.AutoApproval);
     }

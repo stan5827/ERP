@@ -1,0 +1,685 @@
+metadata:
+  generated: "2026-10-24"
+  source_tasks: "docs/architecture/employee-identity-access/plan.md"
+  last_updated: "2026-10-24"
+
+summary:
+  total_tasks: 36
+  completed_tasks: 5
+  in_progress_tasks: 8
+  pending_tasks: 23
+  completion_percentage: 13.9
+
+tasks:
+  - task_id: "T001"
+    description: "Inventory identity and authorization endpoints"
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "docs/architecture/employee-identity-access/baseline.md"
+          changes:
+            - change_type: "created"
+              description: "Recorded existing API and authorization baseline"
+    upstream_trace:
+      plan_item: "1.1"
+      requirements: ["REQ-004", "REQ-005", "REQ-006", "REQ-007", "REQ-008", "REQ-011"]
+      full_trace: "requirements → plan 1.1 → T001 → baseline.md"
+
+  - task_id: "T002"
+    description: "Prepare read-only identity data preflight"
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "tools/scripts/employee-identity-preflight.sql"
+          changes:
+            - change_type: "created"
+              description: "Added read-only checks for employee and RBAC linkage anomalies"
+        - file: "docs/architecture/employee-identity-access/data-remediation.md"
+          changes:
+            - change_type: "created"
+              description: "Recorded aggregate preflight results and manual-review requirement"
+    upstream_trace:
+      plan_item: "1.1"
+      requirements: ["REQ-001", "REQ-003", "REQ-005"]
+      full_trace: "requirements → plan 1.1 → T002 → preflight SQL and remediation summary"
+
+  - task_id: "T010"
+    description: "Disable anonymous internal account registration"
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Controllers/AuthController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Preserved register route with explicit 410; protected admin reset and removed secret fallback"
+        - file: "src/ErpBackend/Services/AuthService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Removed internal registration service path and client-controlled old-password bypass"
+        - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Tested anonymous registration rejection and password-change bypass rejection"
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~AuthControllerIntegrationTests|FullyQualifiedName~UserManagementAuthorizationIntegrationTests"
+        passed: 5
+        failed: 0
+        skipped: 0
+        failures: []
+      notes: "Legacy registration endpoint intentionally returns 410 Gone."
+    upstream_trace:
+      plan_item: "3.1"
+      requirements: ["REQ-001", "REQ-002", "REQ-007", "REQ-012", "REQ-014"]
+      full_trace: "REQ-001/002/007/012/014 → plan 3.1 → T010 → AuthController/AuthService → integration tests"
+
+  - task_id: "T011"
+    description: "Restrict account provisioning to valid employees and administrators"
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Services/UserService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Validates active employee linkage, username uniqueness and every supplied role; atomically records account create/deactivation audit entries"
+        - file: "src/ErpBackend/Controllers/UsersController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Requires Admin role and maps invalid employee/role conditions to explicit API errors"
+        - file: "src/ErpBackend/Controllers/SystemSettingsController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Requires Admin role for user, role and permission administration endpoints"
+        - file: "tests/ErpBackend.IntegrationTests/CustomWebApplicationFactory.cs"
+          changes:
+            - change_type: "modified"
+              description: "Configured a test-only administrative reset secret"
+        - file: "tests/ErpBackend.IntegrationTests/WipReportsControllerIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Added test role claims while preserving existing test permission claims"
+        - file: "tests/ErpBackend.IntegrationTests/UserManagementAuthorizationIntegrationTests.cs"
+          changes:
+            - change_type: "created"
+              description: "Covers 401/403/admin access and successful employee-bound account creation"
+        - file: "tests/ErpBackend.Tests/Services/UserServiceTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Covers valid provisioning, invalid employee/role cases, uniqueness and audit entries"
+        - file: "tests/ErpBackend.IntegrationTests/UserManagementAuthorizationIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Covers account-unlock authorization and own-user theme preference scope"
+        - file: "src/erp-frontend/src/api/auth.ts"
+          changes:
+            - change_type: "modified"
+              description: "Updates change-password and account-create request contracts"
+        - file: "src/erp-frontend/src/App.tsx"
+          changes:
+            - change_type: "modified"
+              description: "Stops sending the client-controlled skip-old-password flag"
+        - file: "docs/architecture/employee-identity-access/plan.md"
+          changes:
+            - change_type: "modified"
+              description: "Recorded completed account-security tasks and their approved lockout policy"
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj --filter FullyQualifiedName~UserServiceTests; dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~UserManagementAuthorizationIntegrationTests"
+        passed: 17
+        failed: 0
+        skipped: 0
+        failures: []
+      notes: "The shared WIP integration test class also passed: 4 passed, 0 failed."
+    upstream_trace:
+      plan_item: "3.1"
+      requirements: ["REQ-001", "REQ-002", "REQ-007", "REQ-011", "REQ-014"]
+      full_trace: "REQ-001/002/007/011/014 → plan 3.1 → T011 → UserService/management controllers → unit and integration tests"
+
+  - task_id: "T012"
+    description: "Implement account lockout, secure password reset and authentication audit"
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Controllers/AuthController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Admin reset requires Admin role and explicit configuration; no fallback secret"
+        - file: "src/ErpBackend/Controllers/UsersController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Adds admin-only manual unlock endpoint"
+        - file: "src/ErpBackend/Services/AuthService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Enforces configurable five-failure/15-minute lockout with serialized PostgreSQL login attempts, password history, forced change and audit"
+        - file: "src/ErpBackend/Services/UserService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Records manual lockout release with the administrator actor"
+        - file: "src/ErpBackend/appsettings.json"
+          changes:
+            - change_type: "modified"
+              description: "Sets the default lockout threshold and duration"
+        - file: "src/ErpBackend/DTOs/AuthDtos.cs"
+          changes:
+            - change_type: "modified"
+              description: "Removes client-controlled old-password bypass property"
+        - file: "src/erp-frontend/src/api/auth.ts"
+          changes:
+            - change_type: "modified"
+              description: "Removes skip-old-password from the API request type"
+        - file: "src/erp-frontend/src/App.tsx"
+          changes:
+            - change_type: "modified"
+              description: "Stops sending skip-old-password from the password form"
+        - file: "src/ErpBackend/Controllers/SystemSettingsController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Protects cross-user theme reads/writes and keeps the endpoints asynchronous"
+        - file: "src/ErpBackend/DTOs/AuthDtos.cs"
+          changes:
+            - change_type: "modified"
+              description: "Removes the client-supplied old-password bypass field"
+        - file: "src/ErpBackend/Controllers/SystemSettingsController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Restricts theme preference operations to the owner or Admin; keeps settings calls asynchronous"
+        - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Covers lockout threshold, expiration, manual unlock, reset audit and password history"
+        - file: "src/erp-frontend/src/api/auth.ts"
+          changes:
+            - change_type: "modified"
+              description: "Removes skip-old-password from change-password API request type"
+        - file: "src/erp-frontend/src/App.tsx"
+          changes:
+            - change_type: "modified"
+              description: "Stops sending skip-old-password in the user password-change flow"
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~AuthControllerIntegrationTests|FullyQualifiedName~UserManagementAuthorizationIntegrationTests"
+        passed: 9
+        failed: 0
+        skipped: 0
+        failures: []
+      notes: "User-approved policy: five consecutive invalid attempts lock for 15 minutes; success, expiry or Admin unlock clears the counter. PostgreSQL row locking serializes per-account login counter updates."
+    upstream_trace:
+      plan_item: "3.2"
+      requirements: ["REQ-002", "REQ-007", "REQ-012", "REQ-014"]
+      full_trace: "REQ-002/007/012/014 → plan 3.2 → T012 → AuthController/AuthService/UsersController → lockout and reset integration tests"
+
+  - task_id: "T003"
+    description: "Capture login and protected API latency baseline"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "tests/ErpBackend.IntegrationTests/PostgreSqlJwtLatencyIntegrationTests.cs"
+          changes:
+            - change_type: "created"
+              description: "Measures successful login and a valid JWT-protected API against isolated PostgreSQL."
+        - file: "docs/architecture/employee-identity-access/authorization-decisions.md"
+          changes:
+            - change_type: "modified"
+              description: "Records local p50/p95 measurements and their non-production limitations."
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~PostgreSqlJwtLatencyIntegrationTests"
+        passed: 1
+        failed: 0
+        skipped: 0
+        failures: []
+      notes: "Local isolated PostgreSQL testhost measured successful login p50/p95 244.12/306.05 ms and GET /api/erp/users p50/p95 46.24/60.66 ms. Production baseline and formal budget remain pending."
+    upstream_trace:
+      plan_item: "2.2"
+      requirements: ["REQ-016"]
+      full_trace: "REQ-016 → plan 2.2 → T003 → PostgreSqlJwtLatencyIntegrationTests → local measurement recorded; production baseline remains open"
+
+  - task_id: "T005"
+    description: "Approve token revocation strategy and performance budget"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "docs/architecture/employee-identity-access/authorization-decisions.md"
+          changes:
+            - change_type: "modified"
+              description: "Records the selected per-request PostgreSQL authority check, fail-closed behavior and measure-first approach."
+    verification:
+      build_passed: true
+      test_results:
+        command: "PostgreSqlJwtLatencyIntegrationTests"
+        passed: 1
+        failed: 0
+        skipped: 0
+        failures: []
+      notes: "Strategy and measure-first approach were selected; formal production performance budget remains unapproved."
+    upstream_trace:
+      plan_item: "2.2"
+      requirements: ["REQ-016"]
+      full_trace: "REQ-016 → plan 2.2 → T005 → authorization-decisions.md → user selection and local performance evidence"
+
+  - task_id: "T007"
+    description: "Implement authoritative account security-version checks"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Models/System/SystemModels.cs"
+          changes:
+            - change_type: "modified"
+              description: "Adds the persisted user security version."
+        - file: "src/ErpBackend/Data/ErpGeneralDbContext.cs"
+          changes:
+            - change_type: "modified"
+              description: "Configures a zero default for new security versions."
+        - file: "src/ErpBackend/Migrations/20261024174200_AddUserSecurityVersion.cs"
+          changes:
+            - change_type: "created"
+              description: "Adds a reversible bigint security-version column with default zero."
+        - file: "src/ErpBackend/Program.cs"
+          changes:
+            - change_type: "modified"
+              description: "Checks account activation and the JWT security version against PostgreSQL on each authenticated request; database errors fail authentication and are logged."
+        - file: "src/ErpBackend/Services/AuthService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Adds the version claim to JWTs and increments the version on password changes and administrative resets."
+        - file: "src/ErpBackend/Services/UserService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Increments the version when an account is deactivated."
+        - file: "src/ErpBackend/Services/SystemSettingsService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Invalidates affected users' tokens when permissions or roles are changed or removed."
+        - file: "src/ErpBackend/Migrations/ErpGeneralDbContextModelSnapshot.cs"
+          changes:
+            - change_type: "modified"
+              description: "Includes the new security-version column in the EF model snapshot."
+        - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Verifies old JWT rejection after account deactivation or version change."
+        - file: "tests/ErpBackend.IntegrationTests/PostgreSqlLoginLockoutIntegrationTests.cs"
+          changes:
+            - change_type: "created"
+              description: "Exercises concurrent failed login serialization on PostgreSQL."
+        - file: "tests/ErpBackend.IntegrationTests/PostgreSqlTestDatabase.cs"
+          changes:
+            - change_type: "created"
+              description: "Creates and removes disposable isolated PostgreSQL schemas for integration tests."
+        - file: "tests/ErpBackend.Tests/Services/SystemSettingsSecurityVersionTests.cs"
+          changes:
+            - change_type: "created"
+              description: "Verifies role and permission changes increment affected users' versions."
+        - file: "src/erp-frontend/src/App.tsx"
+          changes:
+            - change_type: "modified"
+              description: "Clears the invalidated token after first password change and prompts the user to sign in again."
+    verification:
+      build_passed: true
+      test_results:
+        command: "UserServiceTests|SystemSettingsSecurityVersionTests; AuthControllerIntegrationTests|UserManagementAuthorizationIntegrationTests; PostgreSqlLoginLockoutIntegrationTests; PostgreSqlJwtLatencyIntegrationTests; npm test; npm run build"
+        passed: 36
+        failed: 0
+        skipped: 0
+        failures: []
+      notes: "Migration SQL generation was verified. Migration was not applied to the shared or production database. Employee-status enforcement is now implemented according to the user-selected policy; formal HR sign-off and production rollout remain pending."
+    upstream_trace:
+      plan_item: "2.2"
+      requirements: ["REQ-004", "REQ-006", "REQ-007", "REQ-011", "REQ-016"]
+      full_trace: "REQ-004/006/007/011/016 → plan 2.2 → T007 → JWT claims, per-request PostgreSQL check, revocation write paths and tests"
+
+  - task_id: "T013"
+    description: "Synchronize employee lifecycle with account access"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Services/EmployeeService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Audits status transitions, disables linked accounts for terminated/inactive employees, and increments security versions in the same SaveChanges operation."
+        - file: "src/ErpBackend/Controllers/EmployeesController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Restricts employee management to Admin/HR and requires actor and reason for status changes."
+        - file: "src/ErpBackend/DTOs/EmployeeDtos.cs"
+          changes:
+            - change_type: "modified"
+              description: "Adds required reasons for status and organizational changes."
+        - file: "src/ErpBackend/DTOs/HrDtos.cs"
+          changes:
+            - change_type: "modified"
+              description: "Carries the effective termination date and rehire reason."
+        - file: "src/erp-frontend/src/api/hr.ts"
+          changes:
+            - change_type: "modified"
+              description: "Sends termination date and requires a reason for rehire calls."
+        - file: "src/erp-frontend/src/pages/HR.tsx"
+          changes:
+            - change_type: "modified"
+              description: "Submits the selected termination date and requires an audit reason."
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj"
+        passed: 273
+        failed: 0
+        skipped: 2
+        failures: []
+      notes: "Role recalculation is not performed without an approved department/job-title-to-role mapping; future-dated leave/transfer scheduling remains unimplemented."
+    upstream_trace:
+      plan_item: "3.3"
+      requirements: ["REQ-003", "REQ-004", "REQ-007", "REQ-010", "REQ-011"]
+      full_trace: "REQ-003/004/007/010/011 → plan 3.3 → T013 → EmployeeService and EmployeesController → lifecycle audit and revocation tests"
+
+  - task_id: "T014"
+    description: "Enforce current account, employee and authorization status on protected requests"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Program.cs"
+          changes:
+            - change_type: "modified"
+              description: "Adds global authenticated fallback and per-request account/employee status, security-version, employee-binding, ESS-only leave and forced-password checks."
+        - file: "src/ErpBackend/Services/AuthService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Allows login only for active/leave employees and includes the bound EmployeeId in signed JWTs."
+        - file: "src/ErpBackend/Controllers/AuthController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Explicitly marks login anonymous."
+        - file: "src/ErpBackend/Controllers/EmployeeEssController.cs"
+          changes:
+            - change_type: "created"
+              description: "Adds self-scoped, read-only payroll, attendance and leave endpoints."
+        - file: "src/ErpBackend/DTOs/EmployeeEssDtos.cs"
+          changes:
+            - change_type: "created"
+              description: "Defines a limited ESS payroll response without bank-account or internal-cost fields."
+        - file: "tests/ErpBackend.IntegrationTests/FallbackAuthorizationIntegrationTests.cs"
+          changes:
+            - change_type: "created"
+              description: "Verifies anonymous business APIs are denied while health and login remain anonymous."
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj; dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj"
+        passed: 713
+        failed: 0
+        skipped: 2
+        failures: []
+      notes: "Fallback authentication and employee state checks are enforced; per-module RBAC coverage and approved role/permission evaluation remain incomplete."
+    upstream_trace:
+      plan_item: "3.3"
+      requirements: ["REQ-003", "REQ-004", "REQ-007", "REQ-010", "REQ-011"]
+      full_trace: "REQ-003/004/007/010/011 → plan 3.3 → T014 → JWT validation and ESS controller → leave-scope and anonymous-access tests"
+
+  - task_id: "T015"
+    description: "Trigger authorization review after organizational changes"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Services/EmployeeService.cs"
+          changes:
+            - change_type: "modified"
+              description: "Requires a reason, audits old/new department, job-title and grade identifiers, and invalidates linked users' tokens."
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj; dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj"
+        passed: 713
+        failed: 0
+        skipped: 2
+        failures: []
+      notes: "Audit and revocation are implemented; role recalculation or a review queue is not added pending an approved mapping."
+    upstream_trace:
+      plan_item: "3.3"
+      requirements: ["REQ-003", "REQ-004", "REQ-007", "REQ-011"]
+      full_trace: "REQ-003/004/007/011 → plan 3.3 → T015 → EmployeeService → organization change audit and security-version invalidation"
+
+  - task_id: "T016"
+    description: "Add employee-account lifecycle tests"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Covers leave-only ESS access, own-payroll scoping, payroll field exclusion, termination revocation and forced password change."
+        - file: "tests/ErpBackend.IntegrationTests/EmployeesDepartmentsIntegrationTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Covers status audit, account disablement, leave-account continuity and no automatic account reactivation on rehire."
+        - file: "tests/ErpBackend.Tests/Services/UserServiceTests.cs"
+          changes:
+            - change_type: "modified"
+              description: "Covers HR profile completeness and initial password change."
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj; dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj"
+        passed: 713
+        failed: 0
+        skipped: 2
+        failures: []
+      notes: "The existing suites pass; dedicated rollback and PostgreSQL employee lifecycle cases remain outstanding."
+    upstream_trace:
+      plan_item: "3.4"
+      requirements: ["REQ-001", "REQ-002", "REQ-003", "REQ-004", "REQ-007", "REQ-010", "REQ-011"]
+      full_trace: "REQ-001/002/003/004/007/010/011 → plan 3.4 → T016 → lifecycle, ESS and forced-password tests"
+
+  - task_id: "T022"
+    description: "Require authentication by default and explicitly mark anonymous endpoints"
+    status: "in-progress"
+    implementation:
+      files_changed:
+        - file: "src/ErpBackend/Program.cs"
+          changes:
+            - change_type: "modified"
+              description: "Adds a Fallback Policy and anonymous metadata for service root and health endpoints."
+        - file: "src/ErpBackend/Controllers/AuthController.cs"
+          changes:
+            - change_type: "modified"
+              description: "Explicitly allows anonymous login and registration-rejection routes."
+        - file: "tests/ErpBackend.IntegrationTests/CustomWebApplicationFactory.cs"
+          changes:
+            - change_type: "modified"
+              description: "Separates explicit anonymous requests from authenticated test principals and JWT requests."
+    verification:
+      build_passed: true
+      test_results:
+        command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj"
+        passed: 273
+        failed: 0
+        skipped: 2
+        failures: []
+      notes: "This implements the selected authentication boundary, not complete role/permission coverage for every business endpoint."
+    upstream_trace:
+      plan_item: "4.4"
+      requirements: ["REQ-004", "REQ-006", "REQ-011", "REQ-015", "REQ-016"]
+      full_trace: "REQ-004/006/011/015/016 → plan 4.4 → T022 → Fallback Policy and explicit anonymous endpoints → anonymous-access tests"
+
+pending_tasks:
+  - task_id: "T004"
+    description: "Obtain approval for authorization matrix and lifecycle policies"
+    blocked_by: []
+    priority: "P1"
+  - task_id: "T006"
+    description: "Resolve preflight identity anomalies with HR and system-owner approval"
+    blocked_by: []
+    priority: "P1"
+  - task_id: "T008"
+    description: "Implement approved account, lockout and SoD schema migration"
+    blocked_by: ["T004", "T005", "T006"]
+    priority: "P1"
+  - task_id: "T009"
+    description: "Register authorization services and architecture tests"
+    blocked_by: ["T007"]
+    priority: "P1"
+  - task_id: "T017"
+    description: "Create approved permission catalog and compatibility migration"
+    blocked_by: ["T004", "T008"]
+    priority: "P1"
+  - task_id: "T018"
+    description: "Implement role management service"
+    blocked_by: ["T004", "T017"]
+    priority: "P1"
+  - task_id: "T019"
+    description: "Implement permission catalog service"
+    blocked_by: ["T004", "T017"]
+    priority: "P1"
+  - task_id: "T020"
+    description: "Implement protected role and permission APIs"
+    blocked_by: ["T018", "T019"]
+    priority: "P1"
+  - task_id: "T021"
+    description: "Implement SoD conflict detection and time-limited exceptions"
+    blocked_by: ["T004", "T008", "T018", "T019"]
+    priority: "P1"
+  - task_id: "T023"
+    description: "Add role, permission, SoD and revocation integration tests"
+    blocked_by: ["T018", "T019", "T020", "T021", "T022"]
+    priority: "P1"
+  - task_id: "T024"
+    description: "Complete protected API authorization coverage inventory"
+    blocked_by: ["T022"]
+    priority: "P1"
+  - task_id: "T025"
+    description: "Implement time-limited Break-Glass access"
+    blocked_by: ["T004", "T008", "T021"]
+    priority: "P1"
+  - task_id: "T026"
+    description: "Implement scoped employee data access and sensitive-field controls"
+    blocked_by: ["T004", "T008", "T022"]
+    priority: "P1"
+  - task_id: "T027"
+    description: "Protect sensitive employee and payroll APIs"
+    blocked_by: ["T022", "T026"]
+    priority: "P1"
+  - task_id: "T028"
+    description: "Add sensitive-data authorization and disclosure tests"
+    blocked_by: ["T026", "T027"]
+    priority: "P1"
+  - task_id: "T029"
+    description: "Add permission-aware frontend API and authorization handling"
+    blocked_by: ["T017", "T020", "T022"]
+    priority: "P1"
+  - task_id: "T030"
+    description: "Implement account, role, permission and SoD management UI"
+    blocked_by: ["T020", "T021", "T029"]
+    priority: "P1"
+  - task_id: "T031"
+    description: "Add employee-access lifecycle and administrative audit coverage"
+    blocked_by: ["T013", "T018", "T021", "T025", "T030"]
+    priority: "P1"
+  - task_id: "T032"
+    description: "Verify employee application authentication compatibility"
+    blocked_by: ["T014", "T022"]
+    priority: "P1"
+  - task_id: "T033"
+    description: "Run backend, unit, integration, architecture and frontend validation"
+    blocked_by: ["T016", "T023", "T024", "T028", "T030", "T031", "T032"]
+    priority: "P1"
+  - task_id: "T034"
+    description: "Prepare deployment and rollback procedures"
+    blocked_by: ["T033"]
+    priority: "P1"
+  - task_id: "T035"
+    description: "Obtain production rollout approval"
+    blocked_by: ["T034"]
+    priority: "P1"
+  - task_id: "T036"
+    description: "Verify migration rollback and production readiness"
+    blocked_by: ["T035"]
+    priority: "P1"
+
+untracked_changes:
+  - "src/ErpBackend/Controllers/EmployeeEssController.cs"
+  - "src/ErpBackend/DTOs/EmployeeEssDtos.cs"
+  - "tests/ErpBackend.IntegrationTests/FallbackAuthorizationIntegrationTests.cs"
+  - "Other pre-existing untracked worktree files were not changed by this batch."
+
+traceability_chain:
+  - chain_id: "TRACE-IDENTITY-001"
+    requirement: "REQ-001"
+    plan_phase: "Phase 3"
+    plan_item: "3.1"
+    tasks: ["T010", "T011"]
+    files:
+      - "src/ErpBackend/Services/UserService.cs"
+      - "src/ErpBackend/Controllers/UsersController.cs"
+    status: "complete"
+  - chain_id: "TRACE-IDENTITY-002"
+    requirement: "REQ-002"
+    plan_phase: "Phase 3"
+    plan_item: "3.1"
+    tasks: ["T010", "T011"]
+    files:
+      - "src/ErpBackend/Controllers/AuthController.cs"
+      - "src/ErpBackend/Controllers/UsersController.cs"
+    status: "complete"
+  - chain_id: "TRACE-IDENTITY-003"
+    requirement: "REQ-007"
+    plan_phase: "Phase 3"
+    plan_item: "3.1"
+    tasks: ["T011"]
+    files:
+      - "src/ErpBackend/Services/UserService.cs"
+    status: "complete"
+  - chain_id: "TRACE-IDENTITY-004"
+    requirement: "REQ-014"
+    plan_phase: "Phase 3"
+    plan_item: "3.1"
+    tasks: ["T010", "T011"]
+    files:
+      - "src/ErpBackend/Controllers/AuthController.cs"
+      - "src/ErpBackend/Controllers/UsersController.cs"
+      - "src/ErpBackend/Controllers/SystemSettingsController.cs"
+    status: "complete"
+  - chain_id: "TRACE-IDENTITY-005"
+    requirement: "REQ-016"
+    plan_phase: "Phase 2"
+    plan_item: "2.2"
+    tasks: ["T003", "T005", "T007"]
+    files:
+      - "src/ErpBackend/Program.cs"
+      - "src/ErpBackend/Services/AuthService.cs"
+      - "src/ErpBackend/Services/UserService.cs"
+      - "src/ErpBackend/Services/SystemSettingsService.cs"
+      - "src/ErpBackend/Migrations/20261024174200_AddUserSecurityVersion.cs"
+      - "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+      - "tests/ErpBackend.IntegrationTests/PostgreSqlLoginLockoutIntegrationTests.cs"
+      - "tests/ErpBackend.IntegrationTests/PostgreSqlJwtLatencyIntegrationTests.cs"
+    status: "partial"
+  - chain_id: "TRACE-IDENTITY-006"
+    requirement: "REQ-003"
+    plan_phase: "Phase 3"
+    plan_item: "3.3"
+    tasks: ["T013", "T014", "T016"]
+    files:
+      - "src/ErpBackend/Services/EmployeeService.cs"
+      - "src/ErpBackend/Services/AuthService.cs"
+      - "src/ErpBackend/Program.cs"
+      - "src/ErpBackend/Controllers/EmployeeEssController.cs"
+      - "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+      - "tests/ErpBackend.IntegrationTests/EmployeesDepartmentsIntegrationTests.cs"
+    status: "partial"
+
+validation:
+  passed: true
+  errors: []
+  warnings:
+    - "The legacy Admin role is used as a temporary authorization gate; the business-approved IAM role matrix is still pending."
+    - "No database uniqueness migration was added; policy and remediation approvals remain prerequisites."
+    - "T003 measurements are local synthetic measurements, not a production baseline or performance SLA."
+    - "T005 has no formally approved production latency budget."
+    - "The selected employee-status policy is implemented, but formal HR sign-off, future-dated leave/transfer scheduling and automatic role recalculation remain pending."
+    - "Global fallback requires authentication; module-by-module role and permission coverage remains incomplete."
+    - "The frontend has no dedicated ESS screens yet; the backend provides the self-service read-only API."
+    - "Security-version migration SQL was generated and reviewed but not applied to a shared or production database."
+  blocking_issues: []

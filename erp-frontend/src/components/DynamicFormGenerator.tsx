@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FormField } from './FormModal';
+import React, { useState, useMemo, useCallback } from 'react';
 
 export interface ValidationRule {
   type: 'required' | 'minLength' | 'maxLength' | 'min' | 'max' | 'email' | 'regex' | 'custom';
@@ -57,19 +56,20 @@ export function DynamicFormGenerator({
   customRenderers,
   loading = false 
 }: DynamicFormProps) {
-  const [values, setValues] = useState<Record<string, unknown>>(initialValues);
+  const [storedValues, setValues] = useState<Record<string, unknown>>(initialValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
+  const defaultValues = useMemo(() => {
     const defaultValues: Record<string, unknown> = {};
     schema.fields.forEach(field => {
       if (field.defaultValue !== undefined && !(field.name in initialValues)) {
         defaultValues[field.name] = field.defaultValue;
       }
     });
-    setValues(prev => ({ ...defaultValues, ...prev }));
+    return defaultValues;
   }, [schema.fields, initialValues]);
+  const values = useMemo(() => ({ ...defaultValues, ...storedValues }), [defaultValues, storedValues]);
 
   const validateField = useCallback((field: FieldSchema, value: unknown): string | null => {
     if (field.required && (value === undefined || value === null || value === '')) {

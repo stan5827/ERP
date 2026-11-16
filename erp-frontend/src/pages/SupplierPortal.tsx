@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, FileText, Truck, AlertCircle, Search, Package, Clock, CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Users, FileText, Truck } from 'lucide-react';
 import { api } from '../api/api';
 
 interface SupplierUser {

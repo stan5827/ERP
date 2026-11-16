@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ErpBackend.Data;
+using ErpBackend.DTOs;
 using ErpBackend.Models.Finance;
 
 namespace ErpBackend.Services;
@@ -114,28 +115,4 @@ public class BudgetControlService : IBudgetControlService
 
         return alerts.OrderByDescending(a => a.UtilizationPercent).ToList();
     }
-}
-
-public class BudgetOverrunCheck
-{
-    public decimal Amount { get; set; }
-    public string CostCenterCode { get; set; } = null!;
-    public decimal BudgetAmount { get; set; }
-    public decimal PreviousUsed { get; set; }
-    public decimal ProjectedTotal { get; set; }
-    public decimal RemainingAfter { get; set; }
-    public string Status { get; set; } = "ok";
-    public string WarningLevel { get; set; } = "none";
-    public string Message { get; set; } = "ok";
-}
-
-public class BudgetAlertDto
-{
-    public string CostCenterCode { get; set; } = null!;
-    public string CostCenterName { get; set; } = null!;
-    public decimal BudgetAmount { get; set; }
-    public decimal UsedAmount { get; set; }
-    public decimal UtilizationPercent { get; set; }
-    public string WarningLevel { get; set; } = "none";
-    public string Message { get; set; } = null!;
 }

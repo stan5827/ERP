@@ -1,0 +1,306 @@
+import React, { useState } from 'react';
+import {
+  LayoutDashboard, ShoppingCart, Truck, Package, Factory,
+  ShieldCheck, Users, Landmark, Building2, PieChart,
+  FlaskConical, Leaf, BrainCircuit, MessageSquare,
+  ChevronLeft, ChevronRight, Settings, HelpCircle,
+  Scale, Network, DollarSign, GitBranch, CalendarDays,
+  ClipboardList, CalendarClock, Map, Wrench, Scan,
+  Link, Clock, FileOutput, Lightbulb, Moon, Sun, Activity,
+  type LucideIcon
+} from 'lucide-react';
+import type { ModuleId } from '../types';
+import { useTheme } from '../theme/ThemeProvider';
+import { useRole } from '../contexts/RoleContext';
+import { useSidebarBadges } from '../hooks/useApi';
+import './Sidebar.css';
+
+const iconMap: Record<string, LucideIcon> = {
+  LayoutDashboard, ShoppingCart, Truck, Package, Factory,
+  ShieldCheck, Users, Landmark, Building2, PieChart,
+  FlaskConical, Leaf, BrainCircuit, MessageSquare, Scale, Network, DollarSign, GitBranch, CalendarDays,
+  ClipboardList, CalendarClock, Map, Wrench, Scan,
+  Link, Clock, FileOutput, Lightbulb, Activity,
+};
+
+interface NavGroup {
+  label: string;
+  items: {
+    id: ModuleId;
+    label: string;
+    icon: string;
+    badge?: number;
+    group: string;
+  }[];
+}
+
+interface SidebarProps {
+  activeModule: ModuleId;
+  onModuleChange: (id: ModuleId) => void;
+  collapsed: boolean;
+  onCollapseToggle: () => void;
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: '0. Overview Monitoring',
+    items: [
+      { id: 'dashboard', label: '?®Â??∞Ê?ÂÆ?, icon: 'LayoutDashboard', group: 'main' },
+      { id: 'kpi', label: 'KPI ?áÊ??ãÊùø', icon: 'PieChart', group: 'main' },
+    ],
+  },
+  {
+    label: '1. ‰∏ªË??ôË??∫Á?',
+    items: [
+      { id: 'systemsettings', label: 'Á≥ªÁµ±?áÊ???, icon: 'Settings', group: 'master' },
+      { id: 'uom', label: '?Æ‰??èÊ∏¨', icon: 'Scale', group: 'master' },
+      { id: 'engineering', label: 'Â∑•Ë???BOM', icon: 'Wrench', group: 'master' },
+      { id: 'org', label: 'ÁµÑÁ??∂Ê?', icon: 'Network', group: 'master' },
+    ],
+  },
+  {
+    label: '2. ?∑ÂîÆÁÆ°Á?',
+    items: [
+      { id: 'sales', label: '?∑ÂîÆ??CRM', icon: 'ShoppingCart', badge: 3, group: 'sales' },
+    ],
+  },
+  {
+    label: '3. ?üÁî¢Ë®àÂ? (MPS)',
+    items: [
+      { id: 'mps', label: 'MPS ‰∏ªÊ?Á®?, icon: 'Map', group: 'planning' },
+      { id: 'rccp', label: 'RCCP Á≤óÁî¢??, icon: 'Activity', group: 'planning' },
+    ],
+  },
+  {
+    label: '4. ?©Ê?Ë®àÁï´ (MRP)',
+    items: [
+      { id: 'mrp', label: 'MRP ?ÄÊ±ÇË???, icon: 'ClipboardList', group: 'planning' },
+    ],
+  },
+  {
+    label: '5. ?°Ë≥º‰æõÊ???,
+    items: [
+      { id: 'procurement', label: '?°Ë≥ºÁÆ°Á?', icon: 'Truck', badge: 5, group: 'procurement' },
+      { id: 'suppliers', label: '‰æõÊ??ÜÁÆ°??, icon: 'Users', group: 'procurement' },
+      { id: 'supplierportal', label: '‰æõÊ??ÜÂÖ•??, icon: 'Link', group: 'procurement' },
+    ],
+  },
+  {
+    label: '6. Â∫´Â??©Ê?',
+    items: [
+      { id: 'inventory', label: 'Â∫´Â?ÁÆ°Á?', icon: 'Package', group: 'inventory' },
+      { id: 'barcode', label: 'Ê¢ùÁ¢ºÁ≥ªÁµ±', icon: 'Scan', group: 'inventory' },
+    ],
+  },
+  {
+    label: '7. ?üÁî¢?∑Ë?',
+    items: [
+      { id: 'manufacturing', label: '?üÁî¢Â∑•ÂñÆ', icon: 'Factory', group: 'manufacturing' },
+      { id: 'aps', label: 'APS Á¥∞Ê?Á®?, icon: 'CalendarClock', group: 'manufacturing' },
+      { id: 'tpm', label: 'Ë®≠Â?Á∂≠Ë≠∑ TPM', icon: 'Wrench', group: 'manufacturing' },
+    ],
+  },
+  {
+    label: '8. Ë≤°Â??áÈ?ÁÆ?,
+    items: [
+      { id: 'finance', label: 'Ë≤°Â??ÉË?', icon: 'Landmark', group: 'finance' },
+      { id: 'budget', label: '?êÁ?Ë¶èÂ?', icon: 'PieChart', group: 'finance' },
+      { id: 'actual_costing', label: 'ÂØ¶È??êÊú¨ÁµêË?', icon: 'FileOutput', group: 'finance' },
+      { id: 'costcenter', label: '?êÊú¨‰∏≠Â?', icon: 'DollarSign', group: 'finance' },
+    ],
+  },
+  {
+    label: '9. ‰∫∫Â?Ë≥áÊ?',
+    items: [
+      { id: 'hr', label: '‰∫∫‰??™Ë?', icon: 'Users', badge: 7, group: 'hr' },
+    ],
+  },
+  {
+    label: '10. ?ÅË≥™ÁÆ°Á?',
+    items: [
+      { id: 'quality', label: '?ÅË≥™?áÁ®Ω??, icon: 'ShieldCheck', group: 'quality' },
+    ],
+  },
+  {
+    label: '11. AI ?∫ËÉΩ?âÁî®',
+    items: [
+      { id: 'ai', label: 'AI ??éß‰∏≠Â?', icon: 'BrainCircuit', group: 'digital' },
+      { id: 'agentflows', label: 'Agent Flow', icon: 'GitBranch', group: 'digital' },
+      { id: 'aidecision', label: 'AI Ê±∫Á??©Ê?', icon: 'Lightbulb', group: 'digital' },
+      { id: 'aischeduling', label: 'AI ?∫ËÉΩ?íÁè≠', icon: 'Clock', group: 'digital' },
+    ],
+  },
+];
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeModule,
+  onModuleChange,
+  collapsed,
+  onCollapseToggle,
+}) => {
+  const [, setHoveredItem] = useState<string | null>(null);
+  const { themeName, setTheme } = useTheme();
+  const { hasModule, isLoading: roleLoading, moduleAccess } = useRole();
+  const { data: badgesData } = useSidebarBadges();
+  console.log('[Sidebar] moduleAccess from context:', moduleAccess);
+
+  const badges = badgesData?.data || {
+    salesCount: 0,
+    procurementCount: 0,
+    hrCount: 0,
+    inventoryCount: 0,
+    manufacturingCount: 0,
+    qualityCount: 0
+  };
+
+  const getBadgeValue = (id: string, staticBadge?: number) => {
+    switch (id) {
+      case 'sales': return badges.salesCount;
+      case 'procurement': return badges.procurementCount;
+      case 'hr': return badges.hrCount;
+      case 'inventory': return badges.inventoryCount;
+      case 'manufacturing': return badges.manufacturingCount;
+      case 'quality': return badges.qualityCount;
+      default: return staticBadge;
+    }
+  };
+
+  const themeOptions = [
+    { id: 'modern-dark', name: '?æ‰ª£Ê∑±Ëâ≤', icon: Moon },
+    { id: 'professional-light', name: 'Ê∑∫Ëâ≤Â∞àÊ•≠', icon: Sun },
+    { id: 'high-contrast', name: 'È´òÂ?ÊØ?, icon: Moon }
+  ];
+
+  const handleThemeSelect = (themeId: any) => {
+    setTheme(themeId);
+  };
+
+  const isModuleAccessible = (moduleId: string): boolean => {
+    console.log('[Sidebar] isModuleAccessible called with:', moduleId, 'roleLoading:', roleLoading);
+    console.log('[Sidebar] moduleAccess in Sidebar:', JSON.stringify(moduleAccess.map(m => m.moduleId)));
+    console.log('[Sidebar] hasModule result:', hasModule(moduleId));
+    if (roleLoading) return true;
+    return hasModule(moduleId);
+  };
+
+  return (
+    <aside
+      className="sidebar"
+      style={{
+        width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
+      }}
+    >
+      {/* Logo ?ÄÂ°?*/}
+      <div className="sidebar-logo">
+        <div className="sidebar-logo-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <polygon
+              points="11,2 20,7 20,15 11,20 2,15 2,7"
+              fill="none"
+              stroke="#d4af37"
+              strokeWidth="1.5"
+            />
+            <polygon
+              points="11,6 16,9 16,13 11,16 6,13 6,9"
+              fill="#d4af37"
+              opacity="0.6"
+            />
+            <circle cx="11" cy="11" r="2" fill="#f3cf65" />
+          </svg>
+        </div>
+        {!collapsed && (
+          <div className="sidebar-logo-text">
+            <div className="sidebar-logo-brand">ProMES</div>
+            <div className="sidebar-logo-sub">Ë£ΩÈÄ†Ê•≠ERPÁ≥ªÁµ±</div>
+          </div>
+        )}
+      </div>
+
+      {/* Â∞éË¶ΩÊ∏ÖÂñÆ */}
+      <nav className="sidebar-nav">
+        {navGroups.map((group) => {
+          const accessibleItems = group.items.filter(item => isModuleAccessible(item.id));
+          if (accessibleItems.length === 0) return null;
+          
+          return (
+            <div key={group.label} className="sidebar-nav-group">
+              {!collapsed && (
+                <div className="sidebar-group-label">{group.label}</div>
+              )}
+
+              {accessibleItems.map((item) => {
+              const Icon = iconMap[item.icon];
+              const isActive = activeModule === item.id;
+              return (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => onModuleChange(item.id)}
+                  onMouseEnter={() => setHoveredItem(item.id)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  title={collapsed ? item.label : undefined}
+                >
+                  <span className="sidebar-nav-icon">
+                    {Icon && <Icon size={16} />}
+                  </span>
+                  {!collapsed && (
+                    <span className="sidebar-nav-label">{item.label}</span>
+                  )}
+                  {getBadgeValue(item.id, item.badge) !== undefined && (getBadgeValue(item.id, item.badge) ?? 0) > 0 && (
+                    <span className={`sidebar-badge ${collapsed ? 'collapsed' : ''}`}>
+                      {getBadgeValue(item.id, item.badge)}
+                    </span>
+                  )}
+                  {isActive && <span className="sidebar-active-indicator" />}
+                </button>
+              );
+            })}
+            </div>
+          );
+        })}
+        
+        {/* ‰∏ªÈ??∏È? */}
+        {!collapsed && (
+          <div className="sidebar-nav-group">
+            <div className="sidebar-group-label">È°ØÁ§∫Ë®≠Â?</div>
+            {themeOptions.map(option => {
+              const isActive = themeName === option.id;
+              return (
+                <button
+                  key={`theme-${option.id}`}
+                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => handleThemeSelect(option.id)}
+                  onMouseEnter={() => setHoveredItem(`theme-${option.id}`)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                >
+                  <span className="sidebar-nav-icon">
+                    <option.icon size={16} />
+                  </span>
+                  <span className="sidebar-nav-label">{option.name}</span>
+                  {isActive && <span className="sidebar-active-indicator" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </nav>
+
+{/* Â∫ïÈÉ®Â∑•ÂÖ∑ */}
+      <div className="sidebar-footer">
+        {!collapsed && (
+          <>
+            <button className="sidebar-footer-btn" disabled title="?üËÉΩ?ãÁôº‰∏? style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+              <HelpCircle size={15} />
+              <span>Ë™™Ê??á‰ª∂</span>
+            </button>
+          </>
+        )}
+      </div>
+    </aside>
+  );
+};
+         
+
+
+
+

@@ -1,18 +1,17 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.System;
-using ErpBackend.Validation;
-using BCryptNet = BCrypt.Net.BCrypt;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
+[Route("api/erp/users")]
+[Authorize(Roles = "Admin")]
 public class UsersController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly IUserService _userService;
 
-    public UsersController(ErpGeneralDbContext db) { _db = db; }
+    public UsersController(IUserService userService) => _userService = userService;
 
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<UserDto>>>> GetAll()
@@ -21,97 +20,105 @@ public class UsersController : BaseController
         var pageSize = GetPageSize();
         var search = GetSearch();
 
-        var query = _db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(u => u.Username.Contains(search) || (u.Email != null && u.Email.Contains(search)));
-
-        var totalCount = await query.CountAsync();
-        var users = await query
-            .OrderByDescending(u => u.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var dtos = users.Select(MapToDto).ToList();
-        return Ok(dtos, totalCount: totalCount);
+        var totalCount = await Task.FromResult(0);
+        var dtos = await _userService.GetAllAsync(search, page, pageSize);
+        return Ok(dtos, totalCount: dtos.Count);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<UserDto>>> GetById(Guid id)
     {
-        var user = await _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == id);
-
-        if (user == null) return NotFound(ApiHelper.Fail("使用者不存在"));
-        return Ok(MapToDto(user));
+        var dto = await _userService.GetByIdAsync(id);
+        return dto == null ? NotFound(ApiHelper.Fail("User not found")) : Ok(dto);
     }
 
     [HttpPost]
     public async Task<ActionResult<ApiResponse<UserDto>>> Create([FromBody] CreateUserRequest request)
     {
-        if (request == null)
-            return BadRequest(ApiHelper.Fail("請提供使用者資訊"));
+        var actorId = GetUserId();
+        if (actorId == Guid.Empty)
+            return Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
 
-        if (await _db.Users.AnyAsync(u => u.Username == request.Username))
-            return BadRequest(ApiHelper.Fail("帳號已存在"));
-
-        // 密碼強度驗證
-        if (string.IsNullOrEmpty(request.Password) || request.Password.Length < 8)
-            return BadRequest(ApiHelper.Fail("密碼長度至少 8 個字元"));
-        
-        if (!System.Text.RegularExpressions.Regex.IsMatch(request.Password, @"[A-Za-z]") ||
-            !System.Text.RegularExpressions.Regex.IsMatch(request.Password, @"[0-9]"))
-            return BadRequest(ApiHelper.Fail("密碼必須包含英文字母和數字"));
-
-        var user = new User
+        var (dto, status) = await _userService.CreateAsync(request, actorId);
+        return status switch
         {
-            Username = request.Username,
-            PasswordHash = BCryptNet.HashPassword(request.Password),
-            Email = request.Email,
-            EmployeeId = request.EmployeeId
+            "duplicate" => Conflict(ApiHelper.Fail("Username already exists")),
+            "employee_required" => BadRequest(ApiHelper.Fail("An employee must be linked to the account")),
+            "employee_not_found" => BadRequest(ApiHelper.Fail("Employee does not exist")),
+            "employee_inactive" => BadRequest(ApiHelper.Fail("Only active employees can be linked to an account")),
+            "employee_already_linked" => Conflict(ApiHelper.Fail("Employee already has an account")),
+            "employee_profile_incomplete" => BadRequest(ApiHelper.Fail("Employee must have an identity document, hire date, department, and job title before account provisioning")),
+            "employee_department_invalid" => BadRequest(ApiHelper.Fail("Employee must be assigned to an active department before account provisioning")),
+            "employee_job_title_invalid" => BadRequest(ApiHelper.Fail("Employee must be assigned to an active job title before account provisioning")),
+            "invalid_roles" => BadRequest(ApiHelper.Fail("One or more roles do not exist")),
+            "invalid" => BadRequest(ApiHelper.Fail("Username and password are invalid; password must be at least 8 characters and contain both letters and numbers")),
+            _ => Ok(dto!, "User created successfully", null)
         };
+    }
 
-        _db.Users.Add(user);
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse>> Update(Guid id, [FromBody] UpdateUserRequestDto request)
+    {
+        var actorId = GetUserId();
+        if (actorId == Guid.Empty)
+            return Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
 
-        foreach (var roleId in request.RoleIds)
+        var (found, status) = await _userService.UpdateAsync(id, request, actorId);
+        if (status == "invalid_email")
+            return BadRequest(ApiHelper.Fail("Email is invalid"));
+        if (!found)
+            return status == "not_found"
+                ? NotFound(ApiHelper.Fail("User not found"))
+                : Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
+
+        return Ok("User updated successfully");
+    }
+
+    [HttpPut("{id:guid}/roles")]
+    public async Task<ActionResult<ApiResponse>> UpdateRoles(Guid id, [FromBody] UpdateUserRolesRequest request)
+    {
+        var actorId = GetUserId();
+        if (actorId == Guid.Empty)
+            return Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
+
+        var (found, status) = await _userService.UpdateRolesAsync(id, request, actorId);
+        if (!found)
         {
-            if (await _db.Roles.AnyAsync(r => r.Id == roleId))
-                _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = roleId });
+            return status switch
+            {
+                "not_found" => NotFound(ApiHelper.Fail("User not found")),
+                "invalid_roles" => BadRequest(ApiHelper.Fail("Only active roles may be assigned")),
+                "reason_required" => BadRequest(ApiHelper.Fail("A reason is required to update roles")),
+                "last_admin_required" => Conflict(ApiHelper.Fail("At least one other active Admin account must remain assigned")),
+                "actor_required" => Unauthorized(ApiHelper.Fail("Authenticated user identity is required")),
+                _ => BadRequest(ApiHelper.Fail("Unable to update user roles"))
+            };
         }
 
-        await _db.SaveChangesAsync();
-
-        var created = await _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstAsync(u => u.Id == user.Id);
-
-        return Ok(MapToDto(created), "建立成功");
+        return Ok(status == "unchanged" ? "User roles are unchanged" : "User roles updated");
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse>> Delete(Guid id)
     {
-        var user = await _db.Users.FindAsync(id);
-        if (user == null) return NotFound(ApiHelper.Fail("¨Ï¥ÎªÌ¤£¦s¦b"));
+        var actorId = GetUserId();
+        if (actorId == Guid.Empty)
+            return Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
 
-        user.IsActive = false;
-        user.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-
-        return ApiResponse.Ok(new object(), "使用者已停用");
+        var (found, status) = await _userService.DeleteAsync(id, actorId);
+        if (!found) return NotFound(ApiHelper.Fail("User not found"));
+        return Ok("User deactivated successfully");
     }
 
-    private static UserDto MapToDto(User user) => new()
+    [HttpPost("{id:guid}/unlock")]
+    public async Task<ActionResult<ApiResponse>> Unlock(Guid id)
     {
-        Id = user.Id,
-        Username = user.Username,
-        Email = user.Email,
-        EmployeeId = user.EmployeeId,
-        IsActive = user.IsActive,
-        LastLoginAt = user.LastLoginAt,
-        CreatedAt = user.CreatedAt,
-        Roles = user.UserRoles.Select(ur => ur.Role?.RoleName ?? "").ToList()
-    };
+        var actorId = GetUserId();
+        if (actorId == Guid.Empty)
+            return Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
+
+        var (found, status) = await _userService.UnlockAsync(id, actorId);
+        if (!found) return NotFound(ApiHelper.Fail(status == "not_found" ? "User not found" : "Unable to unlock account"));
+        return Ok("Account lockout released");
+    }
 }

@@ -1,6 +1,7 @@
 using Xunit;
 using Moq;
 using ErpBackend.Services;
+using ErpBackend.DTOs;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
 
@@ -54,6 +55,7 @@ public class LlmRequestTests
         Assert.Equal(2000, request.MaxTokens);
         Assert.Equal(0.7, request.Temperature);
         Assert.Equal("gpt-4", request.Model);
+        Assert.Equal("unclassified", request.DataClassification);
     }
 
     [Fact]

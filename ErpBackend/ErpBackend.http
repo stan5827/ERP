@@ -4,3 +4,86 @@ GET {{ErpBackend_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+@apiBase = http://localhost:5100/api/erp
+@goodsReceiptId = 00000000-0000-0000-0000-000000000001
+@purchaseOrderNumber = PO-REPLACE-ME
+@purchaseOrderItemId = 00000000-0000-0000-0000-000000000002
+@warehouseId = 00000000-0000-0000-0000-000000000003
+@binLocationId = 00000000-0000-0000-0000-000000000004
+@authToken = replace-with-a-valid-access-token
+
+### Receive the remaining purchase-order lines (lot-controlled SKUs require a lot number per line)
+POST {{apiBase}}/purchase-orders/{{purchaseOrderNumber}}/receive
+Authorization: ****** {{authToken}}
+Content-Type: application/json
+
+{
+  "warehouseId": "{{warehouseId}}",
+  "binLocationId": "{{binLocationId}}",
+  "items": [
+    {
+      "purchaseOrderItemId": "{{purchaseOrderItemId}}",
+      "quantity": 100,
+      "lotNumber": "SUPPLIER-LOT-001"
+    }
+  ]
+}
+
+###
+
+### Reverse an uninspected goods receipt (requires authenticated operator and reason)
+POST {{apiBase}}/goods-receipts/{{goodsReceiptId}}/reverse
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "reason": "Correcting a receipt created from an incomplete purchase order"
+}
+
+###
+
+@equipmentId = 00000000-0000-0000-0000-000000000010
+
+### List active equipment for work-in-process reporting
+GET {{apiBase}}/equipment/equipment?status=active
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Get equipment details
+GET {{apiBase}}/equipment/equipment/{{equipmentId}}
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Equipment dashboard statistics
+GET {{apiBase}}/equipment/stats
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Create equipment
+POST {{apiBase}}/equipment/equipment
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "equipmentCode": "EQ-DEMO-001",
+  "equipmentName": "Injection Molding Machine",
+  "equipmentType": "machine",
+  "manufacturer": "Example Manufacturer",
+  "purchasePrice": 0
+}
+
+### Update equipment status
+PUT {{apiBase}}/equipment/equipment/{{equipmentId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "maintenance"
+}
+
+### Deactivate equipment (soft delete)
+DELETE {{apiBase}}/equipment/equipment/{{equipmentId}}
+Authorization: Bearer {{authToken}}
+
+###

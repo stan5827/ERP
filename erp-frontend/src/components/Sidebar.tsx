@@ -1,23 +1,23 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   LayoutDashboard, ShoppingCart, Truck, Package, Factory,
-  ShieldCheck, Users, Landmark, Building2, PieChart,
+  ShieldCheck, Users, Landmark, Building2, PieChart, Settings,
   FlaskConical, Leaf, BrainCircuit, MessageSquare,
-  ChevronLeft, ChevronRight, Settings, HelpCircle,
+  HelpCircle,
   Scale, Network, DollarSign, GitBranch, CalendarDays,
   ClipboardList, CalendarClock, Map, Wrench, Scan,
   Link, Clock, FileOutput, Lightbulb, Moon, Sun, Activity,
   type LucideIcon
 } from 'lucide-react';
 import type { ModuleId } from '../types';
-import { useTheme } from '../theme/ThemeProvider';
-import { useRole } from '../contexts/RoleContext';
+import { useTheme } from '../theme/themeContext';
+import { useRole } from '../contexts/useRole';
 import { useSidebarBadges } from '../hooks/useApi';
 import './Sidebar.css';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard, ShoppingCart, Truck, Package, Factory,
-  ShieldCheck, Users, Landmark, Building2, PieChart,
+  ShieldCheck, Users, Landmark, Building2, PieChart, Settings,
   FlaskConical, Leaf, BrainCircuit, MessageSquare, Scale, Network, DollarSign, GitBranch, CalendarDays,
   ClipboardList, CalendarClock, Map, Wrench, Scan,
   Link, Clock, FileOutput, Lightbulb, Activity,
@@ -41,22 +41,18 @@ interface SidebarProps {
   onCollapseToggle: () => void;
 }
 
-const disabledModules = new Set<ModuleId>([
-  'budget',
-  'supplierportal',
-  'suppliers',
-  'ai',
-  'agentflows',
-  'aidecision',
-  'aischeduling',
-]);
-
 const navGroups: NavGroup[] = [
   {
     label: '0. 總覽與監控',
     items: [
       { id: 'dashboard', label: '全廠戰情室', icon: 'LayoutDashboard', group: 'main' },
       { id: 'kpi', label: 'KPI 指標看板', icon: 'PieChart', group: 'main' },
+    ],
+  },
+  {
+    label: '協同作業',
+    items: [
+      { id: 'calendar', label: '行事曆', icon: 'CalendarDays', group: 'calendar' },
     ],
   },
   {
@@ -72,6 +68,13 @@ const navGroups: NavGroup[] = [
     label: '2. 銷售管理',
     items: [
       { id: 'sales', label: '銷售與 CRM', icon: 'ShoppingCart', badge: 3, group: 'sales' },
+    ],
+  },
+  {
+    label: '客商管理',
+    items: [
+      { id: 'customers', label: '客戶管理', icon: 'Building2', group: 'sales' },
+      { id: 'suppliers', label: '供應商管理', icon: 'Users', group: 'procurement' },
     ],
   },
   {
@@ -91,7 +94,6 @@ const navGroups: NavGroup[] = [
     label: '5. 採購供應鏈',
     items: [
       { id: 'procurement', label: '採購管理', icon: 'Truck', badge: 5, group: 'procurement' },
-      { id: 'suppliers', label: '供應商管理', icon: 'Users', group: 'procurement' },
       { id: 'supplierportal', label: '供應商入口', icon: 'Link', group: 'procurement' },
     ],
   },
@@ -146,14 +148,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeModule,
   onModuleChange,
   collapsed,
-  onCollapseToggle,
 }) => {
   const [, setHoveredItem] = useState<string | null>(null);
   const { themeName, setTheme } = useTheme();
-  const { hasModule, isLoading: roleLoading, moduleAccess } = useRole();
-  const { data: badgesData } = useSidebarBadges();
-  console.log('[Sidebar] moduleAccess from context:', moduleAccess);
-
+  const { hasModule, hasPermission, moduleAccess, isLoading: roleLoading } = useRole();
+  const { data: badgesData } = useSidebarBadges(!roleLoading && hasModule('dashboard'));
   const badges = badgesData?.data || {
     salesCount: 0,
     procurementCount: 0,
@@ -179,17 +178,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'modern-dark', name: '現代深色', icon: Moon },
     { id: 'professional-light', name: '淺色專業', icon: Sun },
     { id: 'high-contrast', name: '高對比', icon: Moon }
-  ];
+  ] as const;
 
-  const handleThemeSelect = (themeId: any) => {
+  const handleThemeSelect = (themeId: Parameters<typeof setTheme>[0]) => {
     setTheme(themeId);
   };
 
   const isModuleAccessible = (moduleId: string): boolean => {
-    console.log('[Sidebar] isModuleAccessible called with:', moduleId, 'roleLoading:', roleLoading);
-    console.log('[Sidebar] moduleAccess in Sidebar:', JSON.stringify(moduleAccess.map(m => m.moduleId)));
-    console.log('[Sidebar] hasModule result:', hasModule(moduleId));
-    if (roleLoading) return true;
+    if (roleLoading) return false;
+    if (moduleId === 'customers') {
+      const hasScopedSalesAccess = moduleAccess.some(access => access.moduleId.startsWith('sales:'));
+      return hasScopedSalesAccess
+        ? hasPermission('sales:customers', 'view')
+        : hasModule('sales');
+    }
+    if (moduleId === 'suppliers') return hasModule('suppliers');
     return hasModule(moduleId);
   };
 
@@ -229,7 +232,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 導覽清單 */}
       <nav className="sidebar-nav">
         {navGroups.map((group) => {
-          const accessibleItems = group.items.filter(item => !disabledModules.has(item.id) && isModuleAccessible(item.id));
+          const accessibleItems = group.items.filter(item => isModuleAccessible(item.id));
           if (accessibleItems.length === 0) return null;
           
           return (

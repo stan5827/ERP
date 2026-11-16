@@ -27,14 +27,14 @@ const defaultZones: WarehouseZone[] = [
   { id: 'zone-6', name: '出貨區', type: 'shipping', position: { x: 18, y: 0, z: 0 }, size: { width: 5, height: 3, depth: 15 }, utilization: 0.20, status: 'normal', currentStock: 200, maxCapacity: 1000 },
 ];
 
-export function Warehouse3DViewer({ warehouseId, onZoneClick }: Warehouse3DViewerProps) {
+export function Warehouse3DViewer({ onZoneClick }: Warehouse3DViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [zones, setZones] = useState<WarehouseZone[]>(defaultZones);
+  const [zones] = useState<WarehouseZone[]>(defaultZones);
   const [selectedZone, setSelectedZone] = useState<WarehouseZone | null>(null);
   const [cameraPosition, setCameraPosition] = useState({ x: 30, y: 20, z: 30 });
-  const sceneRef = useRef<any>(null);
-  const rendererRef = useRef<any>(null);
-  const cameraRef = useRef<any>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -80,7 +80,7 @@ export function Warehouse3DViewer({ warehouseId, onZoneClick }: Warehouse3DViewe
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const zoneMeshes: any[] = [];
+    const zoneMeshes: THREE.Mesh[] = [];
 
     zones.forEach(zone => {
       const { width: w, height: h, depth: d } = zone.size;
@@ -129,7 +129,7 @@ export function Warehouse3DViewer({ warehouseId, onZoneClick }: Warehouse3DViewe
       scene.add(stockMesh);
     });
 
-    const labelSprites: any[] = [];
+    const labelSprites: THREE.Sprite[] = [];
     zones.forEach(zone => {
       const canvas = document.createElement('canvas');
       canvas.width = 256;
@@ -218,7 +218,7 @@ export function Warehouse3DViewer({ warehouseId, onZoneClick }: Warehouse3DViewe
       container.removeChild(renderer.domElement);
       renderer.dispose();
     };
-  }, [zones, cameraPosition]);
+  }, [zones, cameraPosition, onZoneClick]);
 
   const handleRotate = (direction: 'left' | 'right' | 'up' | 'down') => {
     const angle = 10 * (Math.PI / 180);

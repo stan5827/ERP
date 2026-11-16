@@ -110,6 +110,7 @@ public class MrpProcessLinkageService : IMrpProcessLinkageService
                     BomStandardQty = item.Quantity,
                     RequiredQty = item.Quantity * order.OrderQty,
                     IssuedQty = 0,
+                    Unit = item.Unit,
                     Status = "pending"
                 };
                 _db.WorkOrderMaterials.Add(material);

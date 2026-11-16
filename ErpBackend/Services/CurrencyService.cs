@@ -42,7 +42,7 @@ public class CurrencyService : ICurrencyService
             foreach (var target in targetCurrencies)
             {
                 var rate = await FetchRateFromMockApi(baseCurrency, target);
-                
+
                 var existingRate = await _context.ExchangeRates
                     .FirstOrDefaultAsync(r => r.ToCurrency == target && r.ValidFrom >= DateTime.Today);
 
@@ -100,14 +100,14 @@ public class CurrencyService : ICurrencyService
             return amount * rate.Rate;
         }
 
-        // TODO: 處理交叉匯率 (USD -> EUR)
+        // TODO: 處理交差匯率 (USD -> EUR)
         return amount;
     }
 
     private async Task<decimal> FetchRateFromMockApi(string baseCurrency, string targetCurrency)
     {
         // 僅為展示目的，實際需對接 API
-        await Task.Delay(100); 
+        await Task.Delay(100);
         return targetCurrency switch
         {
             "USD" => 31.5m + (decimal)new Random().NextDouble(),

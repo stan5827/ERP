@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, ArrowRight, Calculator, Layers, Settings, Loader2, X } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, ArrowRight, Calculator, Layers, Settings, Loader2 } from 'lucide-react';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { uomsApi, skusApi } from '../api/api';
@@ -24,54 +24,30 @@ function toPascalCase(obj: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
-const uomTypeOptions = [
-  { value: '數量單位', label: '數量單位' },
-  { value: '設備單位', label: '設備單位' },
-  { value: '組合單位', label: '組合單位' },
-  { value: '包裝單位', label: '包裝單位' },
-  { value: '容器單位', label: '容器單位' },
-  { value: '平面單位', label: '平面單位' },
-  { value: '配對單位', label: '配對單位' },
-  { value: '特殊單位', label: '特殊單位' },
-  { value: '生產單位', label: '生產單位' },
-  { value: '倉儲單位', label: '倉儲單位' },
-  { value: '餐飲單位', label: '餐飲單位' },
-  { value: '時間單位', label: '時間單位' },
-  { value: '長度單位', label: '長度單位' },
-  { value: '面積單位', label: '面積單位' },
-  { value: '體積單位', label: '體積單位' },
-  { value: '容量單位', label: '容量單位' },
-  { value: '重量單位', label: '重量單位' },
-  { value: '電力單位', label: '電力單位' },
-  { value: '人員單位', label: '人員單位' },
-  { value: '運輸單位', label: '運輸單位' },
-  { value: '物流單位', label: '物流單位' },
-  { value: '次數單位', label: '次數單位' },
-  { value: '資料單位', label: '資料單位' },
-  { value: '客戶單位', label: '客戶單位' },
-  { value: '空間單位', label: '空間單位' },
-  { value: '醫療／住宿單位', label: '醫療／住宿單位' },
-  { value: 'base', label: '基本單位' },
-  { value: 'convert', label: '轉換單位' },
-] as const;
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null)
+    return error instanceof Error ? error.message : String(error);
+  const response = 'response' in error ? error.response : undefined;
+  const responseData = typeof response === 'object' && response !== null && 'data' in response
+    ? response.data
+    : undefined;
+  const responseMessage = typeof responseData === 'object' && responseData !== null && 'message' in responseData
+    ? responseData.message
+    : undefined;
+  return typeof responseMessage === 'string'
+    ? responseMessage
+    : error instanceof Error ? error.message : String(error);
+}
 
-const uomTypePalette = [
-  'var(--cobalt-400)',
-  'var(--emerald-400)',
-  'var(--amber-400)',
-  'var(--violet-400)',
-  'var(--cyan-400)',
-  'var(--orange-400)',
-  'var(--rose-400)',
-  'var(--slate-400)',
-];
-
-const uomTypeConfig: Record<string, { label: string; color: string }> = Object.fromEntries(
-  uomTypeOptions.map((option, index) => [
-    option.value,
-    { label: option.label, color: uomTypePalette[index % uomTypePalette.length] },
-  ])
-);
+const uomTypeConfig: Record<string, { label: string; color: string }> = {
+  數量: { label: '數量', color: 'var(--theme-text)' },
+  重量: { label: '重量', color: 'var(--emerald-400)' },
+  長度: { label: '長度', color: 'var(--amber-400)' },
+  面積: { label: '面積', color: 'var(--violet-400)' },
+  體積: { label: '體積', color: 'var(--cyan-400)' },
+  時間: { label: '時間', color: 'var(--orange-400)' },
+  其他: { label: '其他', color: 'var(--slate-400)' },
+};
 
 export const UomManagement: React.FC = () => {
   const [activeView, setActiveView] = useState<'units' | 'conversions' | 'calculator'>('units');
@@ -100,14 +76,19 @@ export const UomManagement: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uomsRes, conversionsRes, skusRes] = await Promise.all([
+      const [uomsRes, skusRes] = await Promise.all([
         uomsApi.list({ activeOnly: 'true' }),
-        uomsApi.getConversions({}),
         skusApi.list({ pageSize: '100' }),
       ]);
       setUoms(uomsRes.data?.data ?? []);
-      setConversions(conversionsRes.data?.data ?? []);
       setSkus(skusRes.data?.data ?? []);
+      try {
+        const conversionsRes = await uomsApi.getConversions({});
+        setConversions(conversionsRes.data?.data ?? []);
+      } catch (convErr) {
+        console.warn('Failed to load conversions:', convErr);
+        setConversions([]);
+      }
     } catch (err) {
       console.error('Failed to load UOM data:', err);
     } finally {
@@ -119,7 +100,15 @@ export const UomManagement: React.FC = () => {
     { name: 'uomCode', label: '單位代碼', type: 'text', required: true, placeholder: '如: BOX, KG, PCS', description: '系統內唯一識別碼，建議使用國際標準代碼。' },
     { name: 'uomName', label: '單位名稱', type: 'text', required: true, placeholder: '如: 箱、公斤、個', description: '顯示給使用者的中文名稱。' },
     { name: 'uomNameEn', label: '英文名稱', type: 'text', placeholder: '如: Box, Kilogram, Piece', description: '選填，英文名稱。' },
-    { name: 'uomType', label: '單位類型', type: 'select', required: true, options: uomTypeOptions.map(option => ({ value: option.value, label: option.label })), defaultValue: '數量單位', description: '用於分類單位的類型，如：數量單位(箱/個)、重量單位(公斤/克)、長度單位(米/公分)等。' },
+    { name: 'uomType', label: '單位類型', type: 'select', required: true, options: [
+      { value: '數量', label: '數量' },
+      { value: '重量', label: '重量' },
+      { value: '長度', label: '長度' },
+      { value: '面積', label: '面積' },
+      { value: '體積', label: '體積' },
+      { value: '時間', label: '時間' },
+      { value: '其他', label: '其他' },
+    ], defaultValue: '數量', description: '用於分類單位的類型，如：數量(箱/個)、重量(公斤/克)、長度(米/公分)等。' },
     { name: 'decimalPlaces', label: '小數位數', type: 'number', placeholder: '2', min: 0, max: 6, defaultValue: 2, description: '計算時保留的小數位數。' },
     { name: 'allowDecimal', label: '允許小數', type: 'checkbox', defaultValue: true, description: '此單位是否允許輸入小數量值。' },
     { name: 'displayOrder', label: '排序', type: 'number', placeholder: '0', min: 0, defaultValue: 0, description: '在下拉選單中的排序順序。' },
@@ -163,9 +152,9 @@ export const UomManagement: React.FC = () => {
       } else {
         alert('換算失敗: ' + (res.data?.message || '未知錯誤'));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Conversion failed:', err);
-      alert('換算失敗: ' + (err.response?.data?.message || err.message));
+      alert('換算失敗: ' + getErrorMessage(err));
     }
   };
 
@@ -175,8 +164,8 @@ export const UomManagement: React.FC = () => {
       await uomsApi.delete(id);
       queryClient.invalidateQueries({ queryKey: ['uoms'] });
       loadData();
-    } catch (err: any) {
-      alert('刪除失敗: ' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert('刪除失敗: ' + getErrorMessage(err));
     }
   };
 
@@ -185,8 +174,8 @@ export const UomManagement: React.FC = () => {
     try {
       await uomsApi.deleteConversion(id);
       loadData();
-    } catch (err: any) {
-      alert('刪除失敗: ' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert('刪除失敗: ' + getErrorMessage(err));
     }
   };
 
@@ -275,7 +264,7 @@ export const UomManagement: React.FC = () => {
                       const typeConfig = uomTypeConfig[u.uomType] ?? { label: u.uomType, color: 'var(--slate-400)' };
                       return (
                         <tr key={u.id}>
-                          <td className="mono" style={{ color: 'var(--cobalt-300)', fontWeight: 600 }}>{u.uomCode}</td>
+                          <td className="mono" style={{ color: 'var(--theme-text)', fontWeight: 600 }}>{u.uomCode}</td>
                           <td style={{ fontWeight: 500 }}>{u.uomName}</td>
                           <td style={{ color: 'var(--slate-400)', fontSize: 12 }}>{u.uomNameEn ?? '—'}</td>
                           <td>
@@ -333,7 +322,7 @@ export const UomManagement: React.FC = () => {
                     filteredConversions.map(c => (
                       <tr key={c.id}>
                         <td>
-                          <span className="mono" style={{ color: 'var(--cobalt-300)' }}>{c.fromUomCode}</span>
+                          <span className="mono" style={{ color: 'var(--theme-text)' }}>{c.fromUomCode}</span>
                           <div style={{ fontSize: 11, color: 'var(--slate-500)' }}>{c.fromUomName}</div>
                         </td>
                         <td style={{ textAlign: 'center', color: 'var(--slate-500)' }}>
@@ -502,7 +491,7 @@ export const UomManagement: React.FC = () => {
           allowDecimal: editingUnit.allowDecimal,
           displayOrder: editingUnit.displayOrder,
           description: editingUnit.description,
-        } : { uomType: '數量單位', decimalPlaces: 2, allowDecimal: true, isActive: true, displayOrder: 0 }}
+        } : { uomType: 'base', decimalPlaces: 2, allowDecimal: true, isActive: true, displayOrder: 0 }}
         onClose={() => { setShowAddUnit(false); setEditingUnit(null); }}
         onSubmit={async (data) => {
           if (!data.uomCode || String(data.uomCode).length === 0) {
@@ -566,8 +555,8 @@ export const UomManagement: React.FC = () => {
             setShowAddConversion(false);
             setEditingConversion(null);
             loadData();
-          } catch (err: any) {
-            alert('儲存失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('儲存失敗: ' + getErrorMessage(err));
           }
         }}
       />

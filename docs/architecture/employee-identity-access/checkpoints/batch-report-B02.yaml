@@ -1,0 +1,153 @@
+batch_id: "B02"
+completed_tasks: []
+blocked_tasks: []
+files_changed:
+  T003:
+    - file: "tests/ErpBackend.IntegrationTests/PostgreSqlJwtLatencyIntegrationTests.cs"
+      change_type: "created"
+      description: "Measures successful login and an authenticated API against an isolated PostgreSQL schema."
+    - file: "tests/ErpBackend.IntegrationTests/PostgreSqlTestDatabase.cs"
+      change_type: "created"
+      description: "Provides disposable PostgreSQL schemas for safe integration and latency tests."
+    - file: "docs/architecture/employee-identity-access/authorization-decisions.md"
+      change_type: "modified"
+      description: "Records local p50/p95 measurements and explicitly limits their production applicability."
+  T005:
+    - file: "docs/architecture/employee-identity-access/authorization-decisions.md"
+      change_type: "modified"
+      description: "Records the selected PostgreSQL-per-request, fail-closed revocation strategy and measure-first decision."
+  T007:
+    - file: "src/ErpBackend/Models/System/SystemModels.cs"
+      change_type: "modified"
+      description: "Adds the persisted user security version."
+    - file: "src/ErpBackend/Data/ErpGeneralDbContext.cs"
+      change_type: "modified"
+      description: "Configures a zero default for the security version."
+    - file: "src/ErpBackend/Migrations/20261024174200_AddUserSecurityVersion.cs"
+      change_type: "created"
+      description: "Adds a reversible bigint security-version column with default zero."
+    - file: "src/ErpBackend/Migrations/ErpGeneralDbContextModelSnapshot.cs"
+      change_type: "modified"
+      description: "Updates the EF model snapshot for the new column."
+    - file: "src/ErpBackend/Program.cs"
+      change_type: "modified"
+      description: "Validates account activation and token version from PostgreSQL on authenticated requests; database errors are logged and fail closed."
+    - file: "src/ErpBackend/Services/AuthService.cs"
+      change_type: "modified"
+      description: "Issues security-version claims and increments them after password changes and resets."
+    - file: "src/ErpBackend/Services/UserService.cs"
+      change_type: "modified"
+      description: "Increments security version when an account is deactivated."
+    - file: "src/ErpBackend/Services/SystemSettingsService.cs"
+      change_type: "modified"
+      description: "Invalidates affected users' tokens after permission or role changes/removals."
+    - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Verifies JWT revocation after account security version changes and account deactivation."
+    - file: "tests/ErpBackend.IntegrationTests/PostgreSqlLoginLockoutIntegrationTests.cs"
+      change_type: "created"
+      description: "Verifies concurrent invalid PostgreSQL logins serialize through the per-user row lock."
+    - file: "tests/ErpBackend.Tests/Services/UserServiceTests.cs"
+      change_type: "modified"
+      description: "Asserts account deactivation increments security version."
+    - file: "tests/ErpBackend.Tests/Services/SystemSettingsSecurityVersionTests.cs"
+      change_type: "created"
+      description: "Covers version bumps on permission update/deletion and role deletion."
+    - file: "src/erp-frontend/src/App.tsx"
+      change_type: "modified"
+      description: "Clears the invalidated JWT after password change and requires a fresh login."
+    - file: "tests/ErpBackend.Tests/Services/SystemSettingsSecurityVersionTests.cs"
+      change_type: "created"
+      description: "Covers token invalidation on permission update/deletion and role deletion."
+upstream_artifacts_consumed:
+  T003:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Performance-Goals"
+      used_for: "Measure successful login and effective JWT API latency before production rollout."
+  T005:
+    - artifact: "docs/architecture/employee-identity-access/authorization-decisions.md"
+      used_for: "Recorded the user's selected per-request PostgreSQL check, fail-closed behavior, and no-unmeasured-threshold approach."
+  T007:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-2.2"
+      used_for: "Security-version claim, authoritative per-request validation and revocation on account/authorization changes."
+    - artifact: "docs/architecture/employee-identity-access/authorization-matrix.md"
+      used_for: "Deferred employee-state handling because HR lifecycle mappings remain unapproved."
+evidence_mapping:
+  T003:
+    - upstream: "plan.md#Performance-Goals"
+      output: "PostgreSqlJwtLatencyIntegrationTests"
+      evidence: "12 successful logins: p50 244.12 ms, p95 306.05 ms; 40 valid-token GET /api/erp/users calls: p50 46.24 ms, p95 60.66 ms."
+  T005:
+    - upstream: "authorization-decisions.md#已核定技術決定"
+      output: "authorization-decisions.md"
+      evidence: "User selected a database query for every protected request, fail-closed behavior and measurement before setting a performance budget."
+  T007:
+    - upstream: "plan.md#Step-2.2"
+      output: "Program.cs#OnTokenValidated"
+      evidence: "Integration requests succeed with a matching active account/version and return 401 after version mismatch or account deactivation."
+    - upstream: "plan.md#Step-2.2"
+      output: "AuthService, UserService and SystemSettingsService"
+      evidence: "Service tests verify the affected user's version increments for password and account/permission/role changes."
+    - upstream: "plan.md#Step-3.2"
+      output: "PostgreSqlLoginLockoutIntegrationTests"
+      evidence: "Five concurrent failed logins on isolated PostgreSQL serialize and cause the next valid login to be denied."
+traceability:
+  - requirement: "REQ-016"
+    plan_item: "2.2"
+    task: "T007"
+    files:
+      - "src/ErpBackend/Program.cs"
+      - "src/ErpBackend/Services/AuthService.cs"
+      - "src/ErpBackend/Services/UserService.cs"
+      - "src/ErpBackend/Services/SystemSettingsService.cs"
+      - "src/ErpBackend/Migrations/20261024174200_AddUserSecurityVersion.cs"
+    status: "in-progress"
+  - requirement: "REQ-002"
+    plan_item: "3.2"
+    task: "T012"
+    files:
+      - "src/ErpBackend/Services/AuthService.cs"
+      - "tests/ErpBackend.IntegrationTests/PostgreSqlLoginLockoutIntegrationTests.cs"
+    status: "verified"
+protocol_violation: false
+errors: []
+endpoint_probes:
+  - method: "POST"
+    path: "/api/erp/auth/login"
+    status: 200
+    result: "PASS: valid credentials return a JWT containing the current security version."
+  - method: "GET"
+    path: "/api/erp/users"
+    status: 200
+    result: "PASS: active account with matching JWT version is accepted."
+  - method: "GET"
+    path: "/api/erp/users"
+    status: 401
+    result: "PASS: stale version and deactivated account are rejected."
+warnings:
+  - severity: "MEDIUM"
+    message: "HR has not approved employee status handling. Employee-status checks and automatic account deactivation on leave/termination remain out of scope."
+  - severity: "MEDIUM"
+    message: "Performance results are from one local synthetic account and TestServer; they are not a production baseline or SLA."
+  - severity: "HIGH"
+    message: "The security-version migration SQL was generated but has not been applied to a shared or production database."
+  - severity: "MEDIUM"
+    message: "JWTs without a security_version claim will be rejected after rollout, requiring users to sign in again."
+test_results:
+  T003:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~PostgreSqlJwtLatencyIntegrationTests"
+    passed: 1
+    failed: 0
+    skipped: 0
+    failures: []
+  T007:
+    command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj --filter FullyQualifiedName~UserServiceTests|FullyQualifiedName~SystemSettingsSecurityVersionTests; dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~AuthControllerIntegrationTests|FullyQualifiedName~UserManagementAuthorizationIntegrationTests; npm test; npm run build"
+    passed: 34
+    failed: 0
+    skipped: 0
+    failures: []
+  T012:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~PostgreSqlLoginLockoutIntegrationTests"
+    passed: 1
+    failed: 0
+    skipped: 0
+    failures: []

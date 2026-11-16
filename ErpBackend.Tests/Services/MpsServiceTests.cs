@@ -33,6 +33,50 @@ public class MpsServiceTests
     }
 
     [Fact]
+    public async Task CreateMpsVersionAsync_UsesDefaultConsumptionStrategy_WhenRequestOmitsIt()
+    {
+        using var db = CreateInMemoryDbContext();
+        var mockLogger = new Mock<ILogger<MpsService>>();
+        var service = new MpsService(db, mockLogger.Object);
+        var horizonStart = new DateTime(2026, 10, 23);
+        var horizonEnd = new DateTime(2026, 12, 22);
+        var bucketStart = new DateTime(2026, 10, 26);
+        var bucketEnd = new DateTime(2026, 11, 1);
+        var request = new CreateMpsRequest
+        {
+            PlanName = "Test Plan",
+            HorizonStart = horizonStart,
+            HorizonEnd = horizonEnd,
+            TimeBucketType = "WEEK",
+            BaseOn = "MIXED",
+            Lines = new List<MpsLineDto>
+            {
+                new()
+                {
+                    SkuId = Guid.NewGuid(),
+                    BucketStart = bucketStart,
+                    BucketEnd = bucketEnd,
+                    PlanQty = 10
+                }
+            }
+        };
+
+        var result = await service.CreateMpsVersionAsync(request, Guid.NewGuid());
+
+        Assert.Equal("BACKWARD_THEN_FORWARD", result.ConsumptionStrategy);
+        Assert.Equal("WEEK", result.TimeBucketType);
+        Assert.Equal("MIXED", result.BaseOn);
+        Assert.Equal(DateTimeKind.Utc, result.HorizonStart.Kind);
+        Assert.Equal(DateTimeKind.Utc, result.HorizonEnd.Kind);
+        Assert.Equal(DateTimeKind.Utc, Assert.Single(result.Lines).BucketStart.Kind);
+        Assert.Equal(DateTimeKind.Utc, result.Lines.Single().BucketEnd.Kind);
+        Assert.Equal(horizonStart, result.HorizonStart);
+        Assert.Equal(horizonEnd, result.HorizonEnd);
+        Assert.Equal(bucketStart, result.Lines.Single().BucketStart);
+        Assert.Equal(bucketEnd, result.Lines.Single().BucketEnd);
+    }
+
+    [Fact]
     public async Task GetMpsHeadersAsync_ReturnsMpsHeaders()
     {
         using var db = CreateInMemoryDbContext();

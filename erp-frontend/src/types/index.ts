@@ -5,6 +5,7 @@
 export type ModuleId =
   | 'dashboard'
   | 'sales'
+  | 'customers'
   | 'procurement'
   | 'inventory'
   | 'manufacturing'

@@ -1,0 +1,107 @@
+@baseUrl = http://localhost:5100
+@token = replace-with-local-access-token
+@voucherId = 00000000-0000-0000-0000-000000000001
+@debitAccountId = 00000000-0000-0000-0000-000000000002
+@creditAccountId = 00000000-0000-0000-0000-000000000003
+@periodId = 00000000-0000-0000-0000-000000000004
+
+### List recent accounting vouchers
+GET {{baseUrl}}/api/erp/finance/vouchers
+Authorization: Bearer {{token}}
+
+### Create a balanced journal voucher draft
+POST {{baseUrl}}/api/erp/finance/vouchers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "voucherDate": "2026-10-27",
+  "voucherType": "Journal",
+  "description": "Manual journal entry",
+  "entries": [
+    {
+      "glAccountId": "{{debitAccountId}}",
+      "debitAmount": 1250,
+      "creditAmount": 0,
+      "memo": "Debit entry"
+    },
+    {
+      "glAccountId": "{{creditAccountId}}",
+      "debitAmount": 0,
+      "creditAmount": 1250,
+      "memo": "Credit entry"
+    }
+  ]
+}
+
+### Get a voucher
+GET {{baseUrl}}/api/erp/finance/vouchers/{{voucherId}}
+Authorization: Bearer {{token}}
+
+### Update a draft (replace voucherId with the ID returned by create)
+PUT {{baseUrl}}/api/erp/finance/vouchers/{{voucherId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "voucherDate": "2026-10-27",
+  "voucherType": "Journal",
+  "description": "Updated manual journal entry",
+  "entries": [
+    {
+      "glAccountId": "{{debitAccountId}}",
+      "debitAmount": 1250,
+      "creditAmount": 0,
+      "memo": "Updated debit entry"
+    },
+    {
+      "glAccountId": "{{creditAccountId}}",
+      "debitAmount": 0,
+      "creditAmount": 1250,
+      "memo": "Updated credit entry"
+    }
+  ]
+}
+
+### Submit draft for review
+POST {{baseUrl}}/api/erp/finance/vouchers/{{voucherId}}/submit
+Authorization: Bearer {{token}}
+
+### Approve and post (use a different account from the voucher creator)
+POST {{baseUrl}}/api/erp/finance/vouchers/{{voucherId}}/approve
+Authorization: Bearer {{token}}
+
+### Query the posted journal with date, account, voucher number, and pagination filters
+GET {{baseUrl}}/api/erp/finance/journals?fromDate=2026-10-01&toDate=2026-10-31&accountId={{debitAccountId}}&voucherNumber=JV&page=1&pageSize=50
+Authorization: Bearer {{token}}
+
+### Query a general ledger account (date range is optional)
+GET {{baseUrl}}/api/erp/finance/general-ledger?accountId={{debitAccountId}}&fromDate=2026-10-01&toDate=2026-10-31&page=1&pageSize=100
+Authorization: ******
+
+### Query a trial balance as of a date, with optional period activity
+GET {{baseUrl}}/api/erp/finance/trial-balance?fromDate=2026-10-01&toDate=2026-10-31
+Authorization: ******
+
+### Query income statement and balance sheet totals for a date range
+GET {{baseUrl}}/api/erp/finance/financial-statements?fromDate=2026-10-01&toDate=2026-10-31
+Authorization: ******
+
+### Create a monthly accounting period
+POST {{baseUrl}}/api/erp/finance/accounting-periods
+Authorization: ******
+Content-Type: application/json
+
+{
+  "periodCode": "2026-10",
+  "startDate": "2026-10-01",
+  "endDate": "2026-10-31"
+}
+
+### Close a period after completing and reconciling all vouchers
+POST {{baseUrl}}/api/erp/finance/accounting-periods/{{periodId}}/close
+Authorization: ******
+
+### Error path: voucher does not exist
+GET {{baseUrl}}/api/erp/finance/vouchers/00000000-0000-0000-0000-000000000099
+Authorization: Bearer {{token}}

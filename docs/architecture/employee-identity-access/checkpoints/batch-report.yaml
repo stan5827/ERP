@@ -1,0 +1,268 @@
+batch_id: "B01"
+completed_tasks: ["T010", "T011", "T012"]
+blocked_tasks: []
+
+files_changed:
+  T010:
+    - file: "src/ErpBackend/Controllers/AuthController.cs"
+      change_type: "modified"
+      description: "Returns explicit 410 for self-registration; requires Admin and an explicitly configured secret for password resets."
+    - file: "src/ErpBackend/Services/AuthService.cs"
+      change_type: "modified"
+      description: "Removes internal self-registration service and the caller-supplied old-password bypass."
+    - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Verifies anonymous registration rejection and old-password enforcement."
+    - file: "src/ErpBackend/DTOs/AuthDtos.cs"
+      change_type: "modified"
+      description: "Removes the caller-controlled old-password bypass property."
+    - file: "src/erp-frontend/src/api/auth.ts"
+      change_type: "modified"
+      description: "Updates change-password and account-create request types."
+    - file: "src/erp-frontend/src/App.tsx"
+      change_type: "modified"
+      description: "Stops sending the old-password bypass property."
+  T011:
+    - file: "src/ErpBackend/Services/UserService.cs"
+      change_type: "modified"
+      description: "Validates employee and role references and records create/deactivation audit events."
+    - file: "src/ErpBackend/Controllers/UsersController.cs"
+      change_type: "modified"
+      description: "Protects account management and requires an authenticated actor for audited writes."
+    - file: "src/ErpBackend/Controllers/SystemSettingsController.cs"
+      change_type: "modified"
+      description: "Protects user, role and permission administration actions."
+    - file: "tests/ErpBackend.IntegrationTests/CustomWebApplicationFactory.cs"
+      change_type: "modified"
+      description: "Supplies deterministic test-only reset-secret configuration."
+    - file: "tests/ErpBackend.IntegrationTests/WipReportsControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Adds role claims support to the shared integration-test authentication handler."
+    - file: "tests/ErpBackend.IntegrationTests/UserManagementAuthorizationIntegrationTests.cs"
+      change_type: "created"
+      description: "Verifies authorization, employee-bound account creation, lockout release permissions and self-only theme preferences."
+    - file: "tests/ErpBackend.Tests/Services/UserServiceTests.cs"
+      change_type: "modified"
+      description: "Tests employee/role validation, duplicate bindings and account audit events."
+    - file: "docs/architecture/employee-identity-access/plan.md"
+      change_type: "modified"
+      description: "Records completed T010-T012, the approved lockout policy and requirement traceability."
+  T012:
+    - file: "src/ErpBackend/Controllers/AuthController.cs"
+      change_type: "modified"
+      description: "Requires Admin authorization and explicitly configured reset secret; no fallback."
+    - file: "src/ErpBackend/Controllers/UsersController.cs"
+      change_type: "modified"
+      description: "Adds an Admin-only account lockout release endpoint."
+    - file: "src/ErpBackend/Services/AuthService.cs"
+      change_type: "modified"
+      description: "Adds five-attempt/15-minute configurable lockout, serialized PostgreSQL login attempts, password history enforcement, reset auditing and forced change."
+    - file: "src/ErpBackend/Services/UserService.cs"
+      change_type: "modified"
+      description: "Audits administrator-initiated account lockout release."
+    - file: "src/ErpBackend/Controllers/SystemSettingsController.cs"
+      change_type: "modified"
+      description: "Restricts theme preferences to their owner or Admin and awaits asynchronous settings calls."
+    - file: "src/ErpBackend/appsettings.json"
+      change_type: "modified"
+      description: "Configures the default lockout threshold and duration."
+    - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Covers automatic expiration, five-failure lockout, manual Admin unlock, reset history and audit."
+    - file: "tests/ErpBackend.IntegrationTests/UserManagementAuthorizationIntegrationTests.cs"
+      change_type: "modified"
+      description: "Covers Admin-only unlock and self-only theme preference access."
+
+upstream_artifacts_consumed:
+  T010:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.1"
+      used_for: "Disable anonymous registration while preserving the existing route."
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.2"
+      used_for: "Secure the existing administrative password-reset route."
+    - artifact: "docs/architecture/employee-identity-access-plan.md#REQ-014"
+      used_for: "Require server-side authorization and reject anonymous account creation/reset."
+  T011:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.1"
+      used_for: "Require active employee linkage, unique account association, role validation and audit."
+    - artifact: "docs/architecture/employee-identity-access/authorization-matrix.md"
+      used_for: "Avoid seeding or granting unapproved business roles; use only the existing Admin gate temporarily."
+    - artifact: "docs/architecture/employee-identity-access/data-remediation.md"
+      used_for: "Defer database uniqueness changes and any data repair pending owner review."
+  T012:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.2"
+      used_for: "Implement the confirmed five-failure, fifteen-minute, account-scoped lockout policy with reset behavior."
+    - artifact: "User decision on 2026-10-24"
+      used_for: "Clear the failure counter after successful login or expiry and permit Admin manual unlock."
+    - artifact: "docs/architecture/employee-identity-access/authorization-matrix.md"
+      used_for: "Use the existing Admin role only as a temporary compatibility gate; do not seed unapproved IAM roles."
+
+evidence_mapping:
+  T010:
+    - upstream: "plan.md#T010: anonymous registration is disabled"
+      output: "AuthController.Register"
+      evidence: "Register_RejectsAnonymousAccountCreation passes with HTTP 410 and no user created."
+    - upstream: "REQ-014: reset requires authorization"
+      output: "AuthController.AdminReset"
+      evidence: "AdminReset_RequiresAdminRoleAndConfiguredSecret verifies 401 for anonymous and success for Admin."
+    - upstream: "password-change old-password requirement"
+      output: "AuthService.ChangePasswordAsync"
+      evidence: "ChangePassword_DoesNotHonorClientSuppliedSkipOldPassword passes."
+  T011:
+    - upstream: "REQ-001: account must link to an active employee"
+      output: "UserService.CreateAsync"
+      evidence: "UserServiceTests and CreateUser_AdminCanCreateAccountForActiveEmployee pass."
+    - upstream: "REQ-002/REQ-014: management APIs are protected"
+      output: "UsersController and SystemSettingsController"
+      evidence: "ManagementEndpoints_RequireAdminRole checks 401, 403 and Admin success."
+    - upstream: "REQ-007: account create/deactivation is auditable"
+      output: "UserService.CreateAsync and DeleteAsync"
+      evidence: "UserServiceTests and integration account-create audit assertion pass."
+  T012:
+    - upstream: "REQ-014: no anonymous password reset"
+      output: "AuthController.AdminReset"
+      evidence: "AdminReset_RequiresAdminRoleAndConfiguredSecret verifies anonymous denial and Admin success."
+    - upstream: "Approved account lockout policy"
+      output: "AuthService.LoginAsync and UsersController.Unlock"
+      evidence: "Integration tests verify five failures lock, valid login is denied, expiry unlocks, and Admin manual unlock resets the counter."
+    - upstream: "REQ-007/REQ-012: administrative password reset is auditable and protects credentials"
+      output: "AuthService.ResetUserPasswordAsync"
+      evidence: "Integration test verifies the admin actor audit and old hash history; response requires next-login password change."
+    - upstream: "Theme preferences remain user-owned"
+      output: "SystemSettingsController.GetUserTheme/UpdateUserTheme"
+      evidence: "Integration test verifies own preference allowed and cross-user read/update denied."
+
+traceability:
+  - requirement: "REQ-001"
+    plan_item: "3.1"
+    task: "T011"
+    files: ["src/ErpBackend/Services/UserService.cs", "tests/ErpBackend.Tests/Services/UserServiceTests.cs"]
+    status: "completed"
+  - requirement: "REQ-002"
+    plan_item: "3.1"
+    task: "T010/T011"
+    files: ["src/ErpBackend/Controllers/AuthController.cs", "src/ErpBackend/Controllers/UsersController.cs"]
+    status: "completed"
+  - requirement: "REQ-007"
+    plan_item: "3.1"
+    task: "T011"
+    files: ["src/ErpBackend/Services/UserService.cs", "tests/ErpBackend.IntegrationTests/UserManagementAuthorizationIntegrationTests.cs"]
+    status: "completed"
+  - requirement: "REQ-012"
+    plan_item: "3.1"
+    task: "T010"
+    files: ["src/ErpBackend/Controllers/AuthController.cs", "src/ErpBackend/Services/AuthService.cs"]
+    status: "completed"
+  - requirement: "REQ-014"
+    plan_item: "3.1/3.2"
+    task: "T010/T011"
+    files: ["src/ErpBackend/Controllers/AuthController.cs", "src/ErpBackend/Controllers/UsersController.cs", "src/ErpBackend/Controllers/SystemSettingsController.cs"]
+    status: "completed"
+  - requirement: "REQ-007"
+    plan_item: "3.2"
+    task: "T012"
+    files: ["src/ErpBackend/Services/AuthService.cs", "src/ErpBackend/Services/UserService.cs"]
+    status: "completed"
+
+protocol_violation: false
+errors: []
+warnings:
+  - severity: MEDIUM
+    message: "The legacy Admin role is a temporary compatibility authorization gate, not the final dedicated IAM permission model; approval of the authorization matrix remains pending."
+  - severity: MEDIUM
+    message: "Username and EmployeeId duplicate checks are application-level only; database uniqueness migration remains blocked by identity data remediation approval."
+  - severity: MEDIUM
+    message: "The per-user PostgreSQL row-locking branch compiled but could not be exercised because integration tests use SQLite; verify it against the deployed PostgreSQL version before rollout."
+  - severity: MEDIUM
+    message: "Password reset does not immediately revoke already-issued JWTs; that remains dependent on the unapproved token-revocation decision in T005."
+  - severity: MEDIUM
+    message: "Lockout state is derived from AuditLogs, which currently has no EntityId/Action/CreatedAt composite index; baseline and approved index migration are still needed before production-scale rollout."
+  - severity: LOW
+    message: "Frontend standalone validation passed via eval plan: build, Vitest, and home-page HTTP probe."
+
+test_results:
+  T010:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~AuthControllerIntegrationTests|FullyQualifiedName~UserManagementAuthorizationIntegrationTests"
+    passed: 9
+    failed: 0
+    skipped: 0
+    failures: []
+  T011:
+    command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj --filter FullyQualifiedName~UserServiceTests; integration authorization tests"
+    passed: 17
+    failed: 0
+    skipped: 0
+    failures: []
+  T012:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~AuthControllerIntegrationTests|FullyQualifiedName~UserManagementAuthorizationIntegrationTests"
+    passed: 9
+    failed: 0
+    skipped: 0
+    failures: []
+  regression:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --filter FullyQualifiedName~WipReportsControllerIntegrationTests"
+    passed: 4
+    failed: 0
+    skipped: 0
+    failures: []
+  build:
+    command: "dotnet build src/ErpBackend/ErpBackend.csproj --no-restore"
+    passed: 1
+    failed: 0
+    skipped: 0
+    failures: []
+  frontend:
+    command: "typescript_validate_runtime standalone: src/erp-frontend/.tsupgrader/runtime-validation/eval-plan.json"
+    passed: 3
+    failed: 0
+    skipped: 0
+    failures: []
+
+endpoint_probes:
+  - method: "POST"
+    path: "/api/erp/auth/register"
+    status: 410
+    result: "PASS - compatibility route intentionally rejects self-registration"
+  - method: "POST"
+    path: "/api/erp/auth/admin-reset"
+    status: "401 anonymous / 200 Admin with configured test secret"
+    result: "PASS"
+  - method: "GET"
+    path: "/api/erp/users"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS"
+  - method: "POST"
+    path: "/api/erp/users"
+    status: "200 Admin with active employee and valid role"
+    result: "PASS"
+  - method: "GET"
+    path: "/api/erp/system-settings/users"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS"
+  - method: "GET"
+    path: "/api/erp/systemsettings/users"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS - legacy route retained"
+  - method: "GET"
+    path: "/api/erp/system-settings/roles"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS"
+  - method: "GET"
+    path: "/api/erp/system-settings/permissions/tree"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS"
+  - method: "GET"
+    path: "/api/erp/system-settings/role-modules/Admin"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS"
+  - method: "POST"
+    path: "/api/erp/users/{id}/unlock"
+    status: "401 anonymous / 403 non-admin / 200 Admin"
+    result: "PASS"
+  - method: "GET"
+    path: "/api/erp/system-settings/users/{id}/theme"
+    status: "401 anonymous / 403 other-user / 200 owner or Admin"
+    result: "PASS"
+  - method: "PUT"
+    path: "/api/erp/system-settings/users/{id}/theme"
+    status: "401 anonymous / 403 other-user / 200 owner or Admin"
+    result: "PASS"

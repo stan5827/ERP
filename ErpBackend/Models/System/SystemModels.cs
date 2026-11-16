@@ -22,6 +22,7 @@ public class User
     public bool MustChangePassword { get; set; } = false;
     public DateTime? PasswordChangedAt { get; set; }
     public int PasswordHistoryCount { get; set; } = 0;
+    public long SecurityVersion { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
@@ -33,6 +34,7 @@ public class Role
     [Required, MaxLength(50)] public string RoleName { get; set; } = null!;
     [MaxLength(200)] public string? Description { get; set; }
     public bool IsSystem { get; set; }
+    public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
@@ -92,6 +94,23 @@ public class AuditLog
 
     [ForeignKey(nameof(UserId))]
     public User? User { get; set; }
+}
+
+public class DisclosureLog
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? ActorUserId { get; set; }
+    [Required, MaxLength(100)] public string TraceId { get; set; } = null!;
+    [Required, MaxLength(100)] public string ToolName { get; set; } = null!;
+    [Required, MaxLength(30)] public string PolicyVersion { get; set; } = null!;
+    [Required, MaxLength(30)] public string Outcome { get; set; } = null!;
+    [Required, MaxLength(20)] public string DataClassification { get; set; } = "internal";
+    [MaxLength(500)] public string? DisclosedFields { get; set; }
+    [MaxLength(1000)] public string? DecisionReason { get; set; }
+    public Guid? ResourceId { get; set; }
+    [MaxLength(50)] public string? IpAddress { get; set; }
+    [MaxLength(500)] public string? UserAgent { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class AgentExecution
@@ -173,21 +192,4 @@ public class PasswordHistory
 
     [ForeignKey(nameof(UserId))]
     public User User { get; set; } = null!;
-}
-
-public class SystemJob
-{
-    [Key] public Guid Id { get; set; } = Guid.NewGuid();
-    [Required, MaxLength(100)] public string JobName { get; set; } = null!;
-    [Required, MaxLength(50)] public string JobType { get; set; } = null!;
-    [MaxLength(20)] public string Status { get; set; } = "pending";
-    public int Progress { get; set; }
-    [MaxLength(200)] public string? CurrentStep { get; set; }
-    public string? Parameters { get; set; }
-    public string? Result { get; set; }
-    public string? ErrorMessage { get; set; }
-    public DateTime? StartedAt { get; set; }
-    public DateTime? CompletedAt { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public Guid? CreatedBy { get; set; }
 }

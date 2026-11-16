@@ -2,6 +2,7 @@ using Xunit;
 using Moq;
 using ErpBackend.Services;
 using ErpBackend.Data;
+using ErpBackend.DTOs;
 using Microsoft.Extensions.Logging;
 
 namespace ErpBackend.Tests.Services;
@@ -105,7 +106,7 @@ public class AIPlanningServiceTests
     }
 
     [Fact]
-    public async Task ExecutePlanAsync_WithValidPlan_ReturnsSuccess()
+    public async Task ExecutePlanAsync_WithUnapprovedTools_ReturnsFailureWithoutExecution()
     {
         var service = new AIPlanningService(
             _mockDb.Object,
@@ -120,8 +121,50 @@ public class AIPlanningServiceTests
 
         var result = await service.ExecutePlanAsync(request);
 
-        Assert.True(result.Success);
+        Assert.False(result.Success);
         Assert.NotNull(result.ExecutionId);
+        Assert.Contains("not approved", result.ErrorMessage);
+        Assert.Empty(result.Results);
+    }
+
+    [Fact]
+    public async Task CreatePlanAsync_RemovesToolsUntilAgentToolsArePermissionScoped()
+    {
+        var service = new AIPlanningService(
+            _mockDb.Object,
+            _mockLogger.Object,
+            _mockMetrics.Object,
+            _mockHttpClientFactory.Object);
+
+        var result = await service.CreatePlanAsync(new PlanningRequest
+        {
+            TaskDescription = "執行生產工單與物料需求規劃"
+        });
+
+        Assert.True(result.Success);
+        Assert.All(result.Tasks, task => Assert.Empty(task.ToolsNeeded));
+    }
+
+    [Fact]
+    public async Task CreatePlanAsync_DoesNotSendPromptToLlmBeforeEgressPolicyIsApproved()
+    {
+        var llmService = new Mock<ILlmService>();
+        var service = new AIPlanningService(
+            _mockDb.Object,
+            _mockLogger.Object,
+            _mockMetrics.Object,
+            _mockHttpClientFactory.Object,
+            llmService.Object);
+
+        var result = await service.CreatePlanAsync(new PlanningRequest
+        {
+            TaskDescription = "包含敏感工單資訊的測試文字"
+        });
+
+        Assert.True(result.Success);
+        llmService.Verify(
+            llm => llm.CompleteAsync(It.IsAny<LlmRequest>()),
+            Times.Never);
     }
 
     [Fact]

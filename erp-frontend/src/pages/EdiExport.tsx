@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, FileText, DollarSign, Truck, Calendar } from 'lucide-react';
+import { Download, FileText, DollarSign, Truck } from 'lucide-react';
 import { api } from '../api/api';
 
 export const EdiExport: React.FC = () => {
@@ -44,7 +44,7 @@ export const EdiExport: React.FC = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-    } catch (e) {
+    } catch {
       setResult('匯出失敗');
     } finally {
       setExporting('');

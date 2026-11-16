@@ -26,14 +26,15 @@ export interface Employee {
 export interface AttendanceRecord {
   id: string;
   employeeId: string;
-  employeeNo: string;
-  employeeName: string;
+  employeeName?: string;
+  departmentId?: string;
+  departmentName?: string;
   date: string;
   clockIn?: string;
   clockOut?: string;
   shiftType?: string;
   status: string;
-  approvalStatus: string;
+  approvalStatus?: string;
   lateMinutes?: number;
   earlyLeaveMinutes?: number;
   ot1Hours?: number;
@@ -46,17 +47,27 @@ export interface LeaveRequest {
   id: string;
   applicationNo: string;
   employeeId: string;
-  employeeNo: string;
-  employeeName: string;
+  employeeName?: string;
   leaveType: string;
+  applicationDate?: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   totalHours: number;
   reason?: string;
+  attachmentUrl?: string;
+  includesSpecialPeriod?: boolean;
+  shiftConflictFlag?: boolean;
+  autoDeductPayFlag?: boolean;
+  impactOtOrBonus?: boolean;
+  approvalLevel?: number;
   status: string;
   approverId?: string;
-  approverName?: string;
   approvedAt?: string;
+  rejectReason?: string;
+  remarks?: string;
+  createdAt?: string;
 }
 
 export interface LeaveBalance {
@@ -69,14 +80,9 @@ export interface LeaveBalance {
 
 export interface PayrollRecord {
   id: string;
-  employeeId: string;
-  employeeNo: string;
-  employeeName: string;
   periodStart: string;
   periodEnd: string;
   basicSalary: number;
-  foodAllowance: number;
-  positionAllowance: number;
   overtimePay: number;
   bonus: number;
   attendanceBonus: number;
@@ -87,7 +93,7 @@ export interface PayrollRecord {
   withholdingTax: number;
   totalDeductions: number;
   netPay: number;
-  status: string;
+  status: string | null;
   paymentDate?: string;
 }
 

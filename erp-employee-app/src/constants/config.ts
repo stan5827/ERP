@@ -1,20 +1,10 @@
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5100/api';
-export const DEFAULT_TIMEOUT = 15000;
-
-export const COMPANY_LOCATIONS = [
-  {
-    id: 'main',
-    name: '總公司',
-    latitude: 25.0330,
-    longitude: 121.5654,
-    radius: 200,
-  },
-];
+const apiHost = typeof window === 'undefined' ? '10.0.2.2' : window.location.hostname;
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim()
+  || `http://${apiHost}:5100/api/erp`;
 
 export const APP_CONFIG = {
   TOKEN_KEY: 'erp_token',
   USER_KEY: 'erp_user',
-  OFFLINE_KEY: 'erp_offline',
   TOKEN_EXPIRY_DAYS: 30,
 };
 

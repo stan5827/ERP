@@ -1,4 +1,5 @@
 using Xunit;
+using ErpBackend.Services;
 
 namespace ErpBackend.Tests.Services;
 
@@ -32,14 +33,8 @@ public class KpiServiceTests
     [InlineData(90, "excellent")]
     public void GetOeeStatus_ReturnsCorrectStatus(decimal oeeValue, string expectedStatus)
     {
-        var status = oeeValue switch
-        {
-            >= 85 => "excellent",
-            >= 70 => "good",
-            >= 50 => "warning",
-            _ => "critical"
-        };
-        
+        var status = OeeCalculator.GetOeeStatus(oeeValue);
+
         Assert.Equal(expectedStatus, status);
     }
 }

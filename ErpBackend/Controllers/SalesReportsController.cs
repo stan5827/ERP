@@ -1,73 +1,67 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using System.Collections.Generic;
-using System.Linq;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
+[ApiController]
+[Route("api/erp/sales-reports")]
 public class SalesReportsController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly ISalesReportService _reportService;
 
-    public SalesReportsController(ErpGeneralDbContext db)
+    public SalesReportsController(ISalesReportService reportService)
     {
-        _db = db;
+        _reportService = reportService;
     }
 
+    /// <summary>
+    /// 前端 salesReportsApi.orderToCash 呼叫: GET /api/erp/SalesReports/order-to-cash
+    /// </summary>
     [HttpGet("order-to-cash")]
-    public async Task<ActionResult<ApiResponse>> GetOrderToCash(
+    public async Task<ActionResult<ApiResponse<object>>> GetOrderToCash(
         [FromQuery] DateTime? startDate,
-        [FromQuery] DateTime? endDate)
+        [FromQuery] DateTime? endDate,
+        [FromQuery] bool includeAll = false)
     {
-        // Mock data for Order-to-Cash summary
-        var data = new
-        {
-            TotalOrders = await _db.SalesOrders.CountAsync(),
-            TotalAmount = await _db.SalesOrders.SumAsync(so => (decimal?)so.TotalAmount) ?? 0,
-            PendingOrders = await _db.SalesOrders.CountAsync(so => so.Status == "pending"),
-            ClosedOrders = await _db.SalesOrders.CountAsync(so => so.Status == "closed"),
-            MonthlyTrend = new List<dynamic>
-            {
-                new { Month = "1", Orders = 45, Amount = 1200000 },
-                new { Month = "2", Orders = 52, Amount = 1450000 },
-                new { Month = "3", Orders = 61, Amount = 1890000 }
-            }
-        };
+        var data = await _reportService.GetOrderToCashAsync(startDate, endDate, includeAll);
+        return Ok((object)data);
+    }
 
-        return OkObject(data);
+    /// <summary>
+    /// 前端 salesReportsApi.arAging 呼叫: GET /api/erp/SalesReports/ar-aging
+    /// </summary>
+    [HttpGet("ar-aging")]
+    public async Task<ActionResult<ApiResponse<object>>> GetArAging()
+    {
+        var data = await _reportService.GetArAgingAsync();
+        return Ok((object)data);
+    }
+
+    /// <summary>
+    /// 前端 salesReportsApi.monthlySummary 呼叫: GET /api/erp/SalesReports/monthly-summary
+    /// </summary>
+    [HttpGet("monthly-summary")]
+    public async Task<ActionResult<ApiResponse<object>>> GetMonthlySummary([FromQuery] int? year)
+    {
+        var data = await _reportService.GetMonthlySummaryAsync(year);
+        return Ok((object)data);
+    }
+
+    /// <summary>
+    /// 前端 salesReportsApi.creditUsage 呼叫: GET /api/erp/SalesReports/credit-usage
+    /// </summary>
+    [HttpGet("credit-usage")]
+    public async Task<ActionResult<ApiResponse<object>>> GetCreditUsage()
+    {
+        var data = await _reportService.GetCreditUsageAsync();
+        return Ok((object)data);
     }
 
     [HttpGet("monthly-periods")]
-    public async Task<ActionResult<ApiResponse<List<MonthlyPeriodDto>>>> GetMonthlyPeriods([FromQuery] int? year)
+    public async Task<ActionResult<ApiResponse<List<MonthlyPeriodStatusDto>>>> GetMonthlyPeriods([FromQuery] int? year)
     {
-        var query = _db.MonthlyPeriods.AsQueryable();
-        if (year.HasValue) query = query.Where(p => p.Year == year.Value);
-
-        var items = await query.OrderByDescending(p => p.Year).ThenByDescending(p => p.Month).ToListAsync();
-        var dtos = items.Select(p => new MonthlyPeriodDto
-        {
-            Id = p.Id,
-            Year = p.Year,
-            Month = p.Month,
-            IsClosed = p.Status == "closed",
-            ClosedAt = p.ClosedAt,
-            ClosedBy = p.ClosedBy?.ToString(),
-            Notes = p.Notes
-        }).ToList();
-
-        return Ok(dtos);
+        var data = await _reportService.GetMonthlyPeriodsAsync(year);
+        return Ok(data);
     }
-}
-
-public class MonthlyPeriodDto
-{
-    public Guid Id { get; set; }
-    public int Year { get; set; }
-    public int Month { get; set; }
-    public bool IsClosed { get; set; }
-    public DateTime? ClosedAt { get; set; }
-    public string? ClosedBy { get; set; }
-    public string? Notes { get; set; }
 }

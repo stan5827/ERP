@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Search, Bell, ChevronDown, User, Settings, LogOut, Maximize2, Moon, Sun
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { User as UserType, Notification } from '../types';
-import { useTheme } from '../theme/ThemeProvider';
+import { useTheme } from '../theme/themeContext';
 import './Topbar.css';
 
 interface TopbarProps {
@@ -32,7 +33,11 @@ export const Topbar: React.FC<TopbarProps> = ({
     info: 'var(--emerald-400)',
   };
 
-  const themeOptions = [
+  const themeOptions: Array<{
+    id: Parameters<typeof setTheme>[0];
+    name: string;
+    icon: LucideIcon | string;
+  }> = [
     { id: 'modern-dark', name: '現代深色', icon: Moon },
     { id: 'professional-light', name: '淺色專業', icon: Sun },
     { id: 'high-contrast', name: '高對比', icon: Moon },
@@ -43,7 +48,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     { id: 'slate-gray', name: '石板灰', icon: '🪨' }
   ];
 
-  const handleThemeSelect = (themeId: any) => {
+  const handleThemeSelect = (themeId: Parameters<typeof setTheme>[0]) => {
     setTheme(themeId);
     setShowThemePicker(false);
   };
@@ -105,7 +110,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                     onClick={() => handleThemeSelect(option.id)}
                   >
                     <div className="theme-icon">
-                      <option.icon size={14} />
+                      {typeof option.icon === 'string' ? option.icon : <option.icon size={14} />}
                     </div>
                     <div className="theme-info">
                       <div className="theme-name">{option.name}</div>

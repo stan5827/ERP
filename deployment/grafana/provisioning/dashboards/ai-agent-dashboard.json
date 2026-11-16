@@ -1,0 +1,313 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Agent 健康總覽",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "title": "Agent 健康分數",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.85 },
+              { "color": "green", "value": 0.95 }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "targets": [{
+        "expr": "erp_ai_agent_health_score",
+        "legendFormat": "{{agent_type}}",
+        "refId": "A"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": false }
+    },
+    {
+      "title": "可用率",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 4, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "targets": [{
+        "expr": "1 - (rate(erp_ai_agent_errors_total[5m]) / rate(erp_api_requests_total[5m]))",
+        "legendFormat": "可用率",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "平均延遲",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 8, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          },
+          "unit": "ms"
+        }
+      },
+      "targets": [{
+        "expr": "rate(erp_api_request_duration_seconds_sum[5m]) / rate(erp_api_request_duration_seconds_count[5m]) * 1000",
+        "legendFormat": "平均延遲",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "P95 延遲",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          },
+          "unit": "ms"
+        }
+      },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(erp_api_request_duration_seconds_bucket[5m])) * 1000",
+        "legendFormat": "P95 延遲",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "API QPS",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 16, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "targets": [{
+        "expr": "sum(rate(erp_api_requests_total[1m]))",
+        "legendFormat": "QPS",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "活躍工單",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 20, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "erp_work_orders_active",
+        "legendFormat": "活躍工單",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "延遲趨勢",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "collapsed": false
+    },
+    {
+      "title": "API 延遲 P50 / P95 / P99",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "P95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(erp_api_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(erp_api_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, rate(erp_api_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P99", "refId": "C" }
+      ]
+    },
+    {
+      "title": "錯誤率",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.01 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        }
+      },
+      "targets": [{
+        "expr": "rate(erp_ai_agent_errors_total[5m]) / rate(erp_api_requests_total[5m])",
+        "legendFormat": "錯誤率",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "ERP API 效能",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "collapsed": false
+    },
+    {
+      "title": "ERP QPS (按端點)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{
+        "expr": "sum by (endpoint) (rate(erp_api_requests_total[5m]))",
+        "legendFormat": "{{endpoint}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "API 請求狀態分佈",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 17 },
+      "targets": [{
+        "expr": "sum by (status_code) (increase(erp_api_requests_total[1h]))",
+        "legendFormat": "{{status_code}}",
+        "refId": "A"
+      }],
+      "options": { "legend": { "placement": "right" } }
+    },
+    {
+      "title": "低庫存品項數",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 17 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "erp_inventory_low_stock_count",
+        "legendFormat": "低庫存",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "Agent 效能",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "collapsed": false
+    },
+    {
+      "title": "AI Agent 延遲趨勢",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(erp_ai_agent_latency_seconds_bucket[5m])) * 1000",
+        "legendFormat": "{{agent_type}} - {{task_type}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "Agent Flow 執行統計",
+      "type": "barchart",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "targets": [{
+        "expr": "sum by (flow_type, status) (increase(erp_agent_flow_executions_total[1h]))",
+        "legendFormat": "{{flow_type}} - {{status}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "Token 消耗趨勢",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{
+        "expr": "rate(erp_ai_agent_tokens_total[5m])",
+        "legendFormat": "{{agent_type}} - {{model}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "title": "Agent Flow 平均耗時",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{
+        "expr": "rate(erp_agent_flow_duration_seconds_sum[5m]) / rate(erp_agent_flow_duration_seconds_count[5m])",
+        "legendFormat": "{{flow_type}}",
+        "refId": "A"
+      }]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["erp", "ai-agent", "manufacturing"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Taipei",
+  "title": "ERP AI Agent 監控儀表板",
+  "uid": "erp-ai-agent-monitoring",
+  "version": 1
+}

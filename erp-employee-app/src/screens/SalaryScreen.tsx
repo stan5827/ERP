@@ -53,7 +53,7 @@ export const SalaryScreen: React.FC = () => {
     return `${date.getFullYear()}年${date.getMonth() + 1}月`;
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'paid': return COLORS.success;
       case 'approved': return COLORS.primary;
@@ -62,7 +62,7 @@ export const SalaryScreen: React.FC = () => {
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string | null) => {
     switch (status) {
       case 'paid': return '已發放';
       case 'approved': return '待發放';
@@ -123,14 +123,6 @@ export const SalaryScreen: React.FC = () => {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>基本薪資</Text>
                     <Text style={styles.detailValue}>{formatCurrency(item.basicSalary)}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>伙食津貼</Text>
-                    <Text style={styles.detailValue}>{formatCurrency(item.foodAllowance)}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>職務加給</Text>
-                    <Text style={styles.detailValue}>{formatCurrency(item.positionAllowance)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>加班費</Text>

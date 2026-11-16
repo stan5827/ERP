@@ -1,0 +1,18 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    container_name: erp-supplier-portal-keycloak-local
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?Set KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Set KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8182:8080"
+    volumes:
+      - supplier_portal_keycloak_data:/opt/keycloak/data
+      - ./supplier-portal-realm.json:/opt/keycloak/data/import/supplier-portal-realm.json:ro
+    restart: unless-stopped
+
+volumes:
+  supplier_portal_keycloak_data:

@@ -42,27 +42,35 @@ public class MpsService : IMpsService
             MpsNo = $"MPS-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}",
             PlanName = request.PlanName,
             PlantCode = "HQ",
-            HorizonStart = request.HorizonStart,
-            HorizonEnd = request.HorizonEnd,
-            TimeBucketType = request.TimeBucketType,
-            VersionNo = (lastVersion?.VersionNo ?? 0) + 1,
+            HorizonStart = request.HorizonStart.HasValue
+                ? NormalizeUtc(request.HorizonStart.Value)
+                : DateTime.UtcNow,
+            HorizonEnd = request.HorizonEnd.HasValue
+                ? NormalizeUtc(request.HorizonEnd.Value)
+                : DateTime.UtcNow.AddDays(30),
+            TimeBucketType = string.IsNullOrWhiteSpace(request.TimeBucketType)
+                ? "WEEK"
+                : request.TimeBucketType,
+            VersionNo = (int)(lastVersion?.VersionNo ?? 0) + 1,
             Status = "DRAFT",
-            BaseOn = request.BaseOn,
-            BackwardConsumptionDays = request.BackwardConsumptionDays,
-            ForwardConsumptionDays = request.ForwardConsumptionDays,
-            ConsumptionStrategy = request.ConsumptionStrategy,
+            BaseOn = string.IsNullOrWhiteSpace(request.BaseOn) ? "MIXED" : request.BaseOn,
+            BackwardConsumptionDays = request.BackwardConsumptionDays ?? 0,
+            ForwardConsumptionDays = request.ForwardConsumptionDays ?? 0,
+            ConsumptionStrategy = string.IsNullOrWhiteSpace(request.ConsumptionStrategy)
+                ? "BACKWARD_THEN_FORWARD"
+                : request.ConsumptionStrategy,
             CreatedBy = userId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
-        foreach (var l in request.Lines)
+        foreach (var l in request.Lines ?? [])
         {
             header.Lines.Add(new MpsLine
             {
                 SkuId = l.SkuId,
-                BucketStart = l.BucketStart,
-                BucketEnd = l.BucketEnd,
+                BucketStart = NormalizeUtc(l.BucketStart),
+                BucketEnd = NormalizeUtc(l.BucketEnd),
                 BucketCode = l.BucketCode,
                 PlanQty = l.PlanQty,
                 AdjustedQty = l.PlanQty, // Initial
@@ -77,6 +85,16 @@ public class MpsService : IMpsService
         await RunConsumptionAsync(header.Id);
         
         return header;
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => value
+        };
     }
 
     public async Task<List<MpsHeaderDto>> GetMpsHeadersAsync()

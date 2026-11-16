@@ -1,0 +1,124 @@
+metadata:
+  generated: "2026-10-23"
+  source_spec: "docs/architecture/employee-identity-access-plan.md"
+  target_plan: "docs/architecture/employee-identity-access/plan.md"
+
+summary:
+  total_requirements: 13
+  covered_requirements: 13
+  missing_requirements: 0
+  coverage_percentage: 100.0
+
+requirements:
+  - req_id: "REQ-001"
+    req_description: "員工為內部身分來源且一員工至多一帳號"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-2/3"
+      phase_name: "Foundational / US1 帳號與員工生命週期"
+      items: ["1.1", "2.1", "2.3", "3.1", "3.4"]
+    notes: "唯一限制須待既有關聯資料預檢及核准修復後新增。"
+  - req_id: "REQ-002"
+    req_description: "僅授權管理者開通、停用及重新啟用帳號"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-3/5"
+      phase_name: "US1 / US3"
+      items: ["1.1", "3.1", "3.2", "5.3"]
+    notes: ""
+  - req_id: "REQ-003"
+    req_description: "離職保留員工、帳號、交易與稽核歷史"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-2/3/6"
+      phase_name: "Foundational / US1 / Polish"
+      items: ["2.1", "3.3", "3.4", "6.2"]
+    notes: ""
+  - req_id: "REQ-004"
+    req_description: "員工狀態、帳號與既有 Token 狀態一致"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/3/4"
+      phase_name: "Setup / Foundational / US1 / US2"
+      items: ["1.1", "1.2", "2.2", "3.3", "4.4"]
+    notes: "Token 策略須先量測並核定撤銷與效能預算。"
+  - req_id: "REQ-005"
+    req_description: "多角色、多權限及權限來源可查"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/4"
+      phase_name: "Setup / Foundational / US2"
+      items: ["1.1", "2.1", "4.1", "4.2", "4.5"]
+    notes: ""
+  - req_id: "REQ-006"
+    req_description: "統一權限代碼並於伺服器端執行"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/4"
+      phase_name: "Setup / Foundational / US2"
+      items: ["1.1", "1.2", "2.2", "4.1", "4.4", "4.5"]
+    notes: "路由啟用前完成端點清冊及匿名 allow-list。"
+  - req_id: "REQ-007"
+    req_description: "帳號、授權、例外及敏感讀取具稽核"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/3/4/5"
+      phase_name: "Setup / Foundational / US1 / US2 / US3"
+      items: ["1.1", "2.3", "3.1", "3.2", "3.3", "4.2", "4.3", "5.1", "5.2"]
+    notes: ""
+  - req_id: "REQ-008"
+    req_description: "員工敏感資料最小回傳、遮罩、欄位及部門階層範圍權限"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/5"
+      phase_name: "Setup / Foundational / US3"
+      items: ["1.2", "2.3", "5.1", "5.2", "5.4"]
+    notes: ""
+  - req_id: "REQ-009"
+    req_description: "跨角色 SoD 衝突、限期例外與緊急授權控制"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/4/5"
+      phase_name: "Setup / Foundational / US2 / US3"
+      items: ["1.2", "2.3", "4.3", "4.5", "4.6", "5.3"]
+    notes: "衝突矩陣與例外核准人由業務負責人核定。"
+  - req_id: "REQ-013"
+    req_description: "Break-Glass 具不同人核准、最小權限、最長 2 小時、自動撤銷及高優先稽核"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/4/5/6"
+      phase_name: "Setup / Foundational / US2 / US3 / Polish"
+      items: ["1.2", "2.3", "4.3", "4.6", "5.4", "6.1"]
+    notes: "2 小時為預設最高期限；企業政策如更嚴格則採較短期限。"
+  - req_id: "REQ-010"
+    req_description: "組織異動觸發角色審查"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/3"
+      phase_name: "Setup / US1"
+      items: ["1.2", "3.3", "3.4"]
+    notes: ""
+  - req_id: "REQ-011"
+    req_description: "API 相容且未登入／無權限回應明確"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-1/2/3/4/5/6"
+      phase_name: "All phases"
+      items: ["1.1", "2.2", "3.3", "3.4", "4.2", "4.4", "4.5", "5.3", "5.4", "6.1"]
+    notes: ""
+  - req_id: "REQ-012"
+    req_description: "日誌不得包含密碼雜湊、Token 或完整個資"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-3/5"
+      phase_name: "US1 / US3"
+      items: ["3.2", "5.1", "5.2", "5.4"]
+    notes: ""
+
+missing_requirements: []
+orphan_plan_items: []
+validation:
+  passed: true
+  errors: []
+  warnings:
+    - "業務權限矩陣、留停政策、SoD 衝突及核准責任尚須在 Phase 1 核定。"

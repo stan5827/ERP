@@ -1,0 +1,159 @@
+# ============================================================
+# Prometheus Alert Rules - ERP 系統告警規則
+# ============================================================
+groups:
+  - name: erp-api-alerts
+    rules:
+      - alert: ERP API High Error Rate
+        expr: |
+          sum(rate(erp_api_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(erp_api_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: erp-api
+        annotations:
+          summary: "ERP API 錯誤率過高 ({{ $value | humanizePercentage }})"
+          description: "過去 5 分鐘內 HTTP 5xx 錯誤率超過 5%，請檢查後端服務。"
+
+      - alert: ERP API High Latency
+        expr: |
+          histogram_quantile(0.95, sum(rate(erp_api_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: erp-api
+        annotations:
+          summary: "ERP API P95 延遲過高 ({{ $value }}s)"
+          description: "過去 5 分鐘內 P95 回應延遲超過 2 秒，請檢查效能瓶頸。"
+
+      - alert: ERP API Down
+        expr: up{job="erp-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: erp-api
+        annotations:
+          summary: "ERP API 無法連線"
+          description: "Prometheus 已無法抓取 ERP 後端指標，服務可能已停止。"
+
+  - name: erp-ai-agent-alerts
+    rules:
+      - alert: ERP AI Agent Health Degraded
+        expr: erp_ai_agent_health_score < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: erp-ai-agent
+        annotations:
+          summary: "AI Agent 健康分數過低 ({{ $value }})"
+          description: "AI Agent 健康分數低於 0.5，持續 10 分鐘，請檢查 Agent 狀態。"
+
+      - alert: ERP AI Agent High Error Rate
+        expr: |
+          sum(rate(erp_ai_agent_errors_total[5m]))
+          /
+          clamp_min(sum(rate(erp_ai_agent_flow_executions_total[5m])), 1) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: erp-ai-agent
+        annotations:
+          summary: "AI Agent 錯誤率過高 ({{ $value | humanizePercentage }})"
+          description: "AI Agent 流程執行錯誤率超過 20%，請檢查 AI 服務。"
+
+  - name: erp-infra-alerts
+    rules:
+      - alert: ERP Low Stock Warning
+        expr: erp_inventory_low_stock_count > 20
+        for: 15m
+        labels:
+          severity: warning
+          service: erp-inventory
+        annotations:
+          summary: "低庫存品項過多 ({{ $value }} 項)"
+          description: "目前低於安全庫存之品項超過 20 項，請檢視庫存管理。"
+
+      - alert: ERP Database Connection Pool Exhaustion
+        expr: erp_db_connections_checked_out / erp_db_connection_pool_max > 0.85
+        for: 5m
+        labels:
+          severity: critical
+          service: erp-database
+        annotations:
+          summary: "資料庫連線池接近耗盡 ({{ $value | humanizePercentage }})"
+          description: "資料庫活躍連線數超過 85%，可能導致新請求無法取得連線。請擴大連線池或檢查洩漏。"
+
+      - alert: ERP Database Connection Pool Saturation
+        expr: erp_db_connections_checked_out / erp_db_connection_pool_max > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          service: erp-database
+        annotations:
+          summary: "資料庫連線池幾乎耗盡 ({{ $value | humanizePercentage }})"
+          description: "資料庫活躍連線數超過 95%，系統可能無法處理新請求，需立即處理。"
+
+      - alert: ERP Database Connection Lease Too Long
+        expr: increase(erp_db_connection_long_leases_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: erp-database
+        annotations:
+          summary: "資料庫連線曾被長時間占用"
+          description: "連線釋放時發現租用時間超過 30 秒，請依 source 標籤檢查 API 或背景服務。"
+
+      - alert: ERP Database Connection Lease Currently Too Long
+        expr: |
+          erp_db_connections_checked_out_by_source > 0
+          and
+          time() - erp_db_connection_oldest_lease_started_timestamp_seconds > 30
+        for: 1m
+        labels:
+          severity: warning
+          service: erp-database
+        annotations:
+          summary: "資料庫連線仍被長時間占用: {{ $labels.source }}"
+          description: "此來源仍有連線租用超過 30 秒，請檢查是否有長查詢、交易或未釋放的 DbContext。"
+
+      - alert: ERP High Memory Usage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: erp-infrastructure
+        annotations:
+          summary: "記憶體使用率過高 ({{ $value | humanizePercentage }})"
+          description: "伺服器記憶體使用率超過 85%，可能導致效能下降或 OOM。"
+
+      - alert: ERP Disk Space Low
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: erp-infrastructure
+        annotations:
+          summary: "磁碟空間不足 ({{ $value | humanizePercentage }})"
+          description: "根目錄磁碟使用率超過 85%，可能影響日誌寫入與資料庫運作。"
+
+      - alert: ERP Business Process Failure
+        expr: rate(erp_business_process_failures_total[10m]) > 5
+        for: 10m
+        labels:
+          severity: critical
+          service: erp-business
+        annotations:
+          summary: "業務流程失敗率過高 ({{ $value }} 次/10分鐘)"
+          description: "銷售訂單、MRP、工單或發票等業務流程在 10 分鐘內發生超過 5 次失敗。"
+
+      - alert: Prometheus TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: monitoring
+        annotations:
+          summary: "監控目標離線 ({{ $labels.instance }})"
+          description: "{{ $labels.job }} 的目標 {{ $labels.instance }} 已離線超過 2 分鐘。"

@@ -1,19 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
-using ErpBackend.Models.MES;
+using ErpBackend.Services;
 using ErpBackend.DTOs;
+using ErpBackend.Models.MES;
 
 namespace ErpBackend.Controllers;
 
 [Route("api/erp/rccp")]
 public class RccpResourcesController : BaseController
 {
-    private readonly ErpGeneralDbContext _context;
+    private readonly IRccpResourceService _rccpService;
 
-    public RccpResourcesController(ErpGeneralDbContext context)
+    public RccpResourcesController(IRccpResourceService rccpService)
     {
-        _context = context;
+        _rccpService = rccpService;
     }
 
     // --- Resources ---
@@ -21,26 +20,34 @@ public class RccpResourcesController : BaseController
     [HttpGet("resources")]
     public async Task<ActionResult<ApiResponse<List<RccpResource>>>> ListResources()
     {
-        var list = await _context.RccpResources
-            .Include(r => r.WorkCenter)
-            .ToListAsync();
+        var list = await _rccpService.ListResourcesAsync();
         return Ok(list);
     }
 
     [HttpPost("resources")]
     public async Task<ActionResult<ApiResponse<RccpResource>>> CreateResource(RccpResource model)
     {
-        _context.RccpResources.Add(model);
-        await _context.SaveChangesAsync();
-        return Ok(model);
+        var (resource, status) = await _rccpService.CreateResourceAsync(model);
+
+        return status switch
+        {
+            "ok" => Ok(resource!),
+            "duplicate" => ApiResponse<RccpResource>.Fail("Resource code already exists"),
+            _ => ApiResponse<RccpResource>.Fail("Invalid resource data")
+        };
     }
 
     [HttpPut("resources/{id}")]
     public async Task<ActionResult<ApiResponse<RccpResource>>> UpdateResource(Guid id, RccpResource model)
     {
-        _context.Entry(model).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
-        return Ok(model);
+        var (resource, status) = await _rccpService.UpdateResourceAsync(id, model);
+
+        return status switch
+        {
+            "ok" => Ok(resource!),
+            "not_found" => ApiResponse<RccpResource>.Fail("Resource not found"),
+            _ => ApiResponse<RccpResource>.Fail("Invalid resource data")
+        };
     }
 
     // --- Capacity Bills (Item Resources) ---
@@ -48,28 +55,17 @@ public class RccpResourcesController : BaseController
     [HttpGet("item-resources/{skuId}")]
     public async Task<ActionResult<ApiResponse<List<RccpItemResource>>>> GetItemResources(Guid skuId)
     {
-        var list = await _context.RccpItemResources
-            .Include(ir => ir.Resource)
-            .Where(ir => ir.SkuId == skuId)
-            .ToListAsync();
+        var list = await _rccpService.GetItemResourcesAsync(skuId);
         return Ok(list);
     }
 
     [HttpPost("item-resources")]
     public async Task<ActionResult<ApiResponse>> UpdateItemResources([FromBody] List<RccpItemResource> items)
     {
-        if (items == null || !items.Any()) return BadRequest();
-        
-        var skuId = items.First().SkuId;
-        var existing = await _context.RccpItemResources.Where(ir => ir.SkuId == skuId).ToListAsync();
-        _context.RccpItemResources.RemoveRange(existing);
-        
-        foreach(var item in items) {
-            item.Id = Guid.NewGuid();
-            _context.RccpItemResources.Add(item);
-        }
-        
-        await _context.SaveChangesAsync();
-        return Ok("Saved successfully");
+        var (success, message) = await _rccpService.UpdateItemResourcesAsync(items);
+
+        return success
+            ? Ok(message)
+            : ApiResponse.Fail(message);
     }
 }

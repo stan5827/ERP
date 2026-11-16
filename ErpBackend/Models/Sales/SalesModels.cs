@@ -232,11 +232,14 @@ public class DeliveryOrderItem
     public Guid SkuId { get; set; }
     [MaxLength(50)] public string? LotNumber { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal DeliveredQty { get; set; }
+    public Guid? WarehouseId { get; set; }
     public Guid? BinLocationId { get; set; }
     [MaxLength(50)] public string? SerialNumber { get; set; }
 
     [ForeignKey(nameof(DeliveryOrderId))] public DeliveryOrder DeliveryOrder { get; set; } = null!;
     [ForeignKey(nameof(SkuId))] public Inventory.Sku? Sku { get; set; }
+    [ForeignKey(nameof(WarehouseId))] public Inventory.Warehouse? Warehouse { get; set; }
+    [ForeignKey(nameof(BinLocationId))] public Inventory.BinLocation? BinLocation { get; set; }
 }
 
 public class SalesInvoice
@@ -257,6 +260,7 @@ public class SalesInvoice
     [Column(TypeName = "decimal(14,2)")] public decimal TaxAmount { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal TotalAmount { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal PaidAmount { get; set; } = 0;
+    [Column(TypeName = "decimal(14,2)")] public decimal DiscountedAmount { get; set; }
     
     [Column(TypeName = "decimal(14,2)")] public decimal BaseSalesAmount { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal BaseTaxAmount { get; set; }
@@ -297,6 +301,7 @@ public class CashReceipt
     [MaxLength(30)] public string PaymentMethod { get; set; } = "wire";
     [Column(TypeName = "decimal(14,2)")] public decimal ReceivedAmount { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal DiscountAmount { get; set; }
+    [MaxLength(10)] public string Currency { get; set; } = "TWD";
     public Guid? BankAccountId { get; set; }
     [MaxLength(100)] public string? ReferenceNumber { get; set; }
     [MaxLength(500)] public string? Notes { get; set; }
@@ -304,6 +309,7 @@ public class CashReceipt
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(CustomerId))] public Customer Customer { get; set; } = null!;
+    [ForeignKey(nameof(BankAccountId))] public Models.Finance.BankAccount? BankAccount { get; set; }
     public ICollection<CashReceiptAllocation> Allocations { get; set; } = new List<CashReceiptAllocation>();
 }
 
@@ -313,6 +319,7 @@ public class CashReceiptAllocation
     public Guid CashReceiptId { get; set; }
     public Guid SalesInvoiceId { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal AllocatedAmount { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal DiscountAmount { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ExchangeGainLoss { get; set; }
 
     [ForeignKey(nameof(CashReceiptId))] public CashReceipt CashReceipt { get; set; } = null!;
@@ -354,4 +361,3 @@ public class MonthlyPeriod
     [Column(TypeName = "decimal(18,2)")] public decimal CollectedAmount { get; set; }  // 月收款總額
     [Column(TypeName = "decimal(18,2)")] public decimal OutstandingAR { get; set; }    // 月末未收應收
 }
-

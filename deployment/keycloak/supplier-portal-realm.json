@@ -1,0 +1,47 @@
+{
+  "realm": "supplier-portal",
+  "enabled": true,
+  "displayName": "ERP Supplier Portal (Local)",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "clients": [
+    {
+      "clientId": "supplier-portal-local",
+      "name": "ERP Supplier Portal (Local)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5176/auth/callback",
+        "http://localhost:5176/auth/logout-callback"
+      ],
+      "webOrigins": [
+        "http://localhost:5176"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5176/auth/logout-callback"
+      },
+      "protocolMappers": [
+        {
+          "name": "supplier-e2e-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "supplier-e2e-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

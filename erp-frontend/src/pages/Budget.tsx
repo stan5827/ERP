@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Download, Eye, Edit2, Loader2, CheckCircle, Clock, X, FolderOpen, TrendingUp, Users, Building2, DollarSign, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, Download, Edit2, Loader2, CheckCircle, Clock, FolderOpen, TrendingUp, Users, DollarSign, ChevronDown, ChevronRight } from 'lucide-react';
 import { useBudgetYears, useBudgetVersions, useExpenseBudgets, useLaborBudgets, useCapexBudgets } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
@@ -74,6 +74,82 @@ const capexBudgetFields: FormField[] = [
   { name: 'paybackPeriodYears', label: '回收年限', type: 'number' },
 ];
 
+interface BudgetRow {
+  id?: string;
+  Id?: string;
+  ID?: string;
+  year?: number | string;
+  Year?: number | string;
+  YEAR?: number | string;
+  status?: string;
+  Status?: string;
+  totalBudget?: number;
+  TotalBudget?: number;
+  usedAmount?: number;
+  UsedAmount?: number;
+  departments?: number | string;
+  Departments?: number | string;
+  approvedDate?: string;
+  ApprovedDate?: string;
+}
+
+interface BudgetVersion {
+  id?: string;
+  Id?: string;
+  versionNumber?: string;
+  VersionNumber?: string;
+  versionName?: string;
+  VersionName?: string;
+  isActive?: boolean;
+  IsActive?: boolean;
+}
+
+interface DepartmentRecord {
+  id?: string;
+  Id?: string;
+  deptCode?: string;
+  DeptCode?: string;
+  deptName?: string;
+  DeptName?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getBudgetRows(value: unknown): BudgetRow[] {
+  return getArrayRecords(value).map(row => {
+    const item = row as BudgetRow;
+    return {
+      ...item,
+      id: item.id || item.Id || item.ID,
+      year: item.year || item.Year || item.YEAR,
+      status: item.status || item.Status || 'draft',
+    };
+  });
+}
+
+function getArrayRecords(value: unknown): Record<string, unknown>[] {
+  const rows: unknown[] = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.data)
+      ? value.data
+      : isRecord(value) && Array.isArray(value.Data)
+        ? value.Data
+        : [];
+  return rows.filter(isRecord);
+}
+
+function getBudgetErrorMessage(error: unknown): string | undefined {
+  if (isRecord(error)) {
+    const response = isRecord(error.response) ? error.response : undefined;
+    const data = isRecord(response?.data) ? response.data : undefined;
+    if (typeof data?.message === 'string' && data.message) return data.message;
+    if (typeof error.message === 'string' && error.message) return error.message;
+  }
+  return undefined;
+}
+
 export function Budget() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -83,37 +159,15 @@ export function Budget() {
   const [showAddLabor, setShowAddLabor] = useState(false);
   const [showAddCapex, setShowAddCapex] = useState(false);
   const [showEditYear, setShowEditYear] = useState(false);
-  const [editingYear, setEditingYear] = useState<any>(null);
-  const [selectedYear, setSelectedYear] = useState<any>(null);
+  const [editingYear, setEditingYear] = useState<BudgetRow | null>(null);
+  const [selectedYear, setSelectedYear] = useState<BudgetRow | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   
   const queryClient = useQueryClient();
   const { data: budgetResp, isLoading, isError, error, refetch: refetchYears } = useBudgetYears();
   
   // 終極診斷邏輯：找出資料到底在哪裡
-  const years = useMemo(() => {
-    if (!budgetResp) return [];
-    
-    // 1. 取得原始陣列 (相容包裹在 Data/data 或直接是陣列的情況)
-    const rawData = (budgetResp as any).data || (budgetResp as any).Data || 
-                    (Array.isArray(budgetResp) ? budgetResp : []);
-    
-    if (!Array.isArray(rawData)) {
-      console.warn('[Budget] 資料格式非陣列:', rawData);
-      return [];
-    }
-
-    // 2. 映射屬性並標準化
-    return rawData.map(item => {
-      const i = item as any;
-      return {
-        ...i,
-        id: i.id || i.Id || i.ID,
-        year: i.year || i.Year || i.YEAR,
-        status: i.status || i.Status || 'draft'
-      };
-    });
-  }, [budgetResp]);
+  const years = useMemo(() => getBudgetRows(budgetResp), [budgetResp]);
 
   useEffect(() => {
     if (years.length > 0) {
@@ -129,15 +183,8 @@ export function Budget() {
     }
   }, [selectedYear?.id, refetchVersions]);
 
-  const versionsData = (versionsResp as any);
-  const versions = versionsData?.data || versionsData?.Data || [];
-
-  // 自動選取最新的一個版本
-  useEffect(() => {
-    if (versions.length > 0 && !selectedVersionId) {
-      setSelectedVersionId(versions[0].id || versions[0].Id);
-    }
-  }, [versions, selectedVersionId]);
+  const versions = useMemo(() => getArrayRecords(versionsResp).map(row => row as BudgetVersion), [versionsResp]);
+  const activeVersionId = selectedVersionId ?? versions[0]?.id ?? versions[0]?.Id ?? null;
 
   const stats = [
     { label: '預算年度', value: years.length, color: 'var(--cobalt-400)' },
@@ -162,16 +209,16 @@ export function Budget() {
         const matchesSearch = !search || String(yYear).includes(search);
         return matchesStatus && matchesSearch;
       })
-      .sort((a, b) => (b.year || b.Year) - (a.year || a.Year)); // 強制由新到舊排序
+      .sort((a, b) => Number(b.year || b.Year) - Number(a.year || a.Year)); // 強制由新到舊排序
   }, [years, filterStatus, search]);
 
-  const handleYearClick = (year: { id: string; year: string }) => {
+  const handleYearClick = (year: BudgetRow) => {
     setSelectedYear(year);
     setSelectedVersionId(null);
   };
 
   const toggleVersion = (versionId: string) => {
-    if (selectedVersionId === versionId) {
+    if (activeVersionId === versionId) {
       setSelectedVersionId(null);
     } else {
       setSelectedVersionId(versionId);
@@ -185,10 +232,10 @@ export function Budget() {
   });
   
   const departmentOptions = useMemo(() => {
-    const rawDepts = (deptsResp as any)?.data || (deptsResp as any)?.Data || (Array.isArray(deptsResp) ? deptsResp : []);
-    return rawDepts.map((d: any) => ({
-      label: `${d.deptCode || d.DeptCode} ${d.deptName || d.DeptName}`,
-      value: d.id || d.Id
+    const rawDepts = getArrayRecords(deptsResp).map(row => row as DepartmentRecord);
+    return rawDepts.map(department => ({
+      label: `${department.deptCode || department.DeptCode || ''} ${department.deptName || department.DeptName || ''}`,
+      value: department.id || department.Id || ''
     }));
   }, [deptsResp]);
 
@@ -222,7 +269,7 @@ export function Budget() {
     alert('年度預算更新成功！');
   };
 
-  const handleEditClick = (e: React.MouseEvent, year: any) => {
+  const handleEditClick = (e: React.MouseEvent, year: BudgetRow) => {
     e.stopPropagation();
     setEditingYear(year);
     setShowEditYear(true);
@@ -237,24 +284,24 @@ export function Budget() {
 
   const handleCreateExpenseSuccess = async () => {
     setShowAddExpense(false);
-    if (selectedVersionId) {
-      await queryClient.invalidateQueries({ queryKey: ['budget', 'expense-budgets', selectedVersionId] });
+    if (activeVersionId) {
+      await queryClient.invalidateQueries({ queryKey: ['budget', 'expense-budgets', activeVersionId] });
     }
     alert('費用預算建立成功！');
   };
 
   const handleCreateLaborSuccess = async () => {
     setShowAddLabor(false);
-    if (selectedVersionId) {
-      await queryClient.invalidateQueries({ queryKey: ['budget', 'labor-budgets', selectedVersionId] });
+    if (activeVersionId) {
+      await queryClient.invalidateQueries({ queryKey: ['budget', 'labor-budgets', activeVersionId] });
     }
     alert('人事預算建立成功！');
   };
 
   const handleCreateCapexSuccess = async () => {
     setShowAddCapex(false);
-    if (selectedVersionId) {
-      await queryClient.invalidateQueries({ queryKey: ['budget', 'capex-budgets', selectedVersionId] });
+    if (activeVersionId) {
+      await queryClient.invalidateQueries({ queryKey: ['budget', 'capex-budgets', activeVersionId] });
     }
     alert('資本支出預算建立成功！');
   };
@@ -267,7 +314,7 @@ export function Budget() {
           <p className="module-page-desc">預算編列 → 審核 → 核准 → 執行 → 考核</p>
         </div>
         <div className="module-page-actions">
-          {isError && <span style={{ color: 'var(--red-400)', fontSize: '12px', marginRight: '8px' }}>載入失敗: {(error as any)?.message}</span>}
+          {isError && <span style={{ color: 'var(--red-400)', fontSize: '12px', marginRight: '8px' }}>載入失敗: {error instanceof Error ? error.message : String(error)}</span>}
           <span style={{ fontSize: '11px', color: 'var(--slate-500)', border: '1px solid var(--slate-800)', padding: '2px 6px', borderRadius: '4px', marginRight: '8px' }}>
             系統抓到 {years.length} 筆年度資料
           </span>
@@ -338,11 +385,10 @@ export function Budget() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>暫無資料</td></tr>
             ) : filtered.map(year => {
-              // 相容後端可能回傳 Data 或 data 的情況
-              const y = (year as any);
-              const yId = y.id || y.Id;
-              const yYear = y.year || y.Year;
-              const yStatus = y.status || y.Status;
+              const y = year;
+              const yId = y.id || y.Id || y.ID || '';
+              const yYear = y.year || y.Year || '';
+              const yStatus = y.status || y.Status || 'draft';
               const yTotalBudget = y.totalBudget || y.TotalBudget;
               const yUsedAmount = y.usedAmount || y.UsedAmount;
               const yDepartments = y.departments || y.Departments;
@@ -379,7 +425,7 @@ export function Budget() {
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button 
                         className={`btn ${isSelected ? 'btn-primary' : 'btn-ghost'} btn-xs`}
-                        onClick={() => handleYearClick({ id: yId, year: yYear })}
+                        onClick={() => handleYearClick({ ...y, id: yId, year: yYear })}
                       >
                         {isSelected ? <CheckCircle size={12} /> : <TrendingUp size={12} />}
                         {isSelected ? '編輯中' : '預算編列'}
@@ -424,30 +470,36 @@ export function Budget() {
                 </tr>
               </thead>
               <tbody>
-                {versions.map(v => (
-                  <tr key={v.id}>
+                {versions.map(v => {
+                  const versionId = v.id || v.Id || '';
+                  const versionNumber = v.versionNumber || v.VersionNumber || '';
+                  const versionName = v.versionName || v.VersionName;
+                  const isActive = v.isActive || v.IsActive;
+                  return (
+                  <tr key={versionId}>
                     <td>
-                      <button className="icon-action-btn" onClick={() => toggleVersion(v.id)}>
-                        {selectedVersionId === v.id ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                      <button className="icon-action-btn" onClick={() => toggleVersion(versionId)}>
+                        {activeVersionId === versionId ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       </button>
                     </td>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontWeight: 600 }}>{v.versionNumber}</td>
-                    <td>{v.versionName || '-'}</td>
-                    <td><span className={`status-badge status-${v.isActive ? 'active' : 'neutral'}`}>{v.isActive ? '生效中' : '草稿'}</span></td>
+                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontWeight: 600 }}>{versionNumber}</td>
+                    <td>{versionName || '-'}</td>
+                    <td><span className={`status-badge status-${isActive ? 'active' : 'neutral'}`}>{isActive ? '生效中' : '草稿'}</span></td>
                     <td>
-                      <button className="icon-action-btn" title="展開" onClick={() => toggleVersion(v.id)}>
+                      <button className="icon-action-btn" title="展開" onClick={() => toggleVersion(versionId)}>
                         <FolderOpen size={13} />
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
           
-          {selectedVersionId && (
+          {activeVersionId && (
             <VersionDetails 
-              versionId={selectedVersionId} 
+              versionId={activeVersionId}
               onAddExpense={() => setShowAddExpense(true)} 
               onAddLabor={() => setShowAddLabor(true)} 
               onAddCapex={() => setShowAddCapex(true)} 
@@ -494,9 +546,8 @@ export function Budget() {
             }
             await budgetApi.createYear(data);
             handleCreateYearSuccess();
-          } catch (err: any) {
-            const msg = err.response?.data?.message || err.message || String(err);
-            alert('建立失敗：' + msg);
+          } catch (err: unknown) {
+            alert('建立失敗：' + (getBudgetErrorMessage(err) || String(err)));
           }
         }}
       />
@@ -509,13 +560,13 @@ export function Budget() {
         }}
         title="編輯年度預算"
         fields={editBudgetYearFields}
-        initialValues={editingYear}
+        initialValues={editingYear ? { ...editingYear } : undefined}
         onSubmit={async (data) => {
           try {
             await budgetApi.updateYear(editingYear.id, data);
             handleUpdateYearSuccess();
-          } catch (err: any) {
-            alert('更新失敗：' + (err.message || '未知錯誤'));
+          } catch (err: unknown) {
+            alert('更新失敗：' + (getBudgetErrorMessage(err) || '未知錯誤'));
           }
         }}
       />
@@ -534,8 +585,8 @@ export function Budget() {
             console.log('建立版本，資料:', { ...data, budgetYearId: selectedYear.id });
             await budgetApi.createVersion({ ...data, budgetYearId: selectedYear.id });
             await handleCreateVersionSuccess();
-          } catch (err: any) {
-            alert('建立失敗：' + (err.message || String(err)));
+          } catch (err: unknown) {
+            alert('建立失敗：' + (getBudgetErrorMessage(err) || String(err)));
           }
         }}
       />
@@ -547,12 +598,12 @@ export function Budget() {
         fields={dynamicExpenseFields}
         onSubmit={async (data) => {
           try {
-            if (!selectedVersionId) {
+            if (!activeVersionId) {
               alert('請先展開一個版本');
               return;
             }
             await budgetApi.createExpenseBudget({
-              budgetVersionId: selectedVersionId,
+              budgetVersionId: activeVersionId,
               year: Number(data.year),
               departmentId: data.departmentId,
               items: [{
@@ -576,8 +627,8 @@ export function Budget() {
               }]
             });
             await handleCreateExpenseSuccess();
-          } catch (err: any) {
-            alert('建立失敗：' + (err.message || String(err)));
+          } catch (err: unknown) {
+            alert('建立失敗：' + (getBudgetErrorMessage(err) || String(err)));
           }
         }}
       />
@@ -589,12 +640,12 @@ export function Budget() {
         fields={dynamicLaborFields}
         onSubmit={async (data) => {
           try {
-            if (!selectedVersionId) {
+            if (!activeVersionId) {
               alert('請先展開一個版本');
               return;
             }
             await budgetApi.createLaborBudget({
-              budgetVersionId: selectedVersionId,
+              budgetVersionId: activeVersionId,
               year: Number(data.year),
               departmentId: data.departmentId,
               currentHeadcount: Number(data.currentHeadcount),
@@ -612,8 +663,8 @@ export function Budget() {
               }]
             });
             await handleCreateLaborSuccess();
-          } catch (err: any) {
-            alert('建立失敗：' + (err.message || String(err)));
+          } catch (err: unknown) {
+            alert('建立失敗：' + (getBudgetErrorMessage(err) || String(err)));
           }
         }}
       />
@@ -625,12 +676,12 @@ export function Budget() {
         fields={capexBudgetFields}
         onSubmit={async (data) => {
           try {
-            if (!selectedVersionId) {
+            if (!activeVersionId) {
               alert('請先展開一個版本');
               return;
             }
             await budgetApi.createCapexBudget({
-              budgetVersionId: selectedVersionId,
+              budgetVersionId: activeVersionId,
               projectName: data.projectName,
               plannedPurchaseDate: data.plannedPurchaseDate,
               estimatedAmount: Number(data.estimatedAmount),
@@ -642,8 +693,8 @@ export function Budget() {
               paybackPeriodYears: data.paybackPeriodYears ? Number(data.paybackPeriodYears) : null,
             });
             await handleCreateCapexSuccess();
-          } catch (err: any) {
-            alert('建立失敗：' + (err.message || String(err)));
+          } catch (err: unknown) {
+            alert('建立失敗：' + (getBudgetErrorMessage(err) || String(err)));
           }
         }}
       />
@@ -656,9 +707,9 @@ function VersionDetails({ versionId, onAddExpense, onAddLabor, onAddCapex }: { v
   const { data: laborResp } = useLaborBudgets(versionId);
   const { data: capexResp } = useCapexBudgets(versionId);
 
-  const expenses = (expenseResp as { data?: any[] })?.data || [];
-  const labors = (laborResp as { data?: any[] })?.data || [];
-  const capex = (capexResp as { data?: any[] })?.data || [];
+  const expenses = getArrayRecords(expenseResp);
+  const labors = getArrayRecords(laborResp);
+  const capex = getArrayRecords(capexResp);
 
   return (
     <div style={{ padding: 16, background: 'var(--navy-850)', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}>

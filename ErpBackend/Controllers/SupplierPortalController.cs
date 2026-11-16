@@ -1,120 +1,190 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using ErpBackend.DTOs;
+using ErpBackend.Security.SupplierPortal;
 using ErpBackend.Services;
-using ErpBackend.Models.Portal;
-using System.Security.Claims;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ErpBackend.Controllers;
 
+/// <summary>Exposes the authenticated supplier's portal identity.</summary>
 [ApiController]
-[Route("api/erp/supplier-portal")]
-public class SupplierPortalController : BaseController
+[Route("api/supplier-portal")]
+[Authorize(Policy = SupplierPortalAuthentication.Policy)]
+public sealed class SupplierPortalController(
+    SupplierPortalIdentityContext identityContext,
+    ISupplierPortalCollaborationService collaborationService) : ControllerBase
 {
-    private readonly ISupplierPortalService _portalService;
-
-    public SupplierPortalController(ISupplierPortalService portalService)
+    /// <summary>Returns the supplier identity resolved from the validated identity-provider subject.</summary>
+    [HttpGet("session")]
+    [ProducesResponseType<SupplierPortalSessionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult<SupplierPortalSessionDto> GetSession()
     {
-        _portalService = portalService;
+        var supplierUser = identityContext.Current;
+        if (supplierUser is null)
+            return Forbid();
+
+        return Ok(new SupplierPortalSessionDto(
+            supplierUser.SupplierUserId,
+            supplierUser.Username,
+            supplierUser.ContactName,
+            supplierUser.Role,
+            supplierUser.SupplierCode,
+            supplierUser.SupplierName));
     }
 
-    [HttpPost("login")]
-    [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<SupplierPortalLoginResponse>>> Login([FromBody] SupplierPortalLoginRequest request)
-    {
-        var response = await _portalService.LoginAsync(request);
-        if (response == null)
-            return Unauthorized(ApiResponse.Fail("Invalid credentials"));
-
-        return Ok(response);
-    }
-
+    /// <summary>Lists RFQs explicitly assigned to the authenticated supplier.</summary>
     [HttpGet("rfqs")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse<IEnumerable<RfqDto>>>> GetRfqs()
+    [ProducesResponseType(typeof(IReadOnlyList<SupplierPortalRfqSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<SupplierPortalRfqSummaryDto>>> GetRfqs(
+        CancellationToken cancellationToken)
     {
-        var supplierId = GetSupplierId();
-        var rfqs = await _portalService.GetActiveRfqsAsync(supplierId);
-        return Ok(rfqs);
+        if (identityContext.Current is not { } supplierUser)
+            return Forbid();
+
+        return Ok(await collaborationService.GetRfqsAsync(
+            supplierUser.SupplierId,
+            cancellationToken));
     }
 
-    [HttpPost("quotes")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse>> SubmitQuote([FromBody] SubmitSupplierQuoteRequest request)
+    /// <summary>Returns the assigned RFQ details and only this supplier's existing quote.</summary>
+    [HttpGet("rfqs/{rfqId:guid}")]
+    [ProducesResponseType(typeof(SupplierPortalRfqDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SupplierPortalRfqDetailDto>> GetRfq(
+        Guid rfqId,
+        CancellationToken cancellationToken)
     {
-        var supplierId = GetSupplierId();
-        var supplierUserId = GetUserId(); // Assuming sub claim is the user id
-        
-        var success = await _portalService.SubmitQuoteAsync(supplierUserId, supplierId, request);
-        if (!success)
-            return Fail("Failed to submit quote");
+        if (identityContext.Current is not { } supplierUser)
+            return Forbid();
 
-        return Ok("Quote submitted successfully");
+        var rfq = await collaborationService.GetRfqAsync(
+            rfqId,
+            supplierUser.SupplierId,
+            cancellationToken);
+        return rfq is null ? NotFound() : Ok(rfq);
     }
 
+    /// <summary>Submits the authenticated supplier's quote for assigned RFQ items.</summary>
+    [HttpPost("rfqs/{rfqId:guid}/quotes")]
+    [ProducesResponseType(typeof(SupplierPortalQuoteSubmittedDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<SupplierPortalQuoteSubmittedDto>> SubmitQuote(
+        Guid rfqId,
+        SubmitSupplierRfqQuoteRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (identityContext.Current is not { } supplierUser)
+            return Forbid();
+
+        try
+        {
+            return Ok(await collaborationService.SubmitQuoteAsync(
+                rfqId,
+                supplierUser.SupplierId,
+                supplierUser.SupplierUserId,
+                supplierUser.Role,
+                request,
+                cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Lists issued purchase orders belonging only to the authenticated supplier.</summary>
     [HttpGet("purchase-orders")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse<IEnumerable<PurchaseOrderDto>>>> GetPurchaseOrders()
+    [ProducesResponseType(typeof(IReadOnlyList<SupplierPortalPurchaseOrderSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<SupplierPortalPurchaseOrderSummaryDto>>> GetPurchaseOrders(
+        CancellationToken cancellationToken)
     {
-        var supplierId = GetSupplierId();
-        var pos = await _portalService.GetActivePurchaseOrdersAsync(supplierId);
-        return Ok(pos);
+        if (identityContext.Current is not { } supplierUser)
+            return Forbid();
+
+        return Ok(await collaborationService.GetPurchaseOrdersAsync(
+            supplierUser.SupplierId,
+            cancellationToken));
     }
 
-    [HttpPost("purchase-orders/{id}/confirm")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse>> ConfirmPo(Guid id)
+    /// <summary>Returns a purchase order issued to the authenticated supplier and its response history.</summary>
+    [HttpGet("purchase-orders/{purchaseOrderId:guid}")]
+    [ProducesResponseType(typeof(SupplierPortalPurchaseOrderDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SupplierPortalPurchaseOrderDetailDto>> GetPurchaseOrder(
+        Guid purchaseOrderId,
+        CancellationToken cancellationToken)
     {
-        var supplierId = GetSupplierId();
-        var success = await _portalService.ConfirmPurchaseOrderAsync(id, supplierId);
-        if (!success)
-            return Fail("Failed to confirm purchase order");
+        if (identityContext.Current is not { } supplierUser)
+            return Forbid();
 
-        return Ok("Purchase order confirmed successfully");
+        var order = await collaborationService.GetPurchaseOrderAsync(
+            purchaseOrderId,
+            supplierUser.SupplierId,
+            cancellationToken);
+        return order is null ? NotFound() : Ok(order);
     }
 
-    [HttpGet("asns")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse<IEnumerable<SupplierAsnDto>>>> GetAsns()
+    /// <summary>Accepts, rejects, or requests line-level changes to an issued purchase order.</summary>
+    [HttpPost("purchase-orders/{purchaseOrderId:guid}/responses")]
+    [ProducesResponseType(typeof(SupplierPortalPurchaseOrderResponseSubmittedDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<SupplierPortalPurchaseOrderResponseSubmittedDto>> SubmitPurchaseOrderResponse(
+        Guid purchaseOrderId,
+        SubmitSupplierPurchaseOrderResponseRequestDto request,
+        CancellationToken cancellationToken)
     {
-        var supplierId = GetSupplierId();
-        var asns = await _portalService.GetAsnsAsync(supplierId);
-        return Ok(asns);
+        if (identityContext.Current is not { } supplierUser)
+            return Forbid();
+
+        try
+        {
+            var result = await collaborationService.SubmitPurchaseOrderResponseAsync(
+                purchaseOrderId,
+                supplierUser.SupplierId,
+                supplierUser.SupplierUserId,
+                supplierUser.Role,
+                request,
+                cancellationToken);
+            return CreatedAtAction(
+                nameof(GetPurchaseOrder),
+                new { purchaseOrderId },
+                result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
-
-    [HttpPost("asns")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse<Guid>>> CreateAsn([FromBody] CreateSupplierAsnRequest request)
-    {
-        var supplierId = GetSupplierId();
-        var asnId = await _portalService.CreateAsnAsync(supplierId, request);
-        return Ok(asnId);
-    }
-
-    [HttpGet("performance")]
-    [Authorize(Roles = "Supplier")]
-    public async Task<ActionResult<ApiResponse<SupplierPerformanceReportDto>>> GetPerformance([FromQuery] string period)
-    {
-        var supplierId = GetSupplierId();
-        var score = await _portalService.GetPerformanceScoreAsync(supplierId, period);
-        if (score == null)
-            return Fail<SupplierPerformanceReportDto>("Performance data not found");
-
-        return Ok(score);
-    }
-
-    private Guid GetSupplierId()
-    {
-        var claim = User.FindFirst("SupplierId")?.Value ?? User.FindFirst("supplier_id")?.Value;
-        return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
-    }
-}
-
-public class SupplierAsnLegacyCreateRequest : CreateSupplierAsnRequest
-{
-    public Guid SupplierId { get; set; }
-    public string? Notes { get; set; }
 }

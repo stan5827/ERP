@@ -1,4 +1,4 @@
-export type ThemeName = 'modern-dark' | 'professional-light' | 'high-contrast' | 'corporate-blue' | 'forest-green' | 'royal-purple' | 'sunset-orange' | 'slate-gray' | 'custom';
+﻿export type ThemeName = 'modern-dark' | 'professional-light' | 'high-contrast' | 'corporate-blue' | 'forest-green' | 'royal-purple' | 'sunset-orange' | 'slate-gray' | 'custom';
 
 export interface Theme {
   name: ThemeName;
@@ -153,7 +153,8 @@ export function getTheme(name: ThemeName): Theme {
 export function applyTheme(theme: Theme | ThemeColors): void {
   const root = document.documentElement;
   const colors = 'colors' in theme ? theme.colors : theme;
-  
+  const isDark = getRelativeLuminance(colors.background) < 0.45;
+
   // Map theme colors to actual CSS variables used in UI
   root.style.setProperty('--cobalt-600', colors.primary);
   root.style.setProperty('--cobalt-500', colors.primary);
@@ -165,11 +166,11 @@ export function applyTheme(theme: Theme | ThemeColors): void {
   root.style.setProperty('--cobalt-glow-strong', colors.primary + '59');
 
   root.style.setProperty('--slate-100', colors.text);
-  root.style.setProperty('--slate-200', adjustColor(colors.text, -20));
-  root.style.setProperty('--slate-300', adjustColor(colors.text, -40));
-  root.style.setProperty('--slate-400', adjustColor(colors.text, -60));
-  root.style.setProperty('--slate-500', adjustColor(colors.text, -70));
-  root.style.setProperty('--slate-600', adjustColor(colors.text, -80));
+  root.style.setProperty('--slate-200', isDark ? '#d5deeb' : '#334155');
+  root.style.setProperty('--slate-300', isDark ? '#bac8da' : '#475569');
+  root.style.setProperty('--slate-400', isDark ? '#a4b5cb' : '#52637a');
+  root.style.setProperty('--slate-500', isDark ? '#91a4bd' : '#64748b');
+  root.style.setProperty('--slate-600', isDark ? '#788da8' : '#8492a6');
 
   root.style.setProperty('--navy-950', colors.background);
   root.style.setProperty('--navy-900', adjustColor(colors.background, 5));
@@ -180,9 +181,22 @@ export function applyTheme(theme: Theme | ThemeColors): void {
   root.style.setProperty('--navy-600', adjustColor(colors.surface, 20));
   root.style.setProperty('--navy-500', adjustColor(colors.surface, 30));
 
-  root.style.setProperty('--glass-bg', colors.surface + 'cc');
-  root.style.setProperty('--glass-border', colors.border);
-  root.style.setProperty('--glass-border-hover', colors.border);
+  root.style.setProperty('--glass-bg', colors.surface + 'f2');
+  root.style.setProperty('--glass-border', isDark ? blendColor(colors.border, '#ffffff', 0.3) : '#cbd5e1');
+  root.style.setProperty('--glass-border-hover', isDark ? blendColor(colors.border, '#ffffff', 0.5) : '#94a3b8');
+  root.style.setProperty('--visual-panel', isDark ? colors.surface : '#ffffff');
+  root.style.setProperty('--visual-panel-raised', isDark ? blendColor(colors.surface, '#ffffff', 0.045) : '#f8fafc');
+  root.style.setProperty('--visual-panel-header', isDark ? blendColor(colors.surface, '#ffffff', 0.075) : '#eef2f7');
+  root.style.setProperty('--visual-hover', isDark ? 'rgba(126, 177, 235, 0.09)' : 'rgba(30, 58, 138, 0.055)');
+  root.style.setProperty('--visual-shadow', isDark
+    ? '0 12px 30px rgba(0, 0, 0, 0.22)'
+    : '0 10px 26px rgba(15, 23, 42, 0.08)');
+  root.style.setProperty('--grid-line', isDark
+    ? 'rgba(125, 163, 205, 0.035)'
+    : 'rgba(51, 65, 85, 0.035)');
+  root.style.setProperty('--scan-line', isDark
+    ? 'rgba(125, 163, 205, 0.012)'
+    : 'rgba(51, 65, 85, 0.008)');
 
   // Set custom theme variables
   root.style.setProperty('--theme-primary', colors.primary);
@@ -204,4 +218,27 @@ function adjustColor(hex: string, percent: number): string {
     (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 + 
     (B < 255 ? B < 1 ? 0 : B : 255)
   ).toString(16).slice(1);
+}
+
+function getRelativeLuminance(hex: string): number {
+  const channels = hex.replace('#', '').match(/.{2}/g);
+  if (!channels || channels.length !== 3) return 0;
+  const [red, green, blue] = channels.map(channel => {
+    const value = parseInt(channel, 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function blendColor(foreground: string, background: string, amount: number): string {
+  const foregroundChannels = foreground.replace('#', '').match(/.{2}/g);
+  const backgroundChannels = background.replace('#', '').match(/.{2}/g);
+  if (!foregroundChannels || !backgroundChannels) return foreground;
+  const channels = foregroundChannels.map((channel, index) => {
+    const value = Math.round(
+      parseInt(channel, 16) * (1 - amount) + parseInt(backgroundChannels[index], 16) * amount,
+    );
+    return value.toString(16).padStart(2, '0');
+  });
+  return `#${channels.join('')}`;
 }

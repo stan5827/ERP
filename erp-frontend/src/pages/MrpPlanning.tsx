@@ -11,7 +11,6 @@ import {
   Search, 
   Filter, 
   ArrowRightLeft, 
-  Calendar, 
   Clock, 
   Loader2, 
   FileText,
@@ -25,8 +24,29 @@ import { FormModal } from '../components/FormModal';
 import './MrpPlanning.css';
 import './PremiumDesign.css';
 
+const defaultHorizonStart = new Date().toISOString().slice(0, 10);
+const defaultHorizonEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 interface MrpPlanningProps {
   onNavigate?: (module: string) => void;
+}
+
+interface MrpSummaryDto {
+  hasRuns: boolean;
+  latestRunId?: string;
+  latestRunNo?: string;
+  completedAt?: string;
+  plannedOrders?: Array<{
+    type: string;
+    count: number;
+    qty: number;
+  }>;
+}
+
+interface MrpRunFormData {
+  runType: string;
+  horizonStart: string;
+  horizonEnd: string;
 }
 
 export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
@@ -37,7 +57,7 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
   const queryClient = useQueryClient();
 
   // Queries
-  const { data: summary } = useQuery({
+  const { data: summary } = useQuery<MrpSummaryDto | undefined>({
     queryKey: ['mrp-summary'],
     queryFn: () => mrpApi.getSummary().then(res => res.data?.data)
   });
@@ -45,16 +65,6 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
   const { data: runs } = useQuery({
     queryKey: ['mrp-runs'],
     queryFn: () => mrpApi.getRuns().then(res => res.data?.data)
-  });
-
-  const { data: orders, isLoading: ordersLoading } = useQuery({
-    queryKey: ['mrp-orders', selectedRunId || summary?.latestRunId],
-    queryFn: () => {
-      const runId = selectedRunId || summary?.latestRunId;
-      if (!runId) return Promise.resolve([]);
-      return mrpApi.getOrders(runId).then(res => res.data?.data || []);
-    },
-    enabled: !!(selectedRunId || summary?.latestRunId)
   });
 
   // Mutations
@@ -67,7 +77,7 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
       queryClient.invalidateQueries({ queryKey: ['mrp-runs'] });
       setIsRunModalOpen(false);
     },
-    onError: (err: any) => toast.error(`啟動失敗: ${err.message}`)
+    onError: err => toast.error(`啟動失敗: ${err.message}`)
   });
 
   const convertMutation = useMutation({
@@ -78,11 +88,22 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
       queryClient.invalidateQueries({ queryKey: ['mrp-orders'] });
       queryClient.invalidateQueries({ queryKey: ['mrp-summary'] });
     },
-    onError: (err: any) => toast.error(`轉換失敗: ${err.message}`)
+    onError: err => toast.error(`轉換失敗: ${err.message}`)
   });
 
-  const handleRunMrp = async (formData: any) => {
-    await runMrpMutation.mutateAsync(formData);
+  const handleRunMrp = async (formData: Record<string, unknown>) => {
+    const { runType, horizonStart, horizonEnd } = formData;
+    if (
+      typeof runType !== 'string'
+      || typeof horizonStart !== 'string'
+      || typeof horizonEnd !== 'string'
+    ) {
+      toast.error('MRP 運算資料格式無效');
+      return;
+    }
+
+    const request: MrpRunFormData = { runType, horizonStart, horizonEnd };
+    runMrpMutation.mutate(request);
   };
 
   // 修復 FE-001: 使用 server-side 搜尋，而非 client 端過濾
@@ -132,7 +153,7 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
             <Factory size={24} />
           </div>
           <div className="card-value">
-            {summary?.plannedOrders?.find((p: any) => p.type === 'work_order')?.count || 0}
+            {summary?.plannedOrders?.find(order => order.type === 'work_order')?.count || 0}
           </div>
           <div className="card-label">建議生產工單</div>
           <div className="card-trend"><LineChart size={40} /></div>
@@ -143,7 +164,7 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
             <ShoppingCart size={24} />
           </div>
           <div className="card-value">
-            {summary?.plannedOrders?.find((p: any) => p.type === 'purchase_order')?.count || 0}
+            {summary?.plannedOrders?.find(order => order.type === 'purchase_order')?.count || 0}
           </div>
           <div className="card-label">建議採購申請</div>
           <div className="card-trend"><BarChart2 size={40} /></div>
@@ -219,7 +240,7 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
                 </tr>
               </thead>
               <tbody>
-                {ordersLoading ? (
+                {filteredLoading ? (
                   <tr>
                     <td colSpan={7} className="text-center py-24 text-slate-500">
                       <div className="flex flex-col items-center gap-4">
@@ -325,7 +346,7 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
       )}
 
       {/* MRP Run Modal */}
-      <FormModal
+<FormModal
         open={isRunModalOpen}
         onClose={() => setIsRunModalOpen(false)}
         title="啟動 MRP 運算核心"
@@ -334,8 +355,8 @@ export const MrpPlanning: React.FC<MrpPlanningProps> = ({ onNavigate }) => {
             { value: 'regenerative', label: '全重算模式 (Regenerative) - 完整清理並重新排成' },
             { value: 'net_change', label: '淨變模式 (Net Change) - 僅針對變動需求增量計算' }
           ], defaultValue: 'regenerative', required: true },
-          { name: 'horizonStart', label: '需求分析起點', type: 'date', defaultValue: new Date().toISOString().split('T')[0], required: true },
-          { name: 'horizonEnd', label: '需求分析終點', type: 'date', defaultValue: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0], required: true },
+          { name: 'horizonStart', label: '需求分析起點', type: 'date', defaultValue: defaultHorizonStart, required: true },
+          { name: 'horizonEnd', label: '需求分析終點', type: 'date', defaultValue: defaultHorizonEnd, required: true },
           { name: 'notes', label: '執行備註', type: 'text', placeholder: '例如：因應 Q3 訂單突增進行緊急重算' }
         ]}
         onSubmit={handleRunMrp}

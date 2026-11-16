@@ -1,22 +1,226 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Plus, Eye, Edit, X, Save, Trash2, 
-  ChevronRight, Loader2, Filter, ShoppingBag, 
-  FileText, CheckCircle2, TrendingUp, DollarSign, 
-  Calendar, BarChart2, Check, XCircle, Truck, 
-  Factory, ArrowRightLeft, Sparkles, UserPlus, Users,
-  ArrowUpRight, Target, Activity, Download, Mail, Phone, MapPin, CreditCard, Layers
+import { motion } from 'framer-motion';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Search, Plus, Edit, X, Trash2,
+  ChevronRight, ChevronDown, Loader2,
+  FileText, CheckCircle2, DollarSign,
+  Calendar, Check, XCircle, Truck,
+  Factory, ArrowRightLeft, ArrowUpRight, Activity, Layers
 } from 'lucide-react';
-import { useSalesOrders, useQuotes, useCustomers, useOrderToCash, useSkus, useUoms } from '../hooks/useApi';
-import { FormModal, type FormTab, type FormField } from '../components/FormModal';
-import { salesOrdersApi, customersApi, skusApi, invoicesApi, quotesApi, deliveryOrdersApi, workOrdersApi, toPascalCase, inventoryApi } from '../api/api';
-import { useQueryClient } from '@tanstack/react-query';
+import { useSalesOrders, useQuotes, useCustomers, useOrderToCash, useUoms } from '../hooks/useApi';
+import { FormModal, type FormTab } from '../components/FormModal';
+import { salesOrdersApi, customersApi, skusApi, quotesApi, deliveryOrdersApi, workOrdersApi, inventoryApi, warehousesApi, binLocationsApi } from '../api/api';
+import type { BinLocationDto, SkuDto, WarehouseDto } from '../api/inventory';
+import type { CustomerDto, SalesOrderConfirmationDto, SalesOrderDto } from '../api/sales';
+import { CashReceiptsPanel } from './CashReceiptsPanel';
+import { useRole } from '../contexts/useRole';
+import { WorkOrderTransferQueue } from './WorkOrderTransferQueue';
 import './styles/Sales-Luxury.css';
+
+type SalesLineItem = {
+  skuId?: string;
+  productId?: string;
+  skuNumber?: string;
+  productName?: string;
+  skuName?: string;
+  unitName?: string;
+  quantity: number;
+  deliveredQty?: number;
+  unit?: string;
+  unitPrice: number;
+  needManufacturing?: boolean;
+  needOutsourcing?: boolean;
+};
+
+type SalesQuoteDto = {
+  id: string;
+  quoteNumber?: string;
+  customerName?: string;
+  customerId?: string;
+  quoteDate?: string;
+  finalAmount?: number;
+  status: string;
+  items?: SalesLineItem[];
+  quoteItems?: SalesLineItem[];
+};
+
+type SalesProcessRow = {
+  orderId: string;
+  orderNumber: string;
+  customerName?: string;
+  orderAmount?: number;
+  collectedAmount?: number;
+  gapDays: number;
+  pipelineStatus: string;
+  orderDate?: string;
+  deliveryDate?: string;
+  invoiceCount?: number;
+  collectionRate: number;
+};
+
+type SalesProcessSummary = {
+  totalAmount?: number;
+  totalOrders?: number;
+};
+
+type SalesCustomerDto = CustomerDto & {
+  creditRating?: string;
+};
+
+type SalesProcessResponse = {
+  rows?: SalesProcessRow[];
+  summary?: SalesProcessSummary;
+  rowLimit?: number;
+};
+
+type SalesWorkflowError = {
+  response?: { data?: { message?: string } };
+  message?: string;
+};
+
+const EMPTY_SALES_ORDERS: SalesOrderDto[] = [];
+const EMPTY_SALES_QUOTES: SalesQuoteDto[] = [];
+const EMPTY_CUSTOMERS: CustomerDto[] = [];
+const EMPTY_PROCESS_ROWS: SalesProcessRow[] = [];
+const EMPTY_PROCESS_SUMMARY: SalesProcessSummary = {};
+
+type SalesSkuSearchProps = {
+  selectedLabel?: string;
+  onSelect: (sku: SkuDto) => void;
+};
+
+const SalesSkuSearch: React.FC<SalesSkuSearchProps> = ({ selectedLabel, onSelect }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchTerm]);
+
+  const { data: searchResults = [], isFetching, isError } = useQuery({
+    queryKey: ['sellable-sku-search', debouncedSearchTerm],
+    queryFn: async () => {
+      const params: Record<string, string> = {
+        page: '1',
+        pageSize: '25',
+        isSellable: 'true'
+      };
+      if (debouncedSearchTerm) params.searchTerm = debouncedSearchTerm;
+      const response = await skusApi.list(params);
+      if (!response.data.success) {
+        throw new Error(response.data.message || '搜尋銷售商品失敗');
+      }
+      return response.data.data ?? [];
+    },
+    enabled: isOpen,
+    staleTime: 30_000
+  });
+
+  const openOptions = () => {
+    if (selectedLabel) {
+      setSearchTerm('');
+      setDebouncedSearchTerm('');
+    }
+    setIsOpen(true);
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', position: 'relative' }}>
+        <input
+          type="search"
+          className="form-input"
+          value={isOpen ? searchTerm : selectedLabel || ''}
+          onFocus={openOptions}
+          onChange={event => {
+            setSearchTerm(event.target.value);
+            setIsOpen(true);
+          }}
+          onBlur={() => setIsOpen(false)}
+          placeholder="選擇商品或輸入品號、品名搜尋"
+          autoComplete="off"
+          style={{ width: '100%', paddingRight: 36 }}
+        />
+        <button
+          type="button"
+          aria-label={isOpen ? '關閉商品清單' : '開啟商品清單'}
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => isOpen ? setIsOpen(false) : openOptions()}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 36,
+            border: 0,
+            background: 'transparent',
+            color: 'var(--slate-400)',
+            cursor: 'pointer'
+          }}
+        >
+          <ChevronDown size={16} />
+        </button>
+      </div>
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          zIndex: 20,
+          maxHeight: 240,
+          overflowY: 'auto',
+          background: '#07111f',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 6
+        }}>
+          {isFetching ? (
+            <div style={{ padding: 10, color: 'var(--slate-400)', fontSize: 12 }}>搜尋中…</div>
+          ) : isError ? (
+            <div style={{ padding: 10, color: 'var(--rose-400)', fontSize: 12 }}>搜尋商品失敗，請稍後重試</div>
+          ) : searchResults.length === 0 ? (
+            <div style={{ padding: 10, color: 'var(--slate-500)', fontSize: 12 }}>找不到符合的可銷售商品</div>
+          ) : searchResults.map(sku => (
+            <button
+              key={sku.id}
+              type="button"
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                onSelect(sku);
+                setIsOpen(false);
+                setSearchTerm('');
+                setDebouncedSearchTerm('');
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '9px 10px',
+                textAlign: 'left',
+                color: '#fff',
+                background: 'transparent',
+                border: 0,
+                cursor: 'pointer'
+              }}
+            >
+              <span>{sku.skuNumber} - {sku.skuName}</span>
+              {sku.specification && <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: 11 }}>{sku.specification}</span>}
+              <span style={{ display: 'block', color: 'var(--slate-500)', fontSize: 11 }}>
+                銷售單位：{sku.salesUomCode || sku.salesUomName || sku.unit || '未設定'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // 庫存狀態組件
 const StockStatus: React.FC<{ sku: string; qty: number }> = ({ sku, qty }) => {
-  const [atp, setAtp] = useState<any>(null);
+  const [atp, setAtp] = useState<{ available: number; is_sufficient?: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -25,9 +229,12 @@ const StockStatus: React.FC<{ sku: string; qty: number }> = ({ sku, qty }) => {
       setLoading(true);
       try {
         const res = await inventoryApi.checkATP(sku, qty);
-        setAtp(res.data);
-      } catch (e) {}
-      setLoading(false);
+        setAtp(res.data.data ?? null);
+      } catch {
+        setAtp(null);
+      } finally {
+        setLoading(false);
+      }
     };
     check();
   }, [sku, qty]);
@@ -63,7 +270,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   converted:     { label: '轉訂單中', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
 };
 
-const pipelineConfig: Record<string, { label: string; color: string; icon: any }> = {
+const pipelineConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pending:           { label: '待處理', color: '#94a3b8', icon: Calendar },
   in_progress:       { label: '生產/執行中', color: '#60a5fa', icon: Activity },
   shipped:           { label: '已發貨', color: '#10b981', icon: Truck },
@@ -74,6 +281,9 @@ const pipelineConfig: Record<string, { label: string; color: string; icon: any }
   cancelled:         { label: '已取消', color: '#ef4444', icon: XCircle },
 };
 
+const formatDateInput = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const conf = statusConfig[status] || { label: status, color: '#94a3b8', bg: 'rgba(255,255,255,0.05)' };
   return (
@@ -83,229 +293,199 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-interface ItemsTableProps {
-  items: any[];
-  setItems: React.Dispatch<React.SetStateAction<any[]>>;
-  isQuote?: boolean;
-  skus: any[];
-  uoms: any;
-}
+export const Sales: React.FC = () => {
+  const { hasPermission } = useRole();
+  const hasSalesOrderTransferView = hasPermission('sales:workordertransfer', 'view');
+  const hasSalesOrderTransferExecute = hasPermission('sales:workordertransfer', 'execute');
+  const hasSalesManagementCreate = hasPermission('sales', 'create');
 
-const ItemsTable: React.FC<ItemsTableProps> = ({ items, setItems, isQuote = false, skus, uoms }) => {
-  const total = items.reduce((acc, cur) => acc + (cur.quantity * cur.unitPrice || 0), 0);
+  if (hasSalesOrderTransferView && !hasSalesManagementCreate) {
+    return <WorkOrderTransferQueue canTransfer={hasSalesOrderTransferExecute} />;
+  }
 
-  return (
-    <div className="lux-items-editor">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--lux-gold)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Layers size={14} /> {isQuote ? '報價明細清單' : '訂購產品明細'}
-        </div>
-        <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems([...items, { skuId: '', quantity: 1, unit: 'PCS', unitPrice: 0 }])}>
-          <Plus size={12} style={{ marginRight: 4 }} /> 新增品項
-        </button>
-      </div>
-      
-      <div className="lux-items-grid">
-        <div className="lux-items-header">
-          <span style={{ flex: 3 }}>產品 / 品號 *</span>
-          <span style={{ flex: 1, textAlign: 'center' }}>數量 *</span>
-          <span style={{ flex: 1, textAlign: 'center' }}>庫存狀態</span>
-          <span style={{ flex: 1, textAlign: 'center' }}>單位</span>
-          <span style={{ flex: 1.5, textAlign: 'right' }}>單價 *</span>
-          <span style={{ flex: 1.5, textAlign: 'right' }}>小計</span>
-          <span style={{ width: 40 }}></span>
-        </div>
-        {items.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', color: '#64748b', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
-            尚無明細資料，請點擊上方按鈕新增品項
-          </div>
-        ) : items.map((item, idx) => (
-          <div key={idx} className="lux-item-row">
-            <div style={{ flex: 3 }}>
-              <select 
-                className="form-input" 
-                style={{ width: '100%' }}
-                value={item.skuId || item.productId}
-                onChange={e => {
-                  const sku = skus.find(s => s.id === e.target.value);
-                  const news = [...items];
-                  news[idx] = { 
-                    ...news[idx], 
-                    skuId: e.target.value, 
-                    productId: e.target.value,
-                    skuNumber: sku?.skuNumber,
-                    productName: sku?.skuName,
-                    unit: sku?.salesUomCode || sku?.unit || 'PCS',
-                    unitPrice: sku?.suggestedPrice || sku?.purchasePrice || 0
-                  };
-                  setItems(news);
-                }}
-              >
-                <option value="">選擇產品...</option>
-                {skus.filter(s => s.isSellable).map(s => <option key={s.id} value={s.id}>{s.skuNumber} - {s.skuName}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <input 
-                type="number" className="form-input" style={{ textAlign: 'center' }} 
-                value={item.quantity} min={1}
-                onChange={e => {
-                  const news = [...items];
-                  news[idx].quantity = parseFloat(e.target.value) || 0;
-                  setItems(news);
-                }}
-              />
-            </div>
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <StockStatus sku={item.skuNumber} qty={item.quantity} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <input 
-                type="text"
-                className="form-input" 
-                style={{ textAlign: 'center', width: '100%', cursor: 'not-allowed', opacity: 0.8, color: 'var(--lux-gold)', fontWeight: 600 }} 
-                value={(uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '---'}
-                readOnly
-              />
-            </div>
-            <div style={{ flex: 1.5 }}>
-              <input 
-                type="number" className="form-input" style={{ textAlign: 'right' }} 
-                value={item.unitPrice}
-                onChange={e => {
-                  const news = [...items];
-                  news[idx].unitPrice = parseFloat(e.target.value) || 0;
-                  setItems(news);
-                }}
-              />
-            </div>
-            <div className="lux-item-subtotal" style={{ flex: 1.5, textAlign: 'right', fontFamily: 'monospace' }}>
-              ${(item.quantity * item.unitPrice).toLocaleString()}
-            </div>
-            <div style={{ width: 40, textAlign: 'center' }}>
-              <button type="button" className="icon-action-btn" onClick={() => setItems(items.filter((_, i) => i !== idx))}>
-                <Trash2 size={14} color="#ef4444" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      <div className="lux-items-footer">
-        <div style={{ color: 'var(--lux-gold)', fontWeight: 800, fontSize: 16 }}>
-          總金額合計: <span style={{ fontFamily: 'monospace', marginLeft: 12 }}>${total.toLocaleString()}</span>
-        </div>
-      </div>
-    </div>
-  );
+  return <SalesManagement />;
 };
 
-export const Sales: React.FC = () => {
+const SalesManagement: React.FC = () => {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<'orders' | 'quotes' | 'customers' | 'process'>('process');
+  const [view, setView] = useState<'orders' | 'quotes' | 'customers' | 'process' | 'receipts'>('process');
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 3);
+    return { startDate: formatDateInput(startDate), endDate: formatDateInput(endDate) };
+  });
+  const [includeAllOrders, setIncludeAllOrders] = useState(false);
+  const validDateRange = includeAllOrders || dateRange.startDate <= dateRange.endDate;
   
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [showShipmentForm, setShowShipmentForm] = useState(false);
   
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [selectedQuote, setSelectedQuote] = useState<any>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<SalesOrderDto | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState<SalesQuoteDto | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<SalesCustomerDto | null>(null);
+  const [selectedShipmentOrder, setSelectedShipmentOrder] = useState<SalesOrderDto | null>(null);
+  const [shipmentLines, setShipmentLines] = useState<Array<SalesLineItem & { skuId: string; remainingQty: number }>>([]);
   
   // 明細項狀態
-  const [orderItems, setOrderItems] = useState<any[]>([]);
-  const [quoteItems, setQuoteItems] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<SalesLineItem[]>([]);
+  const [quoteItems, setQuoteItems] = useState<SalesLineItem[]>([]);
   const [expItems, setExpItems] = useState<Set<string>>(new Set());
   
   const { data: ordResp, isLoading: ordersLoading } = useSalesOrders();
   const { data: quoResp, isLoading: quotesLoading } = useQuotes();
   const { data: custResp, isLoading: customersLoading } = useCustomers();
-  const { data: procResp, isLoading: processLoading } = useOrderToCash();
-  const { data: skusResp } = useSkus({ pageSize: '1000' });
+  const { data: shippingWarehouses = [] } = useQuery({
+    queryKey: ['shipping-warehouses'],
+    queryFn: async () => {
+      const response = await warehousesApi.list();
+      if (!response.data.success) throw new Error(response.data.message || '載入倉庫失敗');
+      return response.data.data ?? [];
+    }
+  });
+  const { data: shippingBins = [] } = useQuery({
+    queryKey: ['shipping-bin-locations'],
+    queryFn: async () => {
+      const response = await binLocationsApi.list();
+      if (!response.data.success) throw new Error(response.data.message || '載入儲位失敗');
+      return response.data.data ?? [];
+    }
+  });
+  const orderToCashParams = useMemo(() => includeAllOrders
+    ? { includeAll: 'true' }
+    : { startDate: dateRange.startDate, endDate: dateRange.endDate }, [dateRange, includeAllOrders]);
+  const {
+    data: procResp,
+    isLoading: processLoading,
+    isError: processError,
+    error: processQueryError,
+    refetch: refetchOrderToCash
+  } = useOrderToCash(orderToCashParams, validDateRange);
   const { data: uoms } = useUoms();
 
-  const orders = ordResp?.data || [];
-  const quotes = quoResp?.data || [];
-  const customers = custResp?.data || [];
-  const skus = skusResp?.data || [];
-  const processRows = (procResp?.data as any)?.rows || [];
-  const processSummary = (procResp?.data as any)?.summary || {};
+  const orders = ordResp?.data ?? EMPTY_SALES_ORDERS;
+  const quotes = (quoResp?.data ?? EMPTY_SALES_QUOTES) as SalesQuoteDto[];
+  const customers = (custResp?.data ?? EMPTY_CUSTOMERS) as SalesCustomerDto[];
+  const processResponse = procResp?.data as SalesProcessResponse | undefined;
+  const processRows = processResponse?.rows ?? EMPTY_PROCESS_ROWS;
+  const processSummary = processResponse?.summary ?? EMPTY_PROCESS_SUMMARY;
+  const processRowLimit = processResponse?.rowLimit ?? 200;
   
   const isLoading = ordersLoading || quotesLoading || customersLoading || processLoading;
 
-  const filteredOrders = useMemo(() => orders.filter((o: any) => 
+  const filteredOrders = useMemo(() => orders.filter(o =>
     o.orderNumber?.toLowerCase().includes(search.toLowerCase()) || 
     (o.customerName || '').toLowerCase().includes(search.toLowerCase())
   ), [orders, search]);
 
-  const filteredQuotes = useMemo(() => quotes.filter((q: any) => 
+  const filteredQuotes = useMemo(() => quotes.filter(q =>
     q.quoteNumber?.toLowerCase().includes(search.toLowerCase()) || 
     (q.customerName || '').toLowerCase().includes(search.toLowerCase())
   ), [quotes, search]);
 
-  const filteredCustomers = useMemo(() => customers.filter((c: any) => 
+  const filteredCustomers = useMemo(() => customers.filter(c =>
     c.customerCode?.toLowerCase().includes(search.toLowerCase()) || 
     c.customerName?.toLowerCase().includes(search.toLowerCase())
   ), [customers, search]);
 
+  const filteredProcessRows = useMemo(() => processRows.filter(row =>
+    row.orderNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    (row.customerName || '').toLowerCase().includes(search.toLowerCase())
+  ), [processRows, search]);
+
   const stats = useMemo(() => ({
-    revenue: orders.reduce((acc: number, cur: any) => acc + (cur.totalAmount || 0), 0),
-    count: orders.length,
+    revenue: view === 'process'
+      ? processSummary.totalAmount || 0
+      : orders.reduce((acc, cur) => acc + (cur.totalAmount || 0), 0),
+    count: view === 'process' ? processSummary.totalOrders || 0 : orders.length,
     growth: "+14.2%"
-  }), [orders]);
+  }), [orders, processSummary, view]);
 
-  // 控制表單開啟時重置明細
-  useEffect(() => {
-    if (showOrderForm) {
-      setOrderItems(selectedOrder?.items || []);
+  const handleWorkflow = async (
+    type: 'ship' | 'approve' | 'reject' | 'convert' | 'confirm_order' | 'produce',
+    data: SalesOrderDto | SalesQuoteDto
+  ) => {
+    if (type === 'ship' && 'orderNumber' in data) {
+      const lines = (data.items ?? [])
+        .map(item => ({
+          ...item,
+          skuId: item.skuId || item.productId,
+          remainingQty: Math.max(0, Number(item.quantity || 0) - Number(item.deliveredQty || 0))
+        }))
+        .filter((item): item is typeof item & { skuId: string } => Boolean(item.skuId && item.remainingQty > 0));
+      if (lines.length === 0) {
+        alert('訂單沒有尚未出貨的品項。');
+        return;
+      }
+      setSelectedShipmentOrder(data);
+      setShipmentLines(lines);
+      setShowShipmentForm(true);
+      return;
     }
-  }, [showOrderForm, selectedOrder]);
 
-  useEffect(() => {
-    if (showQuoteForm) {
-      const items = selectedQuote ? (selectedQuote.items || selectedQuote.quoteItems || []) : [];
-      setQuoteItems(items);
-    }
-  }, [showQuoteForm, selectedQuote]);
-
-  const handleWorkflow = async (type: string, data: any) => {
     try {
+      let successMessage = '操作執行成功';
       if (type === 'approve') await quotesApi.approve(data.id);
       else if (type === 'reject') await quotesApi.reject(data.id);
       else if (type === 'convert') await quotesApi.convertToOrder(data.id);
       else if (type === 'confirm_order') {
-        const res = await salesOrdersApi.confirm(data.orderNumber);
-        const journal = (res.data as any)?.data?.journal;
+        const order = data as SalesOrderDto;
+        const res = await salesOrdersApi.confirm(order.orderNumber);
+        const confirmation = res.data.data;
+        const journal = (confirmation as (SalesOrderConfirmationDto & {
+          journal?: { journal_no: string; total_amount: number };
+        }) | undefined)?.journal;
         if (journal) {
           console.log('[FINANCE] 產生的會計分錄:', journal);
-          alert(`訂單已確認！\n已自動產生會計分錄：${journal.journal_no}\n總額：${journal.total_amount}`);
+          successMessage = `訂單已確認並生效！\n已自動產生會計分錄：${journal.journal_no}\n總額：${journal.total_amount}`;
         } else {
-          alert('訂單已確認');
+          successMessage = '訂單已確認並生效';
+        }
+        const warnings: string[] = [];
+        if (confirmation?.creditLimitExceeded) {
+          warnings.push(
+            `信用額度提醒：訂單後占用 ${confirmation.creditUsageAfterOrder.toLocaleString()}，額度 ${confirmation.creditLimit.toLocaleString()}；依目前政策仍允許確認。`
+          );
+        }
+        if (confirmation?.inventoryWarnings.length) {
+          warnings.push(
+            '成品庫存不足（訂單仍已確認）：\n' +
+            confirmation.inventoryWarnings.map(item =>
+              `第 ${item.lineNumber} 項 ${item.skuNumber || item.skuName || ''}：需求 ${item.requiredQty}、可用 ${item.availableQty}、缺少 ${item.shortageQty}`
+            ).join('\n')
+          );
+        }
+        if (warnings.length > 0) successMessage += `\n\n${warnings.join('\n\n')}`;
+      }
+      else if (type === 'produce') {
+        const response = await workOrdersApi.createFromSalesOrder(data.id);
+        const workOrders = response.data.data ?? [];
+        const workOrderNumbers = workOrders.map(workOrder => workOrder.woNumber).filter(Boolean);
+        const message = response.data.message || '工單已建立並連結至銷售訂單';
+        successMessage = workOrderNumbers.length > 0
+          ? `${message}：${workOrderNumbers.join('、')}（狀態：未發料／未開工）`
+          : message;
+        const shortages = workOrders.flatMap(workOrder =>
+          (workOrder.materials ?? [])
+            .filter(material => material.shortageQty > 0)
+            .map(material =>
+              `${material.skuNumber || material.skuName || '未命名物料'}：需求 ${material.requiredQty}、可用 ${material.availableQty}、缺料 ${material.shortageQty}`
+            )
+        );
+        if (shortages.length > 0) {
+          successMessage += `\n\n缺料提醒（工單仍已建立，未自動產生請購單）：\n${shortages.join('\n')}`;
         }
       }
-      else if (type === 'ship') {
-        const p = { sales_order_no: data.orderNumber, delivery_date: new Date().toISOString(), items: data.items.map((i:any)=>({ sku_code: i.skuNumber, delivered_qty: i.quantity })) };
-        await deliveryOrdersApi.create(p);
-      } else if (type === 'produce') {
-        for (const item of (data.items || [])) {
-          await workOrdersApi.create({ 
-            sku_code: item.skuNumber, 
-            sales_order_no: data.orderNumber, 
-            planned_qty: item.quantity, 
-            priority: 'normal', 
-            wo_type: 'regular',
-            planned_end_date: data.expectedDeliveryDate
-          });
-        }
-        // 更新訂單的製造狀態
-        await salesOrdersApi.updateManufacturingStatus(data.id, 'sent');
-      }
-      alert('操作執行成功');
+      alert(successMessage);
       queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
-    } catch (err: any) {
-      alert('操作失敗: ' + (err.response?.data?.message || err.message));
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    } catch (error: unknown) {
+      const workflowError = error as SalesWorkflowError;
+      alert('操作失敗: ' + (workflowError.response?.data?.message || workflowError.message || '未知錯誤'));
     }
   };
 
@@ -345,7 +525,131 @@ export const Sales: React.FC = () => {
     ]}
   ];
 
-
+  const ItemsTable = ({ items, setItems, isQuote = false }: {
+    items: SalesLineItem[];
+    setItems: React.Dispatch<React.SetStateAction<SalesLineItem[]>>;
+    isQuote?: boolean;
+  }) => {
+    const total = items.reduce((acc, cur) => acc + (cur.quantity * cur.unitPrice || 0), 0);
+    
+    return (
+      <div className="lux-items-editor">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--lux-gold)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Layers size={14} /> {isQuote ? '報價明細清單' : '訂購產品明細'}
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems([...items, { skuId: '', quantity: 1, unit: 'PCS', unitPrice: 0 }])}>
+            <Plus size={12} style={{ marginRight: 4 }} /> 新增品項
+          </button>
+        </div>
+        
+        <div className="lux-items-grid">
+          <div className="lux-items-header">
+            <span style={{ flex: 3 }}>產品 / 品號 *</span>
+            <span style={{ flex: 1, textAlign: 'center' }}>數量 *</span>
+            <span style={{ flex: 1, textAlign: 'center' }}>庫存狀態</span>
+            {!isQuote && <span style={{ flex: 0.8, textAlign: 'center' }}>需製造</span>}
+            <span style={{ flex: 1, textAlign: 'center' }}>單位</span>
+            <span style={{ flex: 1.5, textAlign: 'right' }}>單價 *</span>
+            <span style={{ flex: 1.5, textAlign: 'right' }}>小計</span>
+            <span style={{ width: 40 }}></span>
+          </div>
+          {items.length === 0 ? (
+            <div style={{ padding: 30, textAlign: 'center', color: '#64748b', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+              尚無明細資料，請點擊上方按鈕新增品項
+            </div>
+          ) : items.map((item, idx) => (
+            <div key={idx} className="lux-item-row">
+              <div style={{ flex: 3 }}>
+                <SalesSkuSearch
+                  selectedLabel={item.skuNumber ? `${item.skuNumber} - ${item.productName || ''}` : ''}
+                  onSelect={sku => {
+                    const news = [...items];
+                    news[idx] = { 
+                      ...news[idx], 
+                      skuId: sku.id,
+                      productId: sku.id,
+                      skuNumber: sku.skuNumber,
+                      productName: sku.skuName,
+                      unit: sku.salesUomCode || sku.salesUomName || sku.unit || 'PCS',
+                      unitPrice: sku.suggestedPrice || sku.purchasePrice || 0,
+                      needManufacturing: sku.isManufacturable ?? false,
+                      needOutsourcing: sku.isOutsourced ?? false
+                    };
+                    setItems(news);
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <input 
+                  type="number" className="form-input" style={{ textAlign: 'center' }} 
+                  value={item.quantity} min={1}
+                  onChange={e => {
+                    const news = [...items];
+                    news[idx].quantity = parseFloat(e.target.value) || 0;
+                    setItems(news);
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <StockStatus sku={item.skuNumber} qty={item.quantity} />
+              </div>
+              {!isQuote && (
+                <div style={{ flex: 0.8, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`${item.skuNumber || item.productName || '品項'}需製造`}
+                    checked={!!item.needManufacturing}
+                    disabled={!!item.needOutsourcing || !!selectedOrder}
+                    title={selectedOrder ? '既有訂單的製造設定請於建立訂單時設定' : undefined}
+                    onChange={event => {
+                      const news = [...items];
+                      news[idx] = { ...news[idx], needManufacturing: event.target.checked };
+                      setItems(news);
+                    }}
+                  />
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <input 
+                  type="text"
+                  className="form-input" 
+                  style={{ textAlign: 'center', width: '100%', cursor: 'not-allowed', opacity: 0.8, color: 'var(--lux-gold)', fontWeight: 600 }} 
+                  value={(uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '---'}
+                  readOnly
+                />
+              </div>
+              <div style={{ flex: 1.5 }}>
+                <input 
+                  type="number" className="form-input" style={{ textAlign: 'right' }} 
+                  value={item.unitPrice}
+                  onChange={e => {
+                    const news = [...items];
+                    news[idx].unitPrice = parseFloat(e.target.value) || 0;
+                    setItems(news);
+                  }}
+                />
+              </div>
+              <div className="lux-item-subtotal" style={{ flex: 1.5, textAlign: 'right', fontFamily: 'monospace' }}>
+                ${(item.quantity * item.unitPrice).toLocaleString()}
+              </div>
+              <div style={{ width: 40, textAlign: 'center' }}>
+                <button type="button" className="icon-action-btn" onClick={() => setItems(items.filter((_, i) => i !== idx))}>
+                  <Trash2 size={14} color="#ef4444" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="lux-items-footer">
+          <div style={{ color: 'var(--lux-gold)', fontWeight: 800, fontSize: 16 }}>
+            總金額合計: <span style={{ fontFamily: 'monospace', marginLeft: 12 }}>${total.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="sales-container">
@@ -360,8 +664,9 @@ export const Sales: React.FC = () => {
             <button className={`lux-tab-btn ${view === 'quotes' ? 'active' : ''}`} onClick={() => setView('quotes')}>報價管理</button>
             <button className={`lux-tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>訂單管理</button>
             <button className={`lux-tab-btn ${view === 'customers' ? 'active' : ''}`} onClick={() => setView('customers')}>客戶管理</button>
+            <button className={`lux-tab-btn ${view === 'receipts' ? 'active' : ''}`} onClick={() => setView('receipts')}>收款管理</button>
           </div>
-          {view !== 'process' && (
+          {view !== 'process' && view !== 'receipts' && (
             <button className="lux-btn-primary" onClick={() => { 
               if(view === 'orders') { setSelectedOrder(null); setOrderItems([]); setShowOrderForm(true); }
               else if(view === 'quotes') { setSelectedQuote(null); setQuoteItems([]); setShowQuoteForm(true); }
@@ -377,7 +682,7 @@ export const Sales: React.FC = () => {
       {/* 看板、搜尋區塊保持不變 (略過以節省空間，請保持原始邏輯) */}
       <section className="lux-stats-grid">
          <div className="lux-stat-card">
-           <div className="lux-stat-label">年度累計營收 (TWD)</div>
+           <div className="lux-stat-label">訂單金額 (TWD)</div>
            <div className="lux-stat-value">${stats.revenue.toLocaleString()}</div>
            <div style={{ color: 'var(--lux-emerald)', fontSize: '0.75rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: 4 }}>
              <ArrowUpRight size={14} /> {stats.growth} 比去年同期
@@ -402,7 +707,7 @@ export const Sales: React.FC = () => {
          </div>
       </section>
 
-      <div className="lux-controls">
+      {view !== 'receipts' && <div className="lux-controls">
         <div className="lux-search-box">
           <Search size={18} color="var(--lux-gold)" />
           <input 
@@ -411,8 +716,74 @@ export const Sales: React.FC = () => {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-      </div>
+        {view === 'process' && (
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginLeft: 'auto' }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>訂單日期</span>
+            <input
+              aria-label="訂單起始日期"
+              type="date"
+              value={dateRange.startDate}
+              disabled={includeAllOrders}
+              onChange={event => {
+                setIncludeAllOrders(false);
+                setDateRange(range => ({ ...range, startDate: event.target.value }));
+              }}
+              className="form-input"
+              style={{ width: 150 }}
+            />
+            <span style={{ color: '#64748b' }}>至</span>
+            <input
+              aria-label="訂單結束日期"
+              type="date"
+              value={dateRange.endDate}
+              disabled={includeAllOrders}
+              onChange={event => {
+                setIncludeAllOrders(false);
+                setDateRange(range => ({ ...range, endDate: event.target.value }));
+              }}
+              className="form-input"
+              style={{ width: 150 }}
+            />
+            <button
+              type="button"
+              className="lux-btn-primary"
+              onClick={() => {
+                const endDate = new Date();
+                const startDate = new Date();
+                startDate.setMonth(startDate.getMonth() - 3);
+                setDateRange({ startDate: formatDateInput(startDate), endDate: formatDateInput(endDate) });
+                setIncludeAllOrders(false);
+              }}
+            >
+              近三個月
+            </button>
+            <button
+              type="button"
+              className="lux-btn-primary"
+              aria-pressed={includeAllOrders}
+              onClick={() => setIncludeAllOrders(true)}
+            >
+              不限期間
+            </button>
+          </div>
+        )}
+      </div>}
+      {view === 'process' && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, margin: '-12px 0 18px', color: '#94a3b8', fontSize: 12 }}>
+          <span>
+            {includeAllOrders ? '不限日期' : `${dateRange.startDate} 至 ${dateRange.endDate}`}
+            {' · '}總覽統計與列表使用相同日期範圍
+          </span>
+          {procResp?.success && (
+            <span>
+              共 {processSummary.totalOrders ?? 0} 筆
+              {processSummary.totalOrders > processRows.length ? `，目前顯示最新 ${processRows.length} 筆（上限 ${processRowLimit}）` : ''}
+            </span>
+          )}
+        </div>
+      )}
 
+      {view === 'receipts' ? <CashReceiptsPanel /> : (
       <div className="lux-table-wrapper">
         <table className="lux-table">
           {view === 'process' ? (
@@ -428,9 +799,26 @@ export const Sales: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
+                {!validDateRange ? (
+                  <tr><td colSpan={6} role="alert" style={{ textAlign: 'center', padding: '4rem', color: '#fbbf24' }}>起始日期不可晚於結束日期。</td></tr>
+                ) : processLoading ? (
                   <tr><td colSpan={6} style={{ textAlign: 'center', padding: '4rem' }}>正在優化流程追蹤地圖...</td></tr>
-                ) : processRows.map((row: any) => (
+                ) : processError ? (
+                  <tr>
+                    <td colSpan={6} role="alert" style={{ textAlign: 'center', padding: '3rem', color: '#fca5a5' }}>
+                      <div>銷售流程資料載入失敗：{processQueryError instanceof Error ? processQueryError.message : '發生未知錯誤'}</div>
+                      <button type="button" className="lux-btn-primary" onClick={() => refetchOrderToCash()} style={{ marginTop: 12 }}>重新載入</button>
+                    </td>
+                  </tr>
+                ) : filteredProcessRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} role="status" style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
+                      {search
+                        ? '目前日期範圍內沒有符合搜尋條件的訂單。'
+                        : '目前日期範圍內查無銷售訂單；可調整日期或選擇「不限期間」。'}
+                    </td>
+                  </tr>
+                ) : filteredProcessRows.map((row) => (
                   <tr key={row.orderId} className="lux-row">
                     <td style={{ fontFamily: 'monospace', color: 'var(--lux-gold)', fontWeight: 600 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -530,17 +918,17 @@ export const Sales: React.FC = () => {
                                <button className="lux-tab-btn" title="立即發貨" onClick={() => handleWorkflow('ship', so)} style={{ color: '#10b981' }}><Truck size={16} /></button>
                              </>
                            )}
-                           <button className="lux-tab-btn" onClick={() => { setSelectedOrder(so); setShowOrderForm(true); }}><Edit size={16} /></button>
+                           <button className="lux-tab-btn" onClick={() => { setSelectedOrder(so); setOrderItems(so.items || []); setShowOrderForm(true); }}><Edit size={16} /></button>
                          </div>
                       </td>
                     </tr>
                     {expItems.has(so.id) && (
-                      <tr className="lux-detail-row">
-                        <td colSpan={7} style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem 3rem' }}>
+                      <tr className="lux-detail-row lux-sales-detail-row">
+                        <td colSpan={7} className="lux-sales-detail-cell">
                            <motion.div 
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              style={{ borderLeft: '2px solid var(--lux-gold)', paddingLeft: '2rem' }}
+                              className="lux-sales-detail-content"
                             >
                               <div style={{ fontSize: '0.75rem', color: 'var(--lux-gold)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                  <FileText size={16} /> 銷售訂單詳細清單 / Contract Detail
@@ -550,12 +938,12 @@ export const Sales: React.FC = () => {
                                  gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', 
                                  gap: '1.5rem', 
                                  padding: '0.8rem 1.2rem', 
-                                 background: 'rgba(212, 175, 55, 0.06)', 
+                                 background: 'rgba(212, 175, 55, 0.06)',
                                  borderRadius: '8px',
                                  marginBottom: '0.5rem', 
                                  fontSize: '0.75rem', 
                                  fontWeight: 800, 
-                                 color: 'var(--lux-gold)', 
+                                 color: 'var(--lux-gold)',
                                  textTransform: 'uppercase', 
                                  letterSpacing: '0.15em',
                                  border: '1px solid rgba(212, 175, 55, 0.1)'
@@ -566,17 +954,17 @@ export const Sales: React.FC = () => {
                                  <div style={{ textAlign: 'right' }}>單價</div>
                                  <div style={{ textAlign: 'right' }}>合計</div>
                               </div>
-                              {so.items?.map((item: any, idx: number) => (
+                              {so.items?.map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', gap: '1.5rem', padding: '1.2rem', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', alignItems: 'center' }}>
                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.productName || item.skuNumber}</span>
+                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.skuName || item.productName || item.skuNumber}</span>
                                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
                                          品號: {item.skuNumber || item.skuId || '---'}
                                       </span>
                                    </div>
                                    <div style={{ textAlign: 'right', fontWeight: 600, color: '#fff', fontFamily: 'var(--font-mono)' }}>{item.quantity?.toLocaleString()}</div>
                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                                     {(uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit}
+                                     {item.unitName || (uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '—'}
                                    </div>
                                    <div style={{ textAlign: 'right', color: '#94a3b8', fontFamily: 'var(--font-mono)' }}>${item.unitPrice?.toLocaleString()}</div>
                                    <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--lux-gold)', fontFamily: 'var(--font-mono)', fontSize: '1rem' }}>
@@ -606,15 +994,23 @@ export const Sales: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotes.map((q: any) => (
+                {isLoading ? (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '4rem' }}>正在同步數據中心...</td></tr>
+                ) : filteredQuotes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '4rem', color: 'var(--slate-500)' }}>
+                      {quotes.length === 0 ? '目前沒有報價資料' : '找不到符合搜尋條件的報價單'}
+                    </td>
+                  </tr>
+                ) : filteredQuotes.map((q) => (
                   <React.Fragment key={q.id}>
                     <tr className="lux-row" style={{ cursor: 'pointer' }} onClick={() => toggleExpand(q.id)}>
                       <td style={{ textAlign: 'center' }}>
                          <ChevronRight size={14} style={{ transform: expItems.has(q.id) ? 'rotate(90deg)' : 'none', transition: '0.2s' }} />
                       </td>
-                      <td style={{ fontFamily: 'monospace', color: '#fbbf24', fontWeight: 600 }}>{q.quoteNumber}</td>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--lux-gold)', fontWeight: 600 }}>{q.quoteNumber}</td>
                       <td style={{ fontWeight: 700 }}>{q.customerName}</td>
-                      <td style={{ fontFamily: 'monospace' }}>${q.finalAmount?.toLocaleString()}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>${q.finalAmount?.toLocaleString()}</td>
                       <td>{q.quoteDate?.slice(0, 10)}</td>
                       <td><StatusBadge status={q.status} /></td>
                       <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
@@ -628,19 +1024,19 @@ export const Sales: React.FC = () => {
                            {q.status === 'approved' && (
                              <button className="lux-tab-btn" title="轉成訂單" onClick={() => handleWorkflow('convert', q)} style={{ color: '#60a5fa' }}><ArrowRightLeft size={16} /></button>
                            )}
-                           <button className="lux-tab-btn" onClick={() => { setSelectedQuote(q); setShowQuoteForm(true); }}><Edit size={16} /></button>
+                            <button className="lux-tab-btn" title="編輯報價" onClick={() => { setSelectedQuote(q); setQuoteItems(q.items || q.quoteItems || []); setShowQuoteForm(true); }}><Edit size={16} /></button>
                          </div>
                       </td>
                     </tr>
                     {expItems.has(q.id) && (
-                      <tr className="lux-detail-row">
-                        <td colSpan={7} style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem 3rem' }}>
+                      <tr className="lux-detail-row lux-sales-detail-row">
+                         <td colSpan={7} className="lux-sales-detail-cell">
                            <motion.div 
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              style={{ borderLeft: '2px solid #fbbf24', paddingLeft: '2rem' }}
+                               className="lux-sales-detail-content"
                             >
-                              <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                               <div style={{ fontSize: '0.75rem', color: 'var(--lux-gold)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                  <FileText size={16} /> 報價詳細清單 / Estimation Detail
                               </div>
                               <div style={{ 
@@ -648,15 +1044,15 @@ export const Sales: React.FC = () => {
                                  gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', 
                                  gap: '1.5rem', 
                                  padding: '0.8rem 1.2rem', 
-                                 background: 'rgba(251, 191, 36, 0.06)', 
+                                 background: 'rgba(212, 175, 55, 0.06)',
                                  borderRadius: '8px',
                                  marginBottom: '0.5rem', 
                                  fontSize: '0.75rem', 
                                  fontWeight: 800, 
-                                 color: '#fbbf24', 
+                                 color: 'var(--lux-gold)',
                                  textTransform: 'uppercase', 
                                  letterSpacing: '0.15em',
-                                 border: '1px solid rgba(251, 191, 36, 0.1)'
+                                 border: '1px solid rgba(212, 175, 55, 0.1)'
                               }}>
                                  <div>產品品號與品名</div>
                                  <div style={{ textAlign: 'right' }}>報價數量</div>
@@ -664,20 +1060,20 @@ export const Sales: React.FC = () => {
                                  <div style={{ textAlign: 'right' }}>單價</div>
                                  <div style={{ textAlign: 'right' }}>預估合計</div>
                               </div>
-                              {(q.items || q.quoteItems || [])?.map((item: any, idx: number) => (
+                              {(q.items || q.quoteItems || []).map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', gap: '1.5rem', padding: '1.2rem', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', alignItems: 'center' }}>
                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.productName || item.skuNumber}</span>
+                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.skuName || item.productName || item.skuNumber}</span>
                                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
                                          品號: {item.skuNumber || item.skuId || '---'}
                                       </span>
                                    </div>
                                    <div style={{ textAlign: 'right', fontWeight: 600, color: '#fff', fontFamily: 'var(--font-mono)' }}>{item.quantity?.toLocaleString()}</div>
                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                                     {(uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit}
+                                     {item.unitName || (uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '—'}
                                    </div>
                                    <div style={{ textAlign: 'right', color: '#94a3b8', fontFamily: 'var(--font-mono)' }}>${item.unitPrice?.toLocaleString()}</div>
-                                   <div style={{ textAlign: 'right', fontWeight: 700, color: '#fbbf24', fontFamily: 'var(--font-mono)', fontSize: '1rem' }}>
+                                   <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--lux-gold)', fontFamily: 'var(--font-mono)', fontSize: '1rem' }}>
                                       ${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                                    </div>
                                 </div>
@@ -702,7 +1098,7 @@ export const Sales: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((c: any) => (
+                {filteredCustomers.map((c) => (
                   <tr key={c.id} className="lux-row">
                     <td style={{ fontFamily: 'monospace', color: 'var(--lux-gold)' }}>{c.customerCode}</td>
                     <td style={{ fontWeight: 700 }}>{c.customerName}</td>
@@ -733,13 +1129,14 @@ export const Sales: React.FC = () => {
           )}
         </table>
       </div>
+      )}
 
       {/* 銷售訂單表單 */}
       <FormModal
         open={showOrderForm}
         title={selectedOrder ? "編輯銷售訂單 " : "建立銷售訂單"}
         onClose={() => setShowOrderForm(false)}
-        initialValues={selectedOrder || undefined}
+        initialValues={selectedOrder ? { ...selectedOrder } : undefined}
         width={800}
         tabs={[
           { label: '訂單標頭', fields: [
@@ -758,7 +1155,7 @@ export const Sales: React.FC = () => {
           ]}
         ]}
         customRenderers={{
-          items_editor: <ItemsTable items={orderItems} setItems={setOrderItems} skus={skus} uoms={uoms} />
+          items_editor: ItemsTable({ items: orderItems, setItems: setOrderItems })
         }}
         onSubmit={async (values) => {
           const payload = { ...values, items: orderItems };
@@ -778,8 +1175,7 @@ export const Sales: React.FC = () => {
         width={800}
         tabs={[
           { label: '報價標頭', fields: [
-            { name: 'quoteNumber', label: '報價編號', type: 'text', required: true, placeholder: 'QUOT-YYYYMM-XXX' },
-            { name: 'customerId', label: '目標客戶 *', type: 'select', required: true, options: customers.map(c => ({ value: c.id, label: c.customerName })) },
+            { name: 'customerId', label: '目標客戶 *', type: 'select', required: true, options: customers.map(c => ({ value: c.id, label: c.customerName })), description: '報價編號將於建立時依年月自動產生。' },
             { name: 'quoteDate', label: '報價日期', type: 'date', required: true },
             { name: 'validUntil', label: '效期至', type: 'date' },
             { name: 'currency', label: '幣別', type: 'select', options: [{ value: 'TWD', label: 'TWD' }, { value: 'USD', label: 'USD' }] },
@@ -792,14 +1188,94 @@ export const Sales: React.FC = () => {
           ]}
         ]}
         customRenderers={{
-          quote_items_editor: <ItemsTable items={quoteItems} setItems={setQuoteItems} isQuote skus={skus} uoms={uoms} />
+          quote_items_editor: ItemsTable({ items: quoteItems, setItems: setQuoteItems, isQuote: true })
         }}
         onSubmit={async (values) => {
-          const payload = { ...values, items: quoteItems };
+          const payload = { ...values, validUntil: values.validUntil || null, items: quoteItems };
           if (selectedQuote) await quotesApi.update(selectedQuote.id, payload);
-          else await quotesApi.create(payload);
+          else {
+            const response = await quotesApi.create(payload);
+            const quoteNumber = response.data.data?.quoteNumber;
+            if (!quoteNumber) throw new Error('報價建立成功，但系統未回傳報價編號。');
+            alert(`報價單已建立\n報價編號：${quoteNumber}`);
+          }
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
           setShowQuoteForm(false);
+        }}
+      />
+
+      {/* 客戶主檔表單 */}
+      <FormModal
+        open={showShipmentForm}
+        title={`建立出貨單 ${selectedShipmentOrder?.orderNumber || ''}`}
+        onClose={() => setShowShipmentForm(false)}
+        width={760}
+        fields={shipmentLines.flatMap((line, index) => [
+          {
+            name: `shipment-${index}-quantity`,
+            label: `${line.skuNumber || line.skuId} - ${line.productName || line.skuName || ''}；本次出貨量（剩餘 ${line.remainingQty}）`,
+            type: 'number' as const,
+            min: 0.01,
+            max: line.remainingQty,
+            step: 0.01,
+            defaultValue: line.remainingQty,
+            required: true
+          },
+          {
+            name: `shipment-${index}-warehouseId`,
+            label: '出貨倉庫',
+            type: 'select' as const,
+            options: shippingWarehouses.map((warehouse: WarehouseDto) => ({
+              value: warehouse.id,
+              label: `${warehouse.warehouseCode} - ${warehouse.warehouseName}`
+            })),
+            required: true
+          },
+          {
+            name: `shipment-${index}-binLocationId`,
+            label: '出貨儲位',
+            type: 'select' as const,
+            options: shippingBins.map((bin: BinLocationDto) => ({
+              value: bin.id,
+              label: `${bin.warehouseCode} / ${bin.locationCode}`
+            })),
+            required: true
+          },
+          {
+            name: `shipment-${index}-lotNumber`,
+            label: '批號',
+            type: 'text' as const,
+            placeholder: '輸入實際出貨批號',
+            required: true
+          }
+        ])}
+        onSubmit={async values => {
+          const items = shipmentLines.map((line, index) => {
+            const quantity = Number(values[`shipment-${index}-quantity`]);
+            if (!Number.isFinite(quantity) || quantity <= 0 || quantity > line.remainingQty) {
+              throw new Error(`${line.skuNumber || line.skuId} 出貨數量無效或超過未出貨量`);
+            }
+            const warehouseId = String(values[`shipment-${index}-warehouseId`] || '');
+            const binLocationId = String(values[`shipment-${index}-binLocationId`] || '');
+            const lotNumber = String(values[`shipment-${index}-lotNumber`] || '').trim();
+            if (!warehouseId || !binLocationId || !lotNumber) {
+              throw new Error(`${line.skuNumber || line.skuId} 必須指定倉庫、儲位與批號`);
+            }
+            const binLocation = shippingBins.find(bin => bin.id === binLocationId);
+            if (!binLocation || binLocation.warehouseId !== warehouseId) {
+              throw new Error(`${line.skuNumber || line.skuId} 所選儲位不屬於指定倉庫`);
+            }
+            return { skuId: line.skuId, quantity, warehouseId, binLocationId, lotNumber };
+          });
+          await deliveryOrdersApi.create({
+            salesOrderId: selectedShipmentOrder.id,
+            deliveryDate: new Date().toISOString(),
+            items
+          });
+          queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
+          setShowShipmentForm(false);
+          setSelectedShipmentOrder(null);
+          setShipmentLines([]);
         }}
       />
 
@@ -808,7 +1284,7 @@ export const Sales: React.FC = () => {
         open={showCustomerForm}
         title={selectedCustomer ? "編輯客戶資料" : "核心客戶建檔"}
         onClose={() => setShowCustomerForm(false)}
-        initialValues={selectedCustomer || undefined}
+        initialValues={selectedCustomer ? { ...selectedCustomer } : undefined}
         width={700}
         isWizard={true}
         wizardConfig={{
@@ -816,8 +1292,9 @@ export const Sales: React.FC = () => {
           getStepFields: (idx) => customerTabs[idx].fields
         }}
         onSubmit={async (values) => {
-          if (selectedCustomer) await customersApi.update(selectedCustomer.id, values);
-          else await customersApi.create(values);
+          const payload = { ...values, creditLimit: Number(values.creditLimit) || 0 };
+          if (selectedCustomer) await customersApi.update(selectedCustomer.id, payload);
+          else await customersApi.create(payload);
           queryClient.invalidateQueries({ queryKey: ['customers'] });
           setShowCustomerForm(false);
         }}
@@ -825,4 +1302,3 @@ export const Sales: React.FC = () => {
     </div>
   );
 };
-

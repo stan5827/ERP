@@ -11,13 +11,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  try {
-    const token = await AsyncStorage.getItem('erp_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  } catch (e) {
-    console.log('Token error:', e);
+  const token = await AsyncStorage.getItem('erp_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -40,46 +36,25 @@ export const authApi = {
 
 export const attendanceApi = {
   list: (params?: Record<string, string>) =>
-    api.get('/attendance', { params }),
-  create: (data: Record<string, unknown>) =>
-    api.post('/attendance', data),
-  update: (id: string, data: Record<string, unknown>) =>
-    api.put(`/attendance/${id}`, data),
-  approve: (id: string, status: string, notes?: string) =>
-    api.patch(`/attendance/${id}/approve`, { status, notes }),
+    api.get('/ess/attendance', { params }),
+  clockIn: (location: { latitude: number; longitude: number }) =>
+    api.post('/ess/attendance/clock-in', location),
+  clockOut: (location: { latitude: number; longitude: number }) =>
+    api.post('/ess/attendance/clock-out', location),
 };
 
 export const leaveRequestsApi = {
   list: (params?: Record<string, string>) =>
-    api.get('/leave-requests', { params }),
-  get: (id: string) =>
-    api.get(`/leave-requests/${id}`),
-  create: (data: Record<string, unknown>) =>
-    api.post('/leave-requests', data),
-  update: (id: string, data: Record<string, unknown>) =>
-    api.put(`/leave-requests/${id}`, data),
-  approve: (id: string, status: string, approverId?: string, rejectReason?: string) =>
-    api.patch(`/leave-requests/${id}/approve`, { status, approverId, rejectReason }),
-  cancel: (id: string, reason?: string) =>
-    api.patch(`/leave-requests/${id}/cancel`, { reason }),
+    api.get('/ess/leave-requests', { params }),
+  create: (data: { leaveType: string; startDate: string; endDate: string; reason?: string }) =>
+    api.post('/ess/leave-requests', data),
   balances: (params?: Record<string, string>) =>
-    api.get('/leave-requests/balances', { params }),
-};
-
-export const approvalApi = {
-  listPending: () =>
-    api.get('/approvals/pending'),
-  approve: (id: string, data: Record<string, unknown>) =>
-    api.post(`/approvals/${id}/approve`, data),
-  reject: (id: string, reason?: string) =>
-    api.post(`/approvals/${id}/reject`, { reason }),
+    api.get('/ess/leave-balances', { params }),
 };
 
 export const payrollApi = {
   list: (params?: Record<string, string>) =>
-    api.get('/payroll', { params }),
-  get: (id: string) =>
-    api.get(`/payroll/${id}`),
+    api.get('/ess/payroll', { params }),
 };
 
 export const announcementApi = {
@@ -92,6 +67,40 @@ export const announcementApi = {
 export const employeesApi = {
   get: (id: string) =>
     api.get(`/employees/${id}`),
+};
+
+export const operationsApi = {
+  warehouses: () => api.get('/warehouses'),
+  workOrders: () => api.get('/work-orders', { params: { pageSize: 500 } }),
+  stocktakeBalance: (skuCode: string, warehouseCode: string, lotNumber: string) =>
+    api.get('/inventory/stocktake/balance', { params: { skuCode, warehouseCode, lotNumber } }),
+  postStocktake: (data: {
+    skuCode: string;
+    warehouseCode: string;
+    lotNumber: string;
+    expiryDate: string;
+    countedQty: number;
+    expectedSystemQty: number;
+    notes: string;
+  }) => api.post('/inventory/stocktake', data),
+  createFqcInspection: (data: {
+    workOrderId: string;
+    lotNumber: string;
+    expiryDate: string;
+    sampledQty: number;
+    defectiveQty: number;
+    criticalDefectFound: boolean;
+    defectCode?: string;
+    inspectorName: string;
+  }) => api.post('/quality/fqc-inspections', data),
+};
+
+export const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || fallback;
+  }
+
+  return error instanceof Error ? error.message : fallback;
 };
 
 export default api;
