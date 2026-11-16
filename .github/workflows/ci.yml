@@ -179,20 +179,45 @@ jobs:
   # 3. Security Scan (Trivy)
   # --------------------------------------------------------
   security-scan:
-    needs: build-and-test
+    needs: [build-and-test, build-and-push]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Set deployed image references
+        id: image-refs
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+        run: |
+          repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "backend=${REGISTRY}/${repository}-backend:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend=${REGISTRY}/${repository}-frontend:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Run Trivy vulnerability scanner
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan backend deployment image
         uses: aquasecurity/trivy-action@v0.18.0
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
+          scan-type: 'image'
+          image-ref: ${{ steps.image-refs.outputs.backend }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Scan frontend deployment image
+        uses: aquasecurity/trivy-action@v0.18.0
+        with:
+          scan-type: 'image'
+          image-ref: ${{ steps.image-refs.outputs.frontend }}
           format: 'table'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'

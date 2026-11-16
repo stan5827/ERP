@@ -1,6 +1,6 @@
 # UAT and production deployment
 
-The CI workflow publishes backend and frontend images tagged `sha-<full-commit-sha>`. A push to `main` or `master` deploys that immutable tag to UAT first. Production runs only after UAT is healthy and the `production` GitHub Environment grants approval.
+The CI workflow publishes backend and frontend images tagged `sha-<full-commit-sha>` and scans both images for high and critical vulnerabilities before UAT deployment. A push to `main` or `master` deploys that immutable tag to UAT first. Production runs only after UAT is healthy and the `production` GitHub Environment grants approval.
 
 ## GitHub setup
 
