@@ -1,0 +1,446 @@
+.work-order-transfer-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.work-order-transfer-banner,
+.work-order-transfer-card {
+  border: 1px solid rgba(148, 174, 207, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(20, 34, 52, 0.98), rgba(13, 23, 37, 0.98));
+  box-shadow: 0 12px 30px rgba(2, 8, 18, 0.18);
+}
+
+.work-order-transfer-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 21px 23px;
+}
+
+.work-order-transfer-banner__icon {
+  display: grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  border-radius: 14px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #b9a1ff;
+}
+
+.work-order-transfer-banner__copy {
+  min-width: 0;
+}
+
+.work-order-transfer-banner__copy p {
+  margin: 0 0 4px;
+  color: #9c87e8;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.work-order-transfer-banner__copy h1 {
+  margin: 0;
+  color: #eef4fc;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.work-order-transfer-banner__copy span {
+  display: block;
+  margin-top: 5px;
+  color: #9fb0c5;
+  font-size: 12px;
+}
+
+.work-order-transfer-scope {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(101, 167, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(101, 167, 255, 0.08);
+  color: #a9cdf8;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.work-order-transfer-card {
+  overflow: hidden;
+}
+
+.work-order-transfer-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 20px;
+  border-bottom: 1px solid rgba(148, 174, 207, 0.14);
+}
+
+.work-order-transfer-card__header h2 {
+  margin: 0;
+  color: #e8eef7;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.work-order-transfer-card__header p {
+  margin: 4px 0 0;
+  color: #8599b1;
+  font-size: 11px;
+}
+
+.work-order-transfer-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(280px, 45%);
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(148, 174, 207, 0.18);
+  border-radius: 9px;
+  background: rgba(6, 14, 25, 0.7);
+  color: #8398b1;
+}
+
+.work-order-transfer-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #e8eef7;
+  font: inherit;
+  font-size: 12px;
+}
+
+.work-order-transfer-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 140px;
+  padding: 24px;
+  color: #9fb0c5;
+  font-size: 13px;
+  text-align: center;
+}
+
+.work-order-transfer-state--error {
+  flex-direction: column;
+  color: #ffaaaa;
+}
+
+.work-order-transfer-retry,
+.work-order-transfer-action,
+.work-order-transfer-view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #d3c5ff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.work-order-transfer-retry:hover,
+.work-order-transfer-action:hover:not(:disabled),
+.work-order-transfer-view:hover {
+  border-color: rgba(139, 92, 246, 0.55);
+  background: rgba(139, 92, 246, 0.2);
+}
+
+.work-order-transfer-action:disabled,
+.work-order-transfer-view:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.work-order-transfer-view {
+  border-color: rgba(101, 167, 255, 0.24);
+  background: rgba(101, 167, 255, 0.08);
+  color: #b7d7ff;
+}
+
+.work-order-transfer-table-wrap {
+  overflow-x: auto;
+}
+
+.work-order-transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #cbd7e6;
+  font-size: 12px;
+}
+
+.work-order-transfer-table th,
+.work-order-transfer-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(148, 174, 207, 0.1);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.work-order-transfer-table th {
+  background: rgba(7, 15, 26, 0.55);
+  color: #8499b2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.work-order-transfer-table tbody tr:hover {
+  background: rgba(101, 167, 255, 0.035);
+}
+
+.work-order-transfer-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.work-order-transfer-order-number {
+  color: #d9c7ff;
+  font-family: var(--font-mono);
+  font-weight: 650;
+}
+
+.work-order-transfer-message,
+.work-order-transfer-error {
+  margin: 14px 18px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.work-order-transfer-message {
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.08);
+  color: #8fe4bd;
+}
+
+.work-order-transfer-error {
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  background: rgba(248, 113, 113, 0.08);
+  color: #ffaaaa;
+}
+
+.work-order-transfer-no-permission {
+  color: #8295ac;
+  font-size: 11px;
+}
+
+.work-order-transfer-details-row:hover {
+  background: transparent !important;
+}
+
+.work-order-transfer-details-cell {
+  padding: 0 !important;
+  background: rgba(5, 12, 22, 0.48);
+  white-space: normal !important;
+}
+
+.work-order-transfer-details {
+  padding: 18px 20px 16px;
+}
+
+.work-order-transfer-details__header,
+.work-order-transfer-details__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.work-order-transfer-details__header h3 {
+  margin: 0;
+  color: #e8eef7;
+  font-size: 13px;
+}
+
+.work-order-transfer-details__header p {
+  margin: 5px 0 0;
+  color: #93a6bd;
+  font-size: 11px;
+}
+
+.work-order-transfer-details__count {
+  color: #b8a5ff;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.work-order-transfer-order-remarks,
+.work-order-transfer-empty-details {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 174, 207, 0.14);
+  border-radius: 8px;
+  color: #c3d0df;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.work-order-transfer-empty-details {
+  border-color: rgba(248, 113, 113, 0.24);
+  color: #ffaaaa;
+}
+
+.work-order-transfer-items-wrap {
+  margin-top: 14px;
+  overflow-x: auto;
+  border: 1px solid rgba(148, 174, 207, 0.12);
+  border-radius: 9px;
+}
+
+.work-order-transfer-items {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  color: #cbd7e6;
+  font-size: 11px;
+}
+
+.work-order-transfer-items th,
+.work-order-transfer-items td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 174, 207, 0.1);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.work-order-transfer-items th {
+  background: rgba(7, 15, 26, 0.68);
+  color: #8499b2;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.work-order-transfer-items tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.work-order-transfer-item-name,
+.work-order-transfer-item-note {
+  display: block;
+  margin-top: 4px;
+  color: #92a6bd;
+  font-size: 10px;
+  white-space: normal;
+}
+
+.work-order-transfer-item-name {
+  color: #d3deeb;
+  font-size: 11px;
+}
+
+.work-order-transfer-item-quantity {
+  color: #e8eef7;
+  font-weight: 650;
+  white-space: nowrap !important;
+}
+
+.work-order-transfer-line-status {
+  display: inline-flex;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.work-order-transfer-line-status.is-transferable {
+  border-color: rgba(16, 185, 129, 0.22);
+  background: rgba(16, 185, 129, 0.1);
+  color: #8fe4bd;
+}
+
+.work-order-transfer-line-status.is-transferred {
+  border-color: rgba(101, 167, 255, 0.22);
+  background: rgba(101, 167, 255, 0.1);
+  color: #b7d7ff;
+}
+
+.work-order-transfer-line-status.is-outsourced,
+.work-order-transfer-line-status.is-excluded {
+  border-color: rgba(148, 174, 207, 0.16);
+  background: rgba(148, 174, 207, 0.06);
+  color: #a0b0c2;
+}
+
+.work-order-transfer-details__footer {
+  margin-top: 14px;
+  color: #91a5bd;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.work-order-transfer-spinner {
+  animation: work-order-transfer-spin 1s linear infinite;
+}
+
+@keyframes work-order-transfer-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .work-order-transfer-banner {
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .work-order-transfer-banner__icon {
+    flex-basis: 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .work-order-transfer-banner__copy h1 {
+    font-size: 17px;
+  }
+
+  .work-order-transfer-scope {
+    display: none;
+  }
+
+  .work-order-transfer-card__header {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 15px;
+  }
+
+  .work-order-transfer-search {
+    width: auto;
+  }
+
+  .work-order-transfer-details {
+    padding: 15px 12px;
+  }
+
+  .work-order-transfer-details__header,
+  .work-order-transfer-details__footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .work-order-transfer-table th,
+  .work-order-transfer-table td {
+    padding: 11px 12px;
+  }
+}

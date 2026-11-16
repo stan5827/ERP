@@ -140,7 +140,7 @@ export const CustomersManagement: React.FC = () => {
               </tr>
             ) : filteredCustomers.map(customer => (
               <tr key={customer.id}>
-                <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{customer.customerCode}</td>
+                <td className="mono" style={{ color: 'var(--theme-text)' }}>{customer.customerCode}</td>
                 <td style={{ color: 'var(--slate-100)', fontWeight: 600 }}>{customer.customerName}</td>
                 <td>{customer.taxId || '—'}</td>
                 <td>{customer.contactPerson || '—'}</td>

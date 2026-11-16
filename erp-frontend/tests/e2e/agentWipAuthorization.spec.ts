@@ -17,7 +17,7 @@ test('mocked backend 403 is shown without exposing WIP facts to a denied user', 
   await page.getByRole('textbox', { name: '工單編號' }).fill('WO-E2E-DENIED');
   await page.getByRole('button', { name: '查詢' }).click();
 
-  await expect(panel.getByRole('alert')).toHaveText('您沒有權限執行此操作');
+  await expect(panel.getByRole('alert')).toHaveText('您目前不在 WIP 助理試用名單中');
   await expect(panel.getByText('60.00 BRANCH')).toHaveCount(0);
   expect(authorization).toBe(`Bearer ${token}`);
 });

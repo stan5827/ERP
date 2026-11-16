@@ -240,7 +240,25 @@ public sealed class GoodsReceiptReversalService : IGoodsReceiptReversalService
             }
 
             foreach (var group in originalTransactions.GroupBy(item => item.SkuId))
-                skus[group.Key].Qty -= group.Sum(item => item.QtyChange);
+            {
+                var sku = skus[group.Key];
+                sku.Qty -= group.Sum(item => item.QtyChange);
+                var latestPurchaseCost = await _db.InventoryTransactions
+                    .Where(item =>
+                        item.SkuId == group.Key &&
+                        item.Type == "purchase_receipt" &&
+                        item.QtyChange > 0 &&
+                        item.UnitCost.HasValue &&
+                        !originalTransactionIds.Contains(item.Id) &&
+                        !_db.InventoryTransactions.Any(reversal =>
+                            reversal.ReversalOfTransactionId == item.Id))
+                    .OrderByDescending(item => item.CreatedAt)
+                    .ThenByDescending(item => item.Id)
+                    .Select(item => item.UnitCost)
+                    .FirstOrDefaultAsync(cancellationToken);
+                sku.LatestPurchaseCost = latestPurchaseCost ?? 0m;
+                sku.UpdatedAt = DateTime.UtcNow;
+            }
             foreach (var group in originalTransactions
                          .Where(item => !string.IsNullOrWhiteSpace(item.LotNumber))
                          .GroupBy(item => (item.SkuId, LotNumber: item.LotNumber!, item.WarehouseId, item.BinLocationId)))

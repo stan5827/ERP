@@ -8,6 +8,7 @@ import { useSkus, useWarehouses, useUoms, useBinLocations } from '../hooks/useAp
 
 import { FormModal } from '../components/FormModal';
 import { InventoryStocktakePanel } from './InventoryStocktakePanel';
+import { useRole } from '../contexts/useRole';
 
 import type { FormField } from '../components/FormModal';
 
@@ -129,15 +130,24 @@ const getGoodsReceiptStatusLabel = (value?: string | null) =>
 const getGoodsReceiptIqcStatusLabel = (value?: string | null) =>
   goodsReceiptIqcStatusLabels[value?.toLowerCase() ?? ''] ?? '未知狀態';
 
+const skuItemTypeColors: Record<string, string> = {
+  finished: 'var(--emerald-300)',
+  semi_finished: '#a78bfa',
+  material: 'var(--amber-300)',
+};
+
+const getSkuItemTypeColor = (itemType?: string) =>
+  skuItemTypeColors[itemType?.toLowerCase() ?? ''] ?? 'var(--theme-text)';
+
 const requiredSkuNumberFields = [
   'leadTimeDays',
   'purchasePrice',
   'standardCost',
+  'latestPurchaseCost',
   'qty',
   'safetyStock',
   'reorderPoint',
   'maxStock',
-  'latestPurchaseCost',
 ];
 
 const optionalSkuNumberFields = [
@@ -317,8 +327,8 @@ const salesFields: FormField[] = [
 
 const costFields = (uomOptions: { value: string; label: string }[]): FormField[] => [
   { name: 'purchasePrice', label: '採購單價', type: 'number', placeholder: '0', min: 0, step: 0.01, description: '預設採購成本' },
-  { name: 'standardCost', label: '標準成本', type: 'number', placeholder: '0', min: 0, step: 0.01, description: '財務核算標準成本' },
-  { name: 'latestPurchaseCost', label: '最近購買單價', type: 'number', placeholder: '0', min: 0, step: 0.01, description: '最後一筆進貨實績單價' },
+  { name: 'standardCost', label: '標準成本', type: 'number', placeholder: '0', min: 0, step: 0.01, readOnly: true, description: '由核准的 BOM 成本捲算更新，不可手動修改' },
+  { name: 'latestPurchaseCost', label: '最近購買單價', type: 'number', placeholder: '0', min: 0, step: 0.01, readOnly: true, description: '由採購收貨過帳自動更新，不可手動修改' },
   { name: 'costMethod', label: '成本計價方式', type: 'select', options: [
     { value: 'standard', label: '標準成本' },
     { value: 'ma', label: '移動平均' },
@@ -1709,6 +1719,15 @@ function BinLocationsPanel() {
 
 export const Inventory: React.FC = () => {
   const queryClient = useQueryClient();
+  const { currentRole, permissions, hasPermission } = useRole();
+  const canCreateSku = currentRole === 'admin' || hasPermission('inventory:skus', 'create');
+  const canViewStock = currentRole === 'admin' || hasPermission('inventory:stock', 'view');
+  const canViewStocktake = currentRole === 'admin' || hasPermission('inventory:stocktake', 'view');
+  const canViewReceipts = currentRole === 'admin' || [
+    'procurement',
+    'procurement:view',
+    'procurement:page',
+  ].some(permission => permissions.includes(permission));
   const [searchSku, setSearchSku] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -1776,7 +1795,8 @@ export const Inventory: React.FC = () => {
   const receiptsQuery = useQuery({ 
     queryKey: ['goods-receipts'], 
     queryFn: () => goodsReceiptsApi.list().then(res => res.data),
-    retry: false
+    retry: false,
+    enabled: canViewReceipts,
   });
 
   React.useEffect(() => {
@@ -1837,10 +1857,10 @@ export const Inventory: React.FC = () => {
 
   const tabs = [
     { id: 'skus', label: '品碼清單', desc: 'SKU' },
-    { id: 'transactions', label: '異動明細', desc: 'Trans' },
+    ...(canViewStock ? [{ id: 'transactions' as const, label: '異動明細', desc: 'Trans' }] : []),
     { id: 'shipping', label: '出貨作業', desc: 'Shipping' },
-    { id: 'count', label: '盤點作業', desc: 'Count' },
-    { id: 'receipts', label: '收貨紀錄', desc: 'Receipts' },
+    ...(canViewStocktake ? [{ id: 'count' as const, label: '盤點作業', desc: 'Count' }] : []),
+    ...(canViewReceipts ? [{ id: 'receipts' as const, label: '收貨紀錄', desc: 'Receipts' }] : []),
     { id: 'transfers', label: '調撥管理', desc: 'Transfer' },
     { id: 'completions', label: '完工入庫', desc: 'Completion' },
     { id: 'bins', label: '儲位管理', desc: 'Bin' },
@@ -1856,7 +1876,7 @@ export const Inventory: React.FC = () => {
         </div>
         <div className="module-page-actions">
           <button className="btn btn-ghost btn-sm"><Download size={13} />匯出報告</button>
-          {activeTab === 'skus' && (
+          {activeTab === 'skus' && canCreateSku && (
             <button className="btn btn-primary btn-sm" onClick={() => { setModalWarehouseId(null); setShowAdd(true); }}><Plus size={13} />新增品碼</button>
           )}
         </div>
@@ -1875,33 +1895,33 @@ export const Inventory: React.FC = () => {
         ))}
       </div>
 
-      <div className="module-filter-bar glass-card no-lift" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--lux-gold)' }}>SITE</span>
-            <select className="form-input" style={{ width: 120 }}>
-              <option value="HQ">總部工廠</option>
-              <option value="WH2">二號倉庫</option>
-            </select>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--lux-gold)' }}>WH</span>
-            <select className="form-input" style={{ width: 180 }} value={selectedWarehouseCode || ''} onChange={e => setSelectedWarehouseCode(e.target.value || null)}>
-              <option value="">所有倉庫</option>
-              {warehouses.map(wh => <option key={wh.value} value={wh.code}>{wh.code} - {wh.label}</option>)}
-            </select>
-          </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-             <button className="btn btn-ghost btn-sm" onClick={() => queryClient.invalidateQueries()}><RefreshCw size={13} /> 重新整理庫存</button>
-          </div>
+      <div className="module-filter-bar glass-card no-lift inventory-location-toolbar">
+        <label className="inventory-location-field">
+          <span className="inventory-location-label">廠區 <span>SITE</span></span>
+          <select className="form-input" aria-label="選擇廠區">
+            <option value="HQ">總部工廠</option>
+            <option value="WH2">二號倉庫</option>
+          </select>
+        </label>
+        <label className="inventory-location-field inventory-warehouse-field">
+          <span className="inventory-location-label">倉庫 <span>WAREHOUSE</span></span>
+          <select className="form-input" value={selectedWarehouseCode || ''} onChange={e => setSelectedWarehouseCode(e.target.value || null)}>
+            <option value="">所有倉庫</option>
+            {warehouses.map(wh => <option key={wh.value} value={wh.code}>{wh.code} - {wh.label}</option>)}
+          </select>
+        </label>
+        <div className="inventory-location-actions">
+          <button className="btn btn-ghost btn-sm" onClick={() => queryClient.invalidateQueries()}>
+            <RefreshCw size={14} /> 重新整理庫存
+          </button>
         </div>
       </div>
 
       <div style={{ marginTop: 0 }}>
         {activeTab === 'skus' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="module-filter-bar glass-card no-lift">
-              <div className="filter-search">
+            <div className="module-filter-bar glass-card no-lift inventory-sku-filter-bar">
+              <div className="filter-search inventory-sku-search">
                 <Search size={14} style={{ color: 'var(--slate-500)' }} />
                 <input 
                   className="search-input" 
@@ -1910,16 +1930,16 @@ export const Inventory: React.FC = () => {
                   onChange={e => { setSearchSku(e.target.value); setCurrentPage(1); }} 
                 />
               </div>
-              <select className="form-input" style={{ width: 150 }} value={filterItemType} onChange={e => { setFilterItemType(e.target.value); setCurrentPage(1); }}>
+              <select className="form-input inventory-sku-type-filter" aria-label="依品項類別篩選" value={filterItemType} onChange={e => { setFilterItemType(e.target.value); setCurrentPage(1); }}>
                 <option value="">所有品項類別</option>
                 <option value="finished">成品</option>
                 <option value="semi_finished">半成品</option>
                 <option value="material">原料</option>
               </select>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+              <label className="inventory-inactive-toggle">
                 <input type="checkbox" id="show-inactive-sku" checked={showInactive} onChange={e => { setShowInactive(e.target.checked); setCurrentPage(1); }} />
-                <label htmlFor="show-inactive-sku" style={{ fontSize: 13, color: 'var(--slate-400)' }}>顯示停用品項</label>
-              </div>
+                <span>顯示停用品項</span>
+              </label>
             </div>
             <div className="glass-card no-lift" style={{ overflow: 'hidden' }}>
               <table className="data-table">
@@ -1937,8 +1957,8 @@ export const Inventory: React.FC = () => {
                 <tbody>
                   {skus.map(sku => (
                     <tr key={sku.id}>
-                      <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{sku.skuNumber}</td>
-                      <td style={{ fontWeight: 500 }}>{sku.skuName}</td>
+                      <td className="mono" style={{ color: getSkuItemTypeColor(sku.itemType) }}>{sku.skuNumber}</td>
+                      <td style={{ color: getSkuItemTypeColor(sku.itemType), fontWeight: 600 }}>{sku.skuName}</td>
                       <td>{sku.specification || '-'}</td>
                       <td>
                         <SkuInventoryDetail
@@ -1978,7 +1998,7 @@ export const Inventory: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'receipts' && (
+        {canViewReceipts && activeTab === 'receipts' && (
           <div className="glass-card no-lift" style={{ overflow: 'hidden' }}>
             <table className="data-table">
               <thead>
@@ -1993,7 +2013,7 @@ export const Inventory: React.FC = () => {
               <tbody>
                 {receipts.map(r => (
                   <tr key={r.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{r.grNumber}</td>
+                    <td className="mono" style={{ color: 'var(--theme-text)' }}>{r.grNumber}</td>
                     <td>{new Date(r.createdAt).toLocaleDateString()}</td>
                     <td className="mono">{r.purchaseOrderId || '-'}</td>
                     <td>
@@ -2013,9 +2033,9 @@ export const Inventory: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'transactions' && <TransactionsPanel />}
+        {activeTab === 'transactions' && canViewStock && <TransactionsPanel />}
         {activeTab === 'shipping' && <ShippingPanel />}
-        {activeTab === 'count' && <CountPanel />}
+        {activeTab === 'count' && canViewStocktake && <CountPanel />}
         {activeTab === 'transfers' && <TransferPanel />}
         {activeTab === 'completions' && <CompletionPanel />}
         {activeTab === 'bins' && <BinLocationsPanel />}
@@ -2084,9 +2104,38 @@ export const Inventory: React.FC = () => {
         .inv-tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--slate-800); margin-top: 12px; padding-bottom: 2px; overflow-x: auto; }
         .inv-tab-btn { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 20px; background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--slate-500); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .inv-tab-btn:hover { color: var(--slate-200); background: rgba(255,255,255,0.03); }
-        .inv-tab-btn.active { color: var(--cobalt-400); border-bottom-color: var(--cobalt-400); background: rgba(59,130,246,0.05); }
+        .inv-tab-btn.active { color: var(--theme-text); border-bottom-color: var(--cobalt-400); background: rgba(59,130,246,0.05); }
         .inv-tab-label { font-size: 14px; font-weight: 700; }
         .inv-tab-desc { font-size: 10px; opacity: 0.6; font-family: var(--font-mono); text-transform: uppercase; margin-top: 2px; }
+        .inventory-location-toolbar { display: grid; grid-template-columns: minmax(190px, 240px) minmax(240px, 320px) minmax(180px, 1fr); align-items: end; gap: 16px; padding: 14px 16px; margin-bottom: 16px; }
+        .inventory-location-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+        .inventory-location-label { display: flex; align-items: center; gap: 8px; color: var(--slate-300); font-size: 12px; font-weight: 650; }
+        .inventory-location-label span { color: var(--slate-500); font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; }
+        .inventory-location-field .form-input { height: 40px; padding-top: 8px; padding-bottom: 8px; }
+        .inventory-location-actions { display: flex; justify-content: flex-end; }
+        .inventory-location-actions .btn { min-height: 40px; padding-inline: 14px; }
+        .inventory-sku-filter-bar { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(180px, 230px) auto; align-items: center; gap: 12px; padding: 12px 14px; }
+        .inventory-sku-search { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; min-height: 40px; padding: 0 12px; border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: rgba(7, 14, 28, 0.38); }
+        .inventory-sku-search:focus-within { border-color: var(--cobalt-400); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+        .inventory-sku-search .search-input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--slate-100); font-size: 13px; }
+        .inventory-sku-search .search-input::placeholder { color: var(--slate-500); }
+        .inventory-sku-type-filter { height: 40px; }
+        .inventory-inactive-toggle { display: inline-flex; align-items: center; gap: 9px; min-height: 40px; padding: 0 12px; border: 1px solid var(--glass-border); border-radius: var(--radius-md); color: var(--slate-300); font-size: 12px; white-space: nowrap; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+        .inventory-inactive-toggle:hover { border-color: var(--glass-border-hover); background: rgba(255, 255, 255, 0.03); }
+        .inventory-inactive-toggle input { width: 15px; height: 15px; margin: 0; accent-color: var(--cobalt-400); }
+        @media (max-width: 900px) {
+          .inventory-location-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+          .inventory-location-actions { grid-column: 1 / -1; }
+          .inventory-sku-filter-bar { grid-template-columns: minmax(0, 1fr) auto; }
+          .inventory-sku-search { grid-column: 1 / -1; }
+        }
+        @media (max-width: 560px) {
+          .inventory-location-toolbar, .inventory-sku-filter-bar { grid-template-columns: minmax(0, 1fr); }
+          .inventory-location-actions, .inventory-sku-search { grid-column: auto; }
+          .inventory-location-actions .btn { width: 100%; justify-content: center; }
+          .inventory-sku-type-filter { width: 100%; }
+          .inventory-inactive-toggle { justify-content: flex-start; }
+        }
       `}</style>
     </div>
   );

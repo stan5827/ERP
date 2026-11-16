@@ -136,6 +136,7 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
             entry.DebitAmount = requestedEntry.DebitAmount;
             entry.CreditAmount = requestedEntry.CreditAmount;
             entry.CostCenterId = requestedEntry.CostCenterId;
+            entry.WorkOrderId = requestedEntry.WorkOrderId;
             entry.Memo = requestedEntry.Memo?.Trim();
 
             if (index >= existingEntries.Count)
@@ -350,6 +351,19 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
                 return "invalid_cost_center";
         }
 
+        var workOrderIds = request.Entries
+            .Where(entry => entry.WorkOrderId.HasValue)
+            .Select(entry => entry.WorkOrderId!.Value)
+            .Distinct()
+            .ToList();
+        if (workOrderIds.Count > 0)
+        {
+            var workOrderCount = await _db.WorkOrders
+                .CountAsync(order => workOrderIds.Contains(order.Id), cancellationToken);
+            if (workOrderCount != workOrderIds.Count)
+                return "invalid_work_order";
+        }
+
         var voucherDate = request.VoucherDate;
         if (await _db.AccountingPeriods.AnyAsync(period =>
                 period.IsClosed &&
@@ -370,6 +384,7 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
             DebitAmount = entry.DebitAmount,
             CreditAmount = entry.CreditAmount,
             CostCenterId = entry.CostCenterId,
+            WorkOrderId = entry.WorkOrderId,
             Memo = entry.Memo?.Trim()
         }).ToList();
 
@@ -455,6 +470,7 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
                 AccountCode = entry.GLAccount.AccountCode,
                 AccountName = entry.GLAccount.AccountName,
                 CostCenterId = entry.CostCenterId,
+                WorkOrderId = entry.WorkOrderId,
                 DebitAmount = entry.DebitAmount,
                 CreditAmount = entry.CreditAmount,
                 Memo = entry.Memo

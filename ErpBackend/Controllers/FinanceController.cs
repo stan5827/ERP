@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ErpBackend.DTOs;
+using ErpBackend.Filters;
 using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
@@ -34,6 +35,31 @@ public class FinanceController : BaseController
     {
         var accounts = await _financeService.GetChartOfAccountsAsync();
         return Ok(accounts);
+    }
+
+    [HttpPost("coa")]
+    [Authorize]
+    [PermissionAuthorize("finance:accounting", "create")]
+    public async Task<ActionResult<ApiResponse<GLAccountDto>>> CreateGLAccount(
+        [FromBody] CreateGLAccountRequestDto request)
+    {
+        var (success, status, account) = await _financeService.CreateGLAccountAsync(request);
+        if (!success)
+        {
+            var message = status switch
+            {
+                "invalid_account_code" => "科目代碼不可空白且最多 20 個字元",
+                "invalid_account_name" => "科目名稱不可空白且最多 100 個字元",
+                "invalid_account_type" => "科目類型不正確",
+                "cash_account_must_be_asset" => "現金／銀行科目必須為資產類",
+                "duplicate_account_code" => "科目代碼已存在",
+                "invalid_parent_account" => "上層科目不存在、已停用或類型不符",
+                _ => "會計科目新增失敗"
+            };
+            return BadRequest(ApiHelper.Fail(message));
+        }
+
+        return Ok(account!);
     }
 
     [HttpGet("accounting-mappings")]
@@ -109,8 +135,11 @@ public class FinanceController : BaseController
                 "already_closed" => "會計期間已關帳",
                 "unposted_vouchers" => "期間內仍有草稿或待覆核傳票，請先完成處理",
                 "unbalanced_vouchers" => "期間內有未平衡的已過帳傳票，無法關帳",
+                "allocation_voucher_pending" => "本期已有未完成的製造費用分攤傳票，請先處理後再關帳",
                 _ => "會計期間關帳失敗"
             };
+            if (status.StartsWith("allocation_blocked:", StringComparison.Ordinal))
+                message = status["allocation_blocked:".Length..];
             return BadRequest(ApiHelper.Fail(message));
         }
 
@@ -359,6 +388,8 @@ public class FinanceController : BaseController
     /// <summary>
     /// 初始化會計科目 (Seed)
     /// </summary>
+    [Authorize]
+    [PermissionAuthorize("finance:accounting", "create")]
     [HttpPost("seed")]
     public async Task<ActionResult<ApiResponse>> SeedAccounts()
     {
@@ -391,6 +422,7 @@ public class FinanceController : BaseController
     }
 
     [HttpGet("bank-accounts")]
+    [PermissionAuthorize("finance", "view")]
     public async Task<ActionResult<ApiResponse<List<BankAccountDto>>>> GetBankAccounts()
     {
         var accounts = await _financeService.GetBankAccountsAsync();
@@ -398,6 +430,7 @@ public class FinanceController : BaseController
     }
 
     [HttpPost("bank-accounts")]
+    [PermissionAuthorize("finance", "create")]
     public async Task<ActionResult<ApiResponse>> CreateBankAccount([FromBody] CreateBankAccountRequest request)
     {
         if (!await _financeService.CreateBankAccountAsync(request))
@@ -405,7 +438,40 @@ public class FinanceController : BaseController
         return Ok("銀行帳戶已建立");
     }
 
+    [HttpPut("bank-accounts/{id:guid}")]
+    [PermissionAuthorize("finance", "edit")]
+    public async Task<ActionResult<ApiResponse>> UpdateBankAccount(
+        Guid id,
+        [FromBody] UpdateBankAccountRequestDto request)
+    {
+        var (success, status) = await _financeService.UpdateBankAccountAsync(id, request);
+        if (!success)
+        {
+            return status switch
+            {
+                "not_found" => NotFound(ApiHelper.Fail("銀行帳戶不存在")),
+                "invalid_gl_account" => BadRequest(ApiHelper.Fail("收款帳戶只能對應有效的現金／銀行總帳科目")),
+                _ => BadRequest(ApiHelper.Fail("銀行帳戶更新失敗"))
+            };
+        }
+
+        return Ok("銀行帳戶已更新");
+    }
+
+    [HttpPatch("bank-accounts/{id:guid}/status")]
+    [PermissionAuthorize("finance", "edit")]
+    public async Task<ActionResult<ApiResponse>> SetBankAccountStatus(
+        Guid id,
+        [FromBody] SetBankAccountStatusRequestDto request)
+    {
+        if (!await _financeService.SetBankAccountStatusAsync(id, request.IsActive))
+            return NotFound(ApiHelper.Fail("銀行帳戶不存在"));
+
+        return Ok(request.IsActive ? "銀行帳戶已啟用" : "銀行帳戶已停用");
+    }
+
     [HttpPatch("bank-accounts/{id:guid}/gl-account")]
+    [PermissionAuthorize("finance", "edit")]
     public async Task<ActionResult<ApiResponse>> SetBankAccountGlMapping(
         Guid id,
         [FromBody] UpdateBankAccountGlMappingDto request)
@@ -479,6 +545,7 @@ public class FinanceController : BaseController
             "invalid_account" => "分錄科目不存在或已停用",
             "invalid_cash_account" => "現金收入／支出傳票必須包含有效的現金或銀行科目",
             "invalid_cost_center" => "成本中心已停用",
+            "invalid_work_order" => "分錄所屬工單不存在",
             "period_closed" => "傳票日期所屬會計期間已關帳，禁止新增或過帳",
             "unbalanced" => "傳票借貸不平衡，無法過帳",
             "not_found" => "找不到會計傳票",

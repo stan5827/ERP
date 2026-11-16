@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Package, Settings, Loader2, X, Factory, Clock, Route, ArrowRight, ChevronUp, ChevronDown, Layers, Zap, DollarSign, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
 import { workCentersApi, operationsApi, routingsApi, skusApi, rccpApi, bomsApi } from '../api/api';
+import { useRole } from '../contexts/useRole';
 import type { SkuDto } from '../api/api';
 import './ManufacturingEngineering.css';
 
@@ -58,11 +59,13 @@ interface BomItem {
   childSkuId: string;
   childSkuNumber?: string;
   childSkuName?: string;
+  childSkuSearch?: string;
+  childSkuDropdownOpen?: boolean;
   quantity: number;
   unit?: string;
   unitName?: string;
   scrapRate: number;
-  operationSeq: number;
+  operationSeq: number | string;
   isPhantom: boolean;
   effectiveDate?: string;
 }
@@ -150,8 +153,23 @@ const TAB_CONFIG = {
   },
 };
 
+const getPermissionModule = (tab: TabType) =>
+  tab === 'boms' ? 'productengineering' : tab === 'rccp' ? 'rccp' : 'processengineering';
+
 export const ManufacturingEngineering: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('boms');
+  const { hasPermission, moduleAccess } = useRole();
+  const canApproveStandardCost = hasPermission('engineering', 'approve');
+  const canViewTab = (tab: TabType) => tab === 'rccp'
+    ? hasPermission('rccp', 'view')
+    : hasPermission('engineering', 'view') || hasPermission(getPermissionModule(tab), 'view');
+  const visibleTabs = (Object.keys(TAB_CONFIG) as TabType[]).filter(canViewTab);
+  const [activeTab, setActiveTab] = useState<TabType>(() => visibleTabs[0] ?? 'boms');
+  const hasActiveTabPermission = (action: string) => activeTab === 'rccp'
+    ? hasPermission('rccp', action)
+    : hasPermission('engineering', action) || hasPermission(getPermissionModule(activeTab), action);
+  const canCreateActive = hasActiveTabPermission('create');
+  const canEditActive = hasActiveTabPermission('edit');
+  const canDeleteActive = hasActiveTabPermission('delete');
   const [boms, setBoms] = useState<Bom[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
@@ -167,7 +185,23 @@ export const ManufacturingEngineering: React.FC = () => {
   const [routingOps, setRoutingOps] = useState<RoutingOp[]>([]);
   const [bomItems, setBomItems] = useState<BomItem[]>([]);
   const [skus, setSkus] = useState<SkuDto[]>([]);
+  const [productSkuSearch, setProductSkuSearch] = useState('');
+  const [productSkuDropdownOpen, setProductSkuDropdownOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [approvingBomId, setApprovingBomId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hasModulePermission = (moduleId: string, action: string) =>
+      moduleAccess.find(module => module.moduleId === moduleId)?.permissions.includes(action) ?? false;
+    const hasAccess = (tab: TabType) => tab === 'rccp'
+      ? hasModulePermission('rccp', 'view')
+      : hasModulePermission('engineering', 'view')
+        || hasModulePermission(getPermissionModule(tab), 'view');
+    if (!hasAccess(activeTab)) {
+      const nextTab = (Object.keys(TAB_CONFIG) as TabType[]).find(hasAccess);
+      setActiveTab(nextTab ?? 'boms');
+    }
+  }, [activeTab, moduleAccess]);
 
   useEffect(() => {
     if (showModal && activeTab === 'routings') {
@@ -211,6 +245,8 @@ export const ManufacturingEngineering: React.FC = () => {
     setFormData({});
     setRoutingOps([]);
     setBomItems([]);
+    setProductSkuSearch('');
+    setProductSkuDropdownOpen(false);
     if (activeTab === 'boms') {
       setFormData({ version: '1.0', status: 'active', effectiveDate: new Date().toISOString().split('T')[0] });
       if (skus.length === 0) {
@@ -243,6 +279,8 @@ export const ManufacturingEngineering: React.FC = () => {
     setModalMode('edit');
     setEditingItem(item);
     setFormData({ ...item });
+    setProductSkuSearch('');
+    setProductSkuDropdownOpen(false);
     if (activeTab === 'boms') {
       let availableSkus = skus;
       try {
@@ -255,11 +293,25 @@ export const ManufacturingEngineering: React.FC = () => {
         alert(`載入產品與元件 SKU 失敗：${getErrorMessage(error)}`);
         return;
       }
-      setBomItems((item.items || []).map((bomItem: BomItem) => ({
-        ...bomItem,
-        unit: availableSkus.find(sku => sku.id === bomItem.childSkuId)?.productionUomCode || bomItem.unit || '',
-        unitName: availableSkus.find(sku => sku.id === bomItem.childSkuId)?.productionUomName || ''
-      })));
+      const bom = item as Bom;
+      const productSku = availableSkus.find(sku => sku.id === bom.productSkuId);
+      setProductSkuSearch(productSku
+        ? `${productSku.skuNumber} - ${productSku.skuName}`
+        : [bom.productSkuNumber, bom.productSkuName].filter(Boolean).join(' - '));
+      setBomItems([...(item.items || [])]
+        .sort((a, b) => Number(a.operationSeq) - Number(b.operationSeq))
+        .map((bomItem: BomItem) => {
+          const componentSku = availableSkus.find(sku => sku.id === bomItem.childSkuId);
+          return {
+            ...bomItem,
+            childSkuSearch: componentSku
+              ? `${componentSku.skuNumber} - ${componentSku.skuName}`
+              : [bomItem.childSkuNumber, bomItem.childSkuName].filter(Boolean).join(' - '),
+            childSkuDropdownOpen: false,
+            unit: componentSku?.productionUomCode || bomItem.unit || '',
+            unitName: componentSku?.productionUomName || ''
+          };
+        }));
     }
     if (activeTab === 'routings') {
       setRoutingOps([...(item.operations || [])].sort((a, b) => a.operationSeq - b.operationSeq));
@@ -294,16 +346,64 @@ export const ManufacturingEngineering: React.FC = () => {
     }
   };
 
+  const handleApproveStandardCost = async (bom: Bom) => {
+    setApprovingBomId(bom.id);
+    try {
+      const previewResponse = await bomsApi.costRollup(bom.id);
+      const preview = previewResponse.data?.data;
+      if (!preview) throw new Error('無法取得 BOM 成本試算結果');
+
+      const confirmed = window.confirm(
+        `核准並套用 BOM 標準成本？\n\n` +
+        `BOM：${bom.bomCode} v${bom.version}\n` +
+        `產品：${bom.productSkuNumber ?? bom.productSkuName ?? '—'}\n` +
+        `材料：${preview.materialCost.toLocaleString('zh-TW')}\n` +
+        `人工：${preview.laborCost.toLocaleString('zh-TW')}\n` +
+        `製費：${preview.overheadCost.toLocaleString('zh-TW')}\n` +
+        `標準成本：${preview.totalCost.toLocaleString('zh-TW')}\n\n` +
+        '核准後將更新此產品 SKU 的標準成本，並留下稽核紀錄。'
+      );
+      if (!confirmed) return;
+
+      const response = await bomsApi.approveCostRollup(bom.id, {
+        expectedTotalCost: preview.totalCost,
+      });
+      const result = response.data?.data;
+      if (!result) throw new Error('核准成功但未收到更新結果');
+
+      alert(
+        `已核准套用標準成本：${result.previousStandardCost.toLocaleString('zh-TW')} → ` +
+        `${result.appliedStandardCost.toLocaleString('zh-TW')}`
+      );
+    } catch (error: unknown) {
+      alert(`核准標準成本失敗：${getErrorMessage(error)}`);
+    } finally {
+      setApprovingBomId(null);
+      await loadData();
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
       if (activeTab === 'boms') {
+        if (!formData.productSkuId) {
+          alert('請選擇產品 (SKU)。');
+          return;
+        }
+        const invalidOperationSeq = bomItems.some(item =>
+          String(item.operationSeq).trim() === '' || !Number.isInteger(Number(item.operationSeq))
+        );
+        if (invalidOperationSeq) {
+          alert('每個 BOM 元件都必須輸入有效的整數工序順序。');
+          return;
+        }
         const items = bomItems.map(it => ({
           childSkuId: it.childSkuId,
           quantity: it.quantity,
           unit: skus.find(sku => sku.id === it.childSkuId)?.productionUomCode || it.unit || '',
           scrapRate: it.scrapRate,
-          operationSeq: it.operationSeq,
+          operationSeq: Number(it.operationSeq),
           isPhantom: it.isPhantom
         }));
         const itemWithoutUnit = items.find(item => !item.childSkuId || !item.unit || item.quantity <= 0);
@@ -371,6 +471,11 @@ export const ManufacturingEngineering: React.FC = () => {
     r.resourceCode.toLowerCase().includes(search.toLowerCase()) ||
     r.resourceName.toLowerCase().includes(search.toLowerCase())
   );
+  const productSkuSearchTerm = productSkuSearch.trim().toLowerCase();
+  const matchingProductSkus = skus.filter(sku =>
+    `${sku.skuNumber} ${sku.skuName}`.toLowerCase().includes(productSkuSearchTerm)
+  );
+  const visibleProductSkus = matchingProductSkus.slice(0, 50);
 
   const activeConfig = TAB_CONFIG[activeTab];
   const ActiveIcon = activeConfig.icon;
@@ -408,14 +513,16 @@ export const ManufacturingEngineering: React.FC = () => {
             <p className="page-subtitle">管理工作中心、製程工序與工藝路線配置</p>
           </div>
         </div>
-        <button className="btn btn-primary btn-lg" onClick={openCreate}>
-          <Plus size={18} />
-          <span>新增資料</span>
-        </button>
+        {canCreateActive && (
+          <button className="btn btn-primary btn-lg" onClick={openCreate}>
+            <Plus size={18} />
+            <span>新增資料</span>
+          </button>
+        )}
       </div>
 
       <div className="tab-navigation">
-        {(Object.keys(TAB_CONFIG) as TabType[]).map((tabKey) => {
+        {visibleTabs.map((tabKey) => {
           const config = TAB_CONFIG[tabKey];
           const Icon = config.icon;
           const isActive = activeTab === tabKey;
@@ -469,15 +576,17 @@ export const ManufacturingEngineering: React.FC = () => {
             </div>
             <h3>尚無{activeConfig.label}資料</h3>
             <p>點擊上方「新增資料」按鈕建立第一筆{activeConfig.label}</p>
-            <button className="btn btn-primary" onClick={openCreate}>
-              <Plus size={16} />
-              <span>立即建立</span>
-            </button>
+            {canCreateActive && (
+              <button className="btn btn-primary" onClick={openCreate}>
+                <Plus size={16} />
+                <span>立即建立</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="table-wrapper">
             {activeTab === 'boms' && (
-              <table className="data-table">
+              <table className="data-table bom-table">
                 <thead>
                   <tr>
                     <th className="col-code">BOM 代碼</th>
@@ -519,12 +628,27 @@ export const ManufacturingEngineering: React.FC = () => {
                       </td>
                       <td className="col-actions">
                         <div className="action-buttons">
-                          <button className="btn-action btn-action-edit" onClick={() => openEdit(b)} title="編輯">
-                            <Edit2 size={14} />
-                          </button>
-                          <button className="btn-action btn-action-delete" onClick={() => handleDelete(b.id)} title="刪除">
-                            <Trash2 size={14} />
-                          </button>
+                          {canEditActive && (
+                            <button className="btn-action btn-action-edit" onClick={() => openEdit(b)} title="編輯">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          {canApproveStandardCost && b.status.toLowerCase() === 'active' && (
+                            <button
+                              className="btn-action btn-action-edit"
+                              onClick={() => void handleApproveStandardCost(b)}
+                              title="核准並套用 BOM 標準成本"
+                              aria-label={`核准 ${b.bomCode} 標準成本`}
+                              disabled={approvingBomId !== null}
+                            >
+                              {approvingBomId === b.id ? <Loader2 size={14} className="spinner-icon" /> : <DollarSign size={14} />}
+                            </button>
+                          )}
+                          {canDeleteActive && (
+                            <button className="btn-action btn-action-delete" onClick={() => handleDelete(b.id)} title="刪除">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -578,12 +702,16 @@ export const ManufacturingEngineering: React.FC = () => {
                       </td>
                       <td className="col-actions">
                         <div className="action-buttons">
-                          <button className="btn-action btn-action-edit" onClick={() => openEdit(wc)} title="編輯">
-                            <Edit2 size={14} />
-                          </button>
-                          <button className="btn-action btn-action-delete" onClick={() => handleDelete(wc.id)} title="刪除">
-                            <Trash2 size={14} />
-                          </button>
+                          {canEditActive && (
+                            <button className="btn-action btn-action-edit" onClick={() => openEdit(wc)} title="編輯">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          {canDeleteActive && (
+                            <button className="btn-action btn-action-delete" onClick={() => handleDelete(wc.id)} title="刪除">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -593,7 +721,7 @@ export const ManufacturingEngineering: React.FC = () => {
             )}
 
             {activeTab === 'operations' && (
-              <table className="data-table">
+              <table className="data-table operations-table">
                 <thead>
                   <tr>
                     <th className="col-code">工序代碼</th>
@@ -650,12 +778,16 @@ export const ManufacturingEngineering: React.FC = () => {
                       </td>
                       <td className="col-actions">
                         <div className="action-buttons">
-                          <button className="btn-action btn-action-edit" onClick={() => openEdit(op)} title="編輯">
-                            <Edit2 size={14} />
-                          </button>
-                          <button className="btn-action btn-action-delete" onClick={() => handleDelete(op.id)} title="刪除">
-                            <Trash2 size={14} />
-                          </button>
+                          {canEditActive && (
+                            <button className="btn-action btn-action-edit" onClick={() => openEdit(op)} title="編輯">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          {canDeleteActive && (
+                            <button className="btn-action btn-action-delete" onClick={() => handleDelete(op.id)} title="刪除">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -710,12 +842,16 @@ export const ManufacturingEngineering: React.FC = () => {
                       </td>
                       <td className="col-actions">
                         <div className="action-buttons">
-                          <button className="btn-action btn-action-edit" onClick={() => openEdit(r)} title="編輯">
-                            <Edit2 size={14} />
-                          </button>
-                          <button className="btn-action btn-action-delete" onClick={() => handleDelete(r.id)} title="刪除">
-                            <Trash2 size={14} />
-                          </button>
+                          {canEditActive && (
+                            <button className="btn-action btn-action-edit" onClick={() => openEdit(r)} title="編輯">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          {canDeleteActive && (
+                            <button className="btn-action btn-action-delete" onClick={() => handleDelete(r.id)} title="刪除">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -763,9 +899,11 @@ export const ManufacturingEngineering: React.FC = () => {
                       </td>
                       <td className="col-actions">
                         <div className="action-buttons">
-                          <button className="btn-action btn-action-edit" onClick={() => openEdit(r)} title="編輯">
-                            <Edit2 size={14} />
-                          </button>
+                          {canEditActive && (
+                            <button className="btn-action btn-action-edit" onClick={() => openEdit(r)} title="編輯">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -813,15 +951,76 @@ export const ManufacturingEngineering: React.FC = () => {
                     <div className="form-grid form-grid-2">
                       <FormField label="BOM 代碼" required value={String(formData.bomCode || '')} onChange={v => setFormData(p => ({ ...p, bomCode: v }))} placeholder="BOM-PROD-001" />
                       <div className="form-field">
-                        <label className="field-label">產品 (SKU)</label>
-                        <select 
-                          className="form-select" 
-                          value={(formData.productSkuId as string) || ''} 
-                          onChange={e => setFormData(p => ({ ...p, productSkuId: e.target.value }))}
+                        <label className="field-label" htmlFor="bom-product-sku-search">
+                          產品 (SKU)<span className="required-mark">*</span>
+                        </label>
+                        <div
+                          className="bom-sku-picker"
+                          onBlur={event => {
+                            const nextTarget = event.relatedTarget;
+                            if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget))
+                              setProductSkuDropdownOpen(false);
+                          }}
                         >
-                          <option value="">選擇產品</option>
-                          {skus.map(s => <option key={s.id} value={s.id}>{s.skuNumber} - {s.skuName}</option>)}
-                        </select>
+                          <input
+                            id="bom-product-sku-search"
+                            className="form-input"
+                            type="search"
+                            value={productSkuSearch}
+                            onFocus={event => {
+                              setProductSkuDropdownOpen(true);
+                              event.currentTarget.select();
+                            }}
+                            onChange={event => {
+                              setProductSkuSearch(event.target.value);
+                              setProductSkuDropdownOpen(true);
+                              setFormData(current => ({ ...current, productSkuId: '' }));
+                            }}
+                            onKeyDown={event => {
+                              if (event.key === 'Escape')
+                                setProductSkuDropdownOpen(false);
+                            }}
+                            placeholder="輸入產品料號或名稱搜尋"
+                            role="combobox"
+                            aria-required="true"
+                            aria-autocomplete="list"
+                            aria-expanded={productSkuDropdownOpen}
+                            aria-controls="bom-product-sku-options"
+                          />
+                          {productSkuDropdownOpen && (
+                            <div id="bom-product-sku-options" className="bom-sku-dropdown" role="listbox">
+                              {matchingProductSkus.length === 0 ? (
+                                <div className="bom-sku-dropdown-message">找不到符合的產品，請調整關鍵字。</div>
+                              ) : (
+                                <>
+                                  {visibleProductSkus.map(sku => (
+                                    <button
+                                      key={sku.id}
+                                      type="button"
+                                      role="option"
+                                      aria-selected={formData.productSkuId === sku.id}
+                                      className="bom-sku-option"
+                                      onMouseDown={event => event.preventDefault()}
+                                      onClick={() => {
+                                        setFormData(current => ({ ...current, productSkuId: sku.id }));
+                                        setProductSkuSearch(`${sku.skuNumber} - ${sku.skuName}`);
+                                        setProductSkuDropdownOpen(false);
+                                      }}
+                                    >
+                                      <span className="bom-sku-option-code">{sku.skuNumber}</span>
+                                      <span>{sku.skuName}</span>
+                                    </button>
+                                  ))}
+                                  <div className="bom-sku-dropdown-footer">
+                                    {matchingProductSkus.length > visibleProductSkus.length
+                                      ? `符合 ${matchingProductSkus.length} 項，顯示前 ${visibleProductSkus.length} 項；請輸入關鍵字縮小範圍。`
+                                      : `共 ${matchingProductSkus.length} 項符合產品`}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="form-grid form-grid-3">
@@ -851,7 +1050,7 @@ export const ManufacturingEngineering: React.FC = () => {
                       </h4>
                       <button 
                         className="btn btn-ghost btn-sm" 
-                        onClick={() => setBomItems([...bomItems, { childSkuId: '', quantity: 1, scrapRate: 0, operationSeq: 10, isPhantom: false }])}
+                        onClick={() => setBomItems([...bomItems, { childSkuId: '', childSkuSearch: '', childSkuDropdownOpen: false, quantity: 1, scrapRate: 0, operationSeq: 10, isPhantom: false }])}
                       >
                         <Plus size={14} />
                         <span>新增元件</span>
@@ -862,7 +1061,13 @@ export const ManufacturingEngineering: React.FC = () => {
                       <div className="empty-items">尚未添加任何元件</div>
                     ) : (
                       <div className="bom-items-list">
-                        {bomItems.map((it, idx) => (
+                        {bomItems.map((it, idx) => {
+                          const componentSearchTerm = (it.childSkuSearch || '').trim().toLowerCase();
+                          const matchingComponentSkus = skus.filter(sku =>
+                            `${sku.skuNumber} ${sku.skuName}`.toLowerCase().includes(componentSearchTerm)
+                          );
+                          const visibleComponentSkus = matchingComponentSkus.slice(0, 50);
+                          return (
                           <div key={idx} className="bom-item-row">
                             <div className="item-row-header">
                               <span className="item-index">#{idx + 1}</span>
@@ -872,25 +1077,95 @@ export const ManufacturingEngineering: React.FC = () => {
                             </div>
                             <div className="form-grid form-grid-2">
                               <div className="form-field">
-                                <label className="field-label">元件 (SKU)</label>
-                                <select 
-                                  className="form-select" 
-                                  value={it.childSkuId} 
-                                  onChange={e => {
-                                    const newItems = [...bomItems];
-                                    const selectedSku = skus.find(sku => sku.id === e.target.value);
-                                    newItems[idx] = {
-                                      ...newItems[idx],
-                                      childSkuId: e.target.value,
-                                      unit: selectedSku?.productionUomCode || '',
-                                      unitName: selectedSku?.productionUomName || ''
-                                    };
-                                    setBomItems(newItems);
+                                <label className="field-label" htmlFor={`bom-component-sku-search-${idx}`}>元件 (SKU)</label>
+                                <div
+                                  className="bom-sku-picker"
+                                  onBlur={event => {
+                                    const nextTarget = event.relatedTarget;
+                                    if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+                                      const newItems = [...bomItems];
+                                      newItems[idx] = { ...newItems[idx], childSkuDropdownOpen: false };
+                                      setBomItems(newItems);
+                                    }
                                   }}
                                 >
-                                  <option value="">選擇元件</option>
-                                  {skus.map(s => <option key={s.id} value={s.id}>{s.skuNumber} - {s.skuName}</option>)}
-                                </select>
+                                  <input
+                                    id={`bom-component-sku-search-${idx}`}
+                                    className="form-input"
+                                    type="search"
+                                    value={it.childSkuSearch || ''}
+                                    onFocus={event => {
+                                      const newItems = [...bomItems];
+                                      newItems[idx] = { ...newItems[idx], childSkuDropdownOpen: true };
+                                      setBomItems(newItems);
+                                      event.currentTarget.select();
+                                    }}
+                                    onChange={event => {
+                                      const newItems = [...bomItems];
+                                      newItems[idx] = {
+                                        ...newItems[idx],
+                                        childSkuId: '',
+                                        childSkuSearch: event.target.value,
+                                        childSkuDropdownOpen: true,
+                                        unit: '',
+                                        unitName: ''
+                                      };
+                                      setBomItems(newItems);
+                                    }}
+                                    onKeyDown={event => {
+                                      if (event.key === 'Escape') {
+                                        const newItems = [...bomItems];
+                                        newItems[idx] = { ...newItems[idx], childSkuDropdownOpen: false };
+                                        setBomItems(newItems);
+                                      }
+                                    }}
+                                    placeholder="輸入元件料號或名稱搜尋"
+                                    role="combobox"
+                                    aria-autocomplete="list"
+                                    aria-expanded={!!it.childSkuDropdownOpen}
+                                    aria-controls={`bom-component-sku-options-${idx}`}
+                                  />
+                                  {it.childSkuDropdownOpen && (
+                                    <div id={`bom-component-sku-options-${idx}`} className="bom-sku-dropdown" role="listbox">
+                                      {matchingComponentSkus.length === 0 ? (
+                                        <div className="bom-sku-dropdown-message">找不到符合的元件，請調整關鍵字。</div>
+                                      ) : (
+                                        <>
+                                          {visibleComponentSkus.map(sku => (
+                                            <button
+                                              key={sku.id}
+                                              type="button"
+                                              role="option"
+                                              aria-selected={it.childSkuId === sku.id}
+                                              className="bom-sku-option"
+                                              onMouseDown={event => event.preventDefault()}
+                                              onClick={() => {
+                                                const newItems = [...bomItems];
+                                                newItems[idx] = {
+                                                  ...newItems[idx],
+                                                  childSkuId: sku.id,
+                                                  childSkuSearch: `${sku.skuNumber} - ${sku.skuName}`,
+                                                  childSkuDropdownOpen: false,
+                                                  unit: sku.productionUomCode || '',
+                                                  unitName: sku.productionUomName || ''
+                                                };
+                                                setBomItems(newItems);
+                                              }}
+                                            >
+                                              <span className="bom-sku-option-code">{sku.skuNumber}</span>
+                                              <span>{sku.skuName}</span>
+                                            </button>
+                                          ))}
+                                          <div className="bom-sku-dropdown-footer">
+                                            {matchingComponentSkus.length > visibleComponentSkus.length
+                                              ? `符合 ${matchingComponentSkus.length} 項，顯示前 ${visibleComponentSkus.length} 項；請輸入關鍵字縮小範圍。`
+                                              : `共 ${matchingComponentSkus.length} 項符合元件`}
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div className="form-grid form-grid-2">
                                 <FormField 
@@ -922,7 +1197,7 @@ export const ManufacturingEngineering: React.FC = () => {
                                 value={it.operationSeq} 
                                 onChange={v => {
                                   const newItems = [...bomItems];
-                                  newItems[idx] = { ...newItems[idx], operationSeq: parseInt(v) || 10 };
+                                  newItems[idx] = { ...newItems[idx], operationSeq: v };
                                   setBomItems(newItems);
                                 }} 
                               />
@@ -942,7 +1217,7 @@ export const ManufacturingEngineering: React.FC = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                        );})}
                       </div>
                     )}
                   </div>

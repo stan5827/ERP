@@ -40,6 +40,18 @@ export interface LeaveRequestDto { id: string; employeeId: string; employeeNo?: 
 
 export interface PayrollDto { id: string; employeeId: string; employeeNo?: string; employeeName?: string; periodStart: string; periodEnd: string; basicSalary: number; insuranceBase: number; pensionBase: number; scheduledDays: number; actualWorkingDays: number; totalLateMinutes: number; totalEarlyMinutes: number; ot1Pay: number; ot2Pay: number; ot3Pay: number; bonus: number; totalDeductions: number; grossPay: number; netPay: number; status: string; createdAt: string; updatedAt: string; }
 
+export interface PayrollPolicyAuditEventDto { action: string; actorUserId: string; actorUsername: string; occurredAt: string; details?: string; }
+export interface PayrollPolicyVersionDto {
+  id: string; versionCode: string; effectiveFrom: string; approvalDocumentReference: string; policyJson: string;
+  status: 'draft' | 'pending_finance' | 'approved' | 'rejected'; createdByUserId: string; createdByUsername: string;
+  createdAt: string; updatedAt: string; submittedByUserId?: string; submittedByUsername?: string; submittedAt?: string;
+  financeReviewerUserId?: string; financeReviewerUsername?: string; financeReviewedAt?: string; reviewComment?: string;
+  calculationEnabled: false; auditTrail: PayrollPolicyAuditEventDto[];
+}
+export interface SavePayrollPolicyRequest {
+  versionCode: string; effectiveFrom: string; approvalDocumentReference: string; policyJson: string;
+}
+
 export interface UomDto { id: string; uomCode: string; uomName: string; uomNameEn?: string; uomType: string; decimalPlaces: number; isActive: boolean; allowDecimal: boolean; description?: string; displayOrder: number; createdAt: string; }
 
 export interface UomConversionDto { id: string; skuId?: string; skuCode?: string; skuName?: string; fromUomId: string; fromUomCode: string; fromUomName: string; toUomId: string; toUomCode: string; toUomName: string; factor: number; operator: string; inverseFactor?: number; isActive: boolean; description?: string; isGlobal: boolean; }
@@ -265,13 +277,13 @@ export const hrApi = {
     delete: (id: string) => api.delete<ApiResponse>(`/Attendance/${id}`),
   },
   leaveRequests: {
-    list: (params?: Record<string, string>) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; applicationNo: string; leaveType: string; applicationDate: string; startDate: string; endDate: string; startTime?: string; endTime?: string; totalHours: number; reason?: string; attachmentUrl?: string; includesSpecialPeriod: boolean; shiftConflictFlag: boolean; autoDeductPayFlag: boolean; impactOtOrBonus: boolean; approvalLevel: number; status: string; approverId?: string; approvedAt?: string; rejectReason?: string; remarks?: string; createdAt: string; }[]>>('/LeaveRequests', { params }),
-    get: (id: string) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; applicationNo: string; leaveType: string; applicationDate: string; startDate: string; endDate: string; startTime?: string; endTime?: string; totalHours: number; reason?: string; attachmentUrl?: string; includesSpecialPeriod: boolean; shiftConflictFlag: boolean; autoDeductPayFlag: boolean; impactOtOrBonus: boolean; approvalLevel: number; status: string; approverId?: string; approvedAt?: string; rejectReason?: string; remarks?: string; createdAt: string; }>>(`/LeaveRequests/${id}`),
-    create: (data: Record<string, unknown>) => api.post<ApiResponse>('/LeaveRequests', data),
-    update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse>(`/LeaveRequests/${id}`, data),
-    approve: (id: string, status: string, approverId?: string, rejectReason?: string) => api.patch<ApiResponse<boolean>>(`/LeaveRequests/${id}/approve`, { status, approverId, rejectReason }),
-    cancel: (id: string, reason?: string) => api.patch<ApiResponse<boolean>>(`/LeaveRequests/${id}/cancel`, { reason }),
-    balances: (params?: Record<string, string>) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; leaveType: string; year: number; totalEntitled: number; used: number; remaining: number; }[]>>('/LeaveRequests/balances', { params }),
+    list: (params?: Record<string, string>) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; applicationNo: string; leaveType: string; applicationDate: string; startDate: string; endDate: string; startTime?: string; endTime?: string; totalHours: number; reason?: string; attachmentUrl?: string; includesSpecialPeriod: boolean; shiftConflictFlag: boolean; autoDeductPayFlag: boolean; impactOtOrBonus: boolean; approvalLevel: number; status: string; approverId?: string; approvedAt?: string; rejectReason?: string; remarks?: string; createdAt: string; }[]>>('/leave-requests', { params }),
+    get: (id: string) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; applicationNo: string; leaveType: string; applicationDate: string; startDate: string; endDate: string; startTime?: string; endTime?: string; totalHours: number; reason?: string; attachmentUrl?: string; includesSpecialPeriod: boolean; shiftConflictFlag: boolean; autoDeductPayFlag: boolean; impactOtOrBonus: boolean; approvalLevel: number; status: string; approverId?: string; approvedAt?: string; rejectReason?: string; remarks?: string; createdAt: string; }>>(`/leave-requests/${id}`),
+    create: (data: Record<string, unknown>) => api.post<ApiResponse>('/leave-requests', data),
+    update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse>(`/leave-requests/${id}`, data),
+    approve: (id: string, status: string, approverId?: string, rejectReason?: string) => api.patch<ApiResponse<boolean>>(`/leave-requests/${id}/approve`, { status, approverId, rejectReason }),
+    cancel: (id: string, reason?: string) => api.patch<ApiResponse<boolean>>(`/leave-requests/${id}/cancel`, { reason }),
+    balances: (params?: Record<string, string>) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; leaveType: string; year: number; totalEntitled: number; used: number; remaining: number; }[]>>('/leave-requests/balances', { params }),
   },
   payroll: {
     list: (params?: Record<string, string>) => api.get<ApiResponse<{ id: string; employeeId: string; employeeNo?: string; employeeName?: string; periodStart: string; periodEnd: string; basicSalary: number; insuranceBase: number; pensionBase: number; newLeavingFlag: boolean; scheduledDays: number; actualWorkingDays: number; totalLateMinutes: number; totalEarlyMinutes: number; anomalyDays: number; totalOt1Hours: number; totalOt2Hours: number; totalOt3Hours: number; ot1Pay: number; ot2Pay: number; ot3Pay: number; totalLeaveHours: number; annualLeaveHours: number; personalLeaveHours: number; sickLeaveHours: number; fullAttendanceFlag: boolean; lateDeduction: number; earlyDeduction: number; anomalyPenalty: number; personalLeaveDeduction: number; sickLeaveDeduction: number; otherDeductions: number; overtimePay: number; bonus: number; attendanceBonus: number; laborInsuranceDeduction: number; healthInsuranceDeduction: number; pensionDeduction: number; withholdingTax: number; employerLi: number; employerHi: number; employerPf: number; employmentInsurance: number; supplementalHealthInsurance?: number; grossPay: number; totalDeductions: number; employerContributions: number; netPay: number; calculatedBy?: string; calculatedAt?: string; status: string; paymentDate?: string; paymentBankAccount?: string; payrollSlipNo?: string; notes?: string; createdAt: string; updatedAt: string; }[]>>('/Payroll', { params }),
@@ -280,5 +292,24 @@ export const hrApi = {
     update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse>(`/Payroll/${id}`, data),
     updateStatus: (id: string, status: string, paymentDate?: string, paymentBankAccount?: string, payrollSlipNo?: string) => api.patch<ApiResponse<boolean>>(`/Payroll/${id}/status`, { status, paymentDate, paymentBankAccount, payrollSlipNo }),
     delete: (id: string) => api.delete<ApiResponse>(`/Payroll/${id}`),
+    policies: {
+      list: () => api.get<ApiResponse<PayrollPolicyVersionDto[]>>('/Payroll/policies'),
+      pendingFinanceReview: () => api.get<ApiResponse<PayrollPolicyVersionDto[]>>('/Payroll/policies/pending-finance-review'),
+      get: (id: string) => api.get<ApiResponse<PayrollPolicyVersionDto>>(`/Payroll/policies/${id}`),
+      create: (data: SavePayrollPolicyRequest) => api.post<ApiResponse<PayrollPolicyVersionDto>>('/Payroll/policies', data),
+      update: (id: string, data: SavePayrollPolicyRequest) => api.put<ApiResponse<PayrollPolicyVersionDto>>(`/Payroll/policies/${id}`, data),
+      submit: (id: string, confirmedOfficialSources: boolean) => api.post<ApiResponse<PayrollPolicyVersionDto>>(
+        `/Payroll/policies/${id}/submit`,
+        { confirmedOfficialSources },
+      ),
+      approve: (id: string, comment: string, confirmedOfficialSources: boolean) => api.post<ApiResponse<PayrollPolicyVersionDto>>(
+        `/Payroll/policies/${id}/approve`,
+        { comment, confirmedOfficialSources },
+      ),
+      reject: (id: string, comment: string, confirmedOfficialSources: boolean) => api.post<ApiResponse<PayrollPolicyVersionDto>>(
+        `/Payroll/policies/${id}/reject`,
+        { comment, confirmedOfficialSources },
+      ),
+    },
   },
 };

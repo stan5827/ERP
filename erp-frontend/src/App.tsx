@@ -6,6 +6,8 @@ import type { ModuleId } from './types';
 import { Lock, User, Eye, EyeOff } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { authApi } from './api/auth';
+import { useRole } from './contexts/useRole';
+import { resolveAccessibleModule } from './utils/accessibleModule';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Manufacturing = lazy(() => import('./pages/Manufacturing').then(m => ({ default: m.Manufacturing })));
@@ -168,6 +170,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const currentUser = useCurrentUser();
   const logout = useLogout();
+  const { currentRole, moduleAccess, isLoading: roleAccessLoading } = useRole();
 
   if (!currentUser) return <LoginPage />;
   if (currentUser.mustChangePassword)
@@ -176,9 +179,21 @@ function App() {
       localStorage.removeItem('erp_user');
     }} onLogout={logout} />;
 
+  const isAdmin = currentRole === 'admin' ||
+    currentUser.roles.some(role => role.toLowerCase() === 'admin');
+  const resolvedModule = roleAccessLoading
+    ? null
+    : resolveAccessibleModule(activeModule, moduleAccess, isAdmin);
+  const displayedModule = resolvedModule ?? activeModule;
+
   const renderPage = () => {
+    if (roleAccessLoading)
+      return <PageLoader />;
+    if (!resolvedModule)
+      return <div role="status" style={{ padding: 24 }}>此帳號尚未設定可使用的系統模組，請聯絡系統管理員。</div>;
+
     const pageElement = (() => {
-      switch (activeModule) {
+      switch (resolvedModule) {
         case 'dashboard': return <Dashboard onNavigate={setActiveModule} />;
         case 'manufacturing': return <Manufacturing onNavigate={setActiveModule} />;
         case 'inventory': return <Inventory />;
@@ -227,13 +242,13 @@ function App() {
   return (
     <div className="app-layout">
       <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: '#1e293b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } }} />
-      <Sidebar activeModule={activeModule} onModuleChange={setActiveModule} collapsed={sidebarCollapsed} onCollapseToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Sidebar activeModule={displayedModule} onModuleChange={setActiveModule} collapsed={sidebarCollapsed} onCollapseToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <div className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`} style={{ marginLeft: sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)' }}>
         <Topbar
           user={{ id: currentUser.userId, name: currentUser.username, role: currentUser.roles[0] || 'user', department: '', avatar: undefined, permissions: [] }}
           notifications={[]}
-          pageTitle={moduleLabels[activeModule]}
-          pageBreadcrumb={activeModule !== 'dashboard' ? '首頁' : undefined}
+          pageTitle={resolvedModule ? moduleLabels[resolvedModule] : roleAccessLoading ? '載入權限中' : '無可用模組'}
+          pageBreadcrumb={displayedModule !== 'dashboard' ? '首頁' : undefined}
           onLogout={logout}
         />
         <main className="page-content" style={{ paddingTop: 'calc(var(--topbar-height) + 24px)' }}>

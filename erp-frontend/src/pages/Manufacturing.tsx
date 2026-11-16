@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -17,6 +17,7 @@ import { equipmentApi } from '../api/api';
 import { wipReportsApi } from '../api/mes';
 import type { WipReportQueueItemDto, WipReportRequest } from '../api/mes';
 import type { ModuleId } from '../types';
+import { useRole } from '../contexts/useRole';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import './styles/Manufacturing-Cyber.css';
@@ -86,7 +87,25 @@ const reportInputStyle: React.CSSProperties = {
 interface EquipmentMachineHourDraft {
   equipmentId: string;
   machineHours: string;
+  startTime: string;
+  endTime: string;
 }
+
+const toLocalDateTimeInput = (value: Date) =>
+  new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+
+const toLocalDateInput = (value: Date) =>
+  new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+const toLocalTimeInput = (value: string) => value.length >= 19 ? value.slice(11, 19) : '';
+
+const combineLocalDateTime = (date: string, time: string) => time ? `${date}T${time}` : '';
+
+const calculateHours = (startTime: string, endTime: string) => {
+  if (!startTime || !endTime) return 0;
+  const milliseconds = new Date(endTime).getTime() - new Date(startTime).getTime();
+  return milliseconds > 0 ? Number((milliseconds / 3600000).toFixed(2)) : 0;
+};
 
 interface WorkOrderOperation {
   id: string;
@@ -130,6 +149,7 @@ interface ManufacturingProps {
 }
 
 export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
+  const { hasPermission } = useRole();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showForm, setShowForm] = useState(false);
@@ -161,6 +181,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
     runHours: '0',
     manHours: '0',
     machineHours: '0',
+    workDate: '',
     startTime: '',
     endTime: '',
     materialLotNumber: '',
@@ -186,10 +207,11 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
   const currentUser = useCurrentUser();
   const currentEmployeeId = currentUser?.employeeId ?? '';
   const canProxyReport = currentUser?.roles.includes('Admin')
-    || currentUser?.permissions.includes('manufacturing.proxy-report')
+    || currentUser?.roles.includes('Production Supervisor')
+    || currentUser?.permissions.includes('manufacturing:proxy-report')
     || currentUser?.permissions.includes('admin.*');
   const canApproveReports = currentUser?.roles.includes('Admin')
-    || currentUser?.permissions.includes('manufacturing.approve')
+    || currentUser?.permissions.includes('manufacturing:approve')
     || currentUser?.permissions.includes('admin.*');
   const myReportsQuery = useQuery({
     queryKey: ['wip-reports', 'my'],
@@ -206,6 +228,13 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
     (total, item) => total + (Number(item.machineHours) || 0),
     0
   );
+  useEffect(() => {
+    if (reportDraft.equipmentMachineHours.length === 0) return;
+    const totalMachineHours = totalSelectedMachineHours.toFixed(2);
+    setReportDraft(current => current.runHours === totalMachineHours
+      ? current
+      : { ...current, runHours: totalMachineHours });
+  }, [totalSelectedMachineHours, reportDraft.equipmentMachineHours.length]);
   const uomNamesByCode = new Map(
     (uomData?.data ?? []).map(uom => [uom.uomCode, uom.uomName])
   );
@@ -216,8 +245,8 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
   const productionUnit = getUnitName(productionUnitCode) || '單位未確認';
   const openReportForOperation = useCallback((operation: WorkOrderOperation) => {
     const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    const localStartTime = new Date(now.getTime() - 60 * 60 * 1000 - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const localDateTime = toLocalDateTimeInput(now);
+    const localStartTime = toLocalDateTimeInput(new Date(now.getTime() - 60 * 60 * 1000));
     setSelectedOp(operation);
     setCorrectionReportId(null);
     setReportDraft({
@@ -236,6 +265,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
       runHours: '0',
       manHours: '0',
       machineHours: '0',
+      workDate: localStartTime.slice(0, 10),
       startTime: localStartTime,
       endTime: localDateTime,
       materialLotNumber: '',
@@ -298,7 +328,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
     const asLocalInput = (value?: string) => {
       if (!value) return '';
       const date = new Date(value);
-      return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      return toLocalDateTimeInput(date);
     };
     setSelectedOp(operation);
     setReportDraft(current => ({
@@ -319,6 +349,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
       setupHours: String(reportToCorrect.setupHours),
       runHours: String(reportToCorrect.runHours),
       manHours: String(reportToCorrect.manHours),
+      workDate: asLocalInput(reportToCorrect.startTime).slice(0, 10),
       startTime: asLocalInput(reportToCorrect.startTime),
       endTime: asLocalInput(reportToCorrect.endTime),
       materialLotNumber: reportToCorrect.materialLotNumber ?? '',
@@ -460,15 +491,12 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
       alert('請選擇設備並輸入各台設備的機台工時。');
       return;
     }
-    if (new Date(reportDraft.endTime) <= new Date(reportDraft.startTime)) {
-      alert('設備使用結束時間必須晚於開始時間。');
-      return;
-    }
     const invalidUsage = reportDraft.equipmentMachineHours.some(item =>
-      !Number.isFinite(Number(item.machineHours)) || Number(item.machineHours) <= 0
+      !Number.isFinite(Number(item.machineHours)) || Number(item.machineHours) <= 0 ||
+      !item.startTime || !item.endTime || new Date(item.endTime) <= new Date(item.startTime)
     );
     if (invalidUsage) {
-      alert('請為每台選擇的設備輸入大於零的機台工時。');
+      alert('請為每台選擇的設備設定有效開始時間、結束時間及大於零的機台工時。');
       return;
     }
 
@@ -482,8 +510,8 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
           equipmentId: usage.equipmentId,
           machineHours: Number(usage.machineHours),
           shiftClass: reportDraft.shiftClass,
-          startTime: new Date(reportDraft.startTime).toISOString(),
-          endTime: new Date(reportDraft.endTime).toISOString(),
+          startTime: new Date(usage.startTime).toISOString(),
+          endTime: new Date(usage.endTime).toISOString(),
           remarks: reportDraft.remarks || undefined,
         });
         savedCount++;
@@ -717,7 +745,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
                         </button>
                       )}
                       
-                      {wo.status === 'released' && (
+                      {wo.status === 'released' && hasPermission('manufacturing', 'execute') && (
                         <button className="cy-action-btn" style={{ color: 'var(--emerald-400)' }} onClick={() => startMutation.mutate(wo.id, {
                           onSuccess: () => alert(`工單 ${wo.woNumber} 已開始生產。`),
                           onError: handleMutationError,
@@ -1202,7 +1230,30 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
               </div>
 
               <section style={{ marginBottom: 20 }}>
-                <h3 style={{ fontSize: 15, color: '#7dd3fc', margin: '0 0 12px' }}>報工人員與時段</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 15, color: '#7dd3fc', margin: 0 }}>報工人員與時段</h3>
+                  <label style={{ ...reportLabelStyle, width: 170, margin: 0 }}>報工日期
+                    <input
+                      type="date"
+                      value={reportDraft.workDate}
+                      onChange={event => {
+                        const workDate = event.target.value;
+                        setReportDraft(current => ({
+                          ...current,
+                          workDate,
+                          startTime: combineLocalDateTime(workDate, toLocalTimeInput(current.startTime)),
+                          endTime: combineLocalDateTime(workDate, toLocalTimeInput(current.endTime)),
+                          equipmentMachineHours: current.equipmentMachineHours.map(item => ({
+                            ...item,
+                            startTime: combineLocalDateTime(workDate, toLocalTimeInput(item.startTime)),
+                            endTime: combineLocalDateTime(workDate, toLocalTimeInput(item.endTime)),
+                          })),
+                        }));
+                      }}
+                      style={reportInputStyle}
+                    />
+                  </label>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
                   <label style={reportLabelStyle}>報工類型 *
                     <select value={reportDraft.reportType} onChange={event => setReportDraft(current => ({
@@ -1218,6 +1269,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
                   <div style={reportLabelStyle}>登入作業員
                     <div style={{ ...reportInputStyle, display: 'flex', alignItems: 'center' }}>
                       {employees.find(employee => employee.id === currentEmployeeId)?.chineseName
+                        ?? currentUser?.employeeName
                         ?? currentUser?.username
                         ?? '尚未登入'}
                     </div>
@@ -1361,7 +1413,7 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
                                       ...current,
                                       equipmentMachineHours: isSelected
                                         ? current.equipmentMachineHours.filter(row => row.equipmentId !== item.id)
-                                        : [...current.equipmentMachineHours, { equipmentId: item.id, machineHours: '0' }],
+                                        : [...current.equipmentMachineHours, { equipmentId: item.id, machineHours: '0', startTime: '', endTime: '' }],
                                     }))}
                                     style={{
                                       display: 'flex',
@@ -1426,16 +1478,63 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
                     {isEquipmentError && <small role="alert" style={{ color: '#f87171' }}>設備資料載入失敗，請重新整理後再試。</small>}
                   </div>
                   <label style={reportLabelStyle}>開始時間
-                    <input type="datetime-local" value={reportDraft.startTime} onChange={event => setReportDraft({ ...reportDraft, startTime: event.target.value })} style={reportInputStyle} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input type="time" step="1" value={toLocalTimeInput(reportDraft.startTime)} onChange={event => {
+                        const startTime = combineLocalDateTime(reportDraft.workDate, event.target.value);
+                        setReportDraft(current => ({
+                          ...current,
+                          startTime,
+                          manHours: String(calculateHours(startTime, current.endTime)),
+                        }));
+                      }} style={{ ...reportInputStyle, flex: 1 }} />
+                      <button type="button" className="btn-cy" onClick={() => setReportDraft(current => ({
+                        ...current,
+                        startTime: toLocalDateTimeInput(new Date()),
+                        workDate: toLocalDateInput(new Date()),
+                        endTime: '',
+                        manHours: '0',
+                      }))}>開始</button>
+                    </div>
                   </label>
                   <label style={reportLabelStyle}>結束時間
-                    <input type="datetime-local" value={reportDraft.endTime} onChange={event => setReportDraft({ ...reportDraft, endTime: event.target.value })} style={reportInputStyle} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input type="time" step="1" value={toLocalTimeInput(reportDraft.endTime)} onChange={event => {
+                        const endTime = combineLocalDateTime(reportDraft.workDate, event.target.value);
+                        setReportDraft(current => ({
+                          ...current,
+                          endTime,
+                          manHours: String(calculateHours(current.startTime, endTime)),
+                        }));
+                      }} style={{ ...reportInputStyle, flex: 1 }} />
+                      <button type="button" className="btn-cy" disabled={!reportDraft.startTime} onClick={() => {
+                        const endTime = toLocalDateTimeInput(new Date());
+                        setReportDraft(current => ({
+                          ...current,
+                          endTime,
+                          manHours: String(calculateHours(current.startTime, endTime)),
+                        }));
+                      }}>停止</button>
+                    </div>
                   </label>
                   <label style={reportLabelStyle}>準備時間 (小時)
                     <input type="number" min="0" step="0.1" value={reportDraft.setupHours} onChange={event => setReportDraft({ ...reportDraft, setupHours: event.target.value })} style={reportInputStyle} />
                   </label>
                   <label style={reportLabelStyle}>加工時間 (小時)
-                    <input type="number" min="0" step="0.1" value={reportDraft.runHours} onChange={event => setReportDraft({ ...reportDraft, runHours: event.target.value })} style={reportInputStyle} />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={reportDraft.runHours}
+                      readOnly={reportDraft.equipmentMachineHours.length > 0}
+                      onChange={event => setReportDraft({ ...reportDraft, runHours: event.target.value })}
+                      style={{
+                        ...reportInputStyle,
+                        ...(reportDraft.equipmentMachineHours.length > 0 ? { background: 'rgba(148, 163, 184, 0.08)', cursor: 'not-allowed' } : {}),
+                      }}
+                    />
+                    {reportDraft.equipmentMachineHours.length > 0 && (
+                      <small style={{ color: '#94a3b8' }}>由所選設備的機台工時自動加總</small>
+                    )}
                   </label>
                   {reportDraft.reportType === 'individual' ? (
                     <label style={reportLabelStyle}>本人實際人工工時 (小時)
@@ -1471,31 +1570,123 @@ export const Manufacturing: React.FC<ManufacturingProps> = ({ onNavigate }) => {
                       </small>
                     </div>
                   )}
-                  <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
-                    {reportDraft.equipmentMachineHours.map(item => {
-                      const selectedEquipment = equipment.find(equipmentItem => equipmentItem.id === item.equipmentId);
-                      return (
-                        <label key={item.equipmentId} style={reportLabelStyle}>
-                          {selectedEquipment ? `${selectedEquipment.equipmentCode} 機台工時 (小時)` : '機台工時 (小時)'}
-                          <input
-                            type="number"
-                            min="0"
-                            max="999999.99"
-                            step="0.01"
-                            value={item.machineHours}
-                            onChange={event => setReportDraft(current => ({
-                              ...current,
-                              equipmentMachineHours: current.equipmentMachineHours.map(row =>
-                                row.equipmentId === item.equipmentId
-                                  ? { ...row, machineHours: event.target.value }
-                                  : row
-                              ),
-                            }))}
-                            style={reportInputStyle}
-                          />
-                        </label>
-                      );
-                    })}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ marginBottom: 10, color: '#7dd3fc', fontSize: 14, fontWeight: 700 }}>設備獨立工時記錄</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                      {reportDraft.equipmentMachineHours.map(item => {
+                        const selectedEquipment = equipment.find(equipmentItem => equipmentItem.id === item.equipmentId);
+                        return (
+                          <div key={item.equipmentId} style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(0, 1fr) auto',
+                            gap: 10,
+                            padding: 14,
+                            borderRadius: 10,
+                            border: '1px solid rgba(56, 189, 248, 0.28)',
+                            background: 'rgba(15, 23, 42, 0.72)',
+                          }}>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                              <strong>{selectedEquipment ? `${selectedEquipment.equipmentCode} - ${selectedEquipment.equipmentName}` : '未命名設備'}</strong>
+                              <span style={{ color: item.startTime && !item.endTime ? '#4ade80' : '#94a3b8', fontSize: 12 }}>
+                                {item.startTime && !item.endTime ? '計時中' : item.endTime ? '已停止' : '未開始'}
+                              </span>
+                            </div>
+                            <label style={{ ...reportLabelStyle, gridColumn: '1 / -1', margin: 0 }}>機台工時 (小時)
+                              <input
+                                type="number"
+                                min="0"
+                                max="999999.99"
+                                step="0.01"
+                                value={item.machineHours}
+                                onChange={event => setReportDraft(current => ({
+                                  ...current,
+                                  equipmentMachineHours: current.equipmentMachineHours.map(row =>
+                                    row.equipmentId === item.equipmentId
+                                      ? { ...row, machineHours: event.target.value }
+                                      : row
+                                  ),
+                                }))}
+                                style={reportInputStyle}
+                              />
+                            </label>
+                            <label style={{ ...reportLabelStyle, gridColumn: '1 / 2', margin: 0 }}>開始時間
+                              <input
+                                type="time"
+                                step="1"
+                                value={toLocalTimeInput(item.startTime)}
+                                onChange={event => setReportDraft(current => ({
+                                  ...current,
+                                  equipmentMachineHours: current.equipmentMachineHours.map(row =>
+                                    row.equipmentId === item.equipmentId
+                                      ? {
+                                          ...row,
+                                          startTime: combineLocalDateTime(current.workDate, event.target.value),
+                                          machineHours: String(calculateHours(combineLocalDateTime(current.workDate, event.target.value), row.endTime)),
+                                        }
+                                      : row
+                                  ),
+                                }))}
+                                style={reportInputStyle}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="btn-cy"
+                              style={{ alignSelf: 'end', height: 40 }}
+                              onClick={() => setReportDraft(current => ({
+                                ...current,
+                                equipmentMachineHours: current.equipmentMachineHours.map(row =>
+                                  row.equipmentId === item.equipmentId
+                                    ? { ...row, startTime: toLocalDateTimeInput(new Date()), endTime: '', machineHours: '0' }
+                                    : row
+                                ),
+                              }))}
+                            >
+                              開始
+                            </button>
+                            <label style={{ ...reportLabelStyle, gridColumn: '1 / 2', margin: 0 }}>結束時間
+                              <input
+                                type="time"
+                                step="1"
+                                value={toLocalTimeInput(item.endTime)}
+                                onChange={event => setReportDraft(current => ({
+                                  ...current,
+                                  equipmentMachineHours: current.equipmentMachineHours.map(row =>
+                                    row.equipmentId === item.equipmentId
+                                      ? {
+                                          ...row,
+                                          endTime: combineLocalDateTime(current.workDate, event.target.value),
+                                          machineHours: String(calculateHours(row.startTime, combineLocalDateTime(current.workDate, event.target.value))),
+                                        }
+                                      : row
+                                  ),
+                                }))}
+                                style={reportInputStyle}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="btn-cy"
+                              disabled={!item.startTime}
+                              style={{ alignSelf: 'end', height: 40 }}
+                              onClick={() => {
+                                const endTime = toLocalDateTimeInput(new Date());
+                                setReportDraft(current => ({
+                                  ...current,
+                                  equipmentMachineHours: current.equipmentMachineHours.map(row =>
+                                    row.equipmentId === item.equipmentId
+                                      ? { ...row, endTime, machineHours: String(calculateHours(row.startTime, endTime)) }
+                                      : row
+                                  ),
+                                }));
+                              }}
+                            >
+                              停止
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                     <small style={{ gridColumn: '1 / -1', color: '#94a3b8' }}>
                       機台總工時：{totalSelectedMachineHours.toFixed(2)} 小時
                     </small>

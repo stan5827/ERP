@@ -400,13 +400,10 @@ public class SystemSettingsService : ISystemSettingsService
                 && userRole.Role.RoleName.ToLower() == "admin");
         if (isAdmin)
         {
-            return PermissionCatalog.Modules
-                .Select(module => new ModuleAccessDto
-                {
-                    ModuleId = module.Id,
-                    Permissions = PermissionCatalog.Actions.Select(action => action.Code).ToList()
-                })
-                .ToList();
+            return BuildModuleAccess(PermissionCatalog.Modules.SelectMany(module =>
+                new[] { module.Id, $"{module.Id}:page" }
+                    .Concat(PermissionCatalog.Actions.Select(action =>
+                        PermissionCatalog.GetActionCode(module.Id, action.Code)))));
         }
 
         var permissionCodes = await _db.UserRoles
@@ -426,12 +423,40 @@ public class SystemSettingsService : ISystemSettingsService
         var access = new List<ModuleAccessDto>();
         foreach (var module in PermissionCatalog.Modules)
         {
-            var moduleGranted = codes.Contains(module.Id) || codes.Contains($"{module.Id}:page");
-            var moduleActions = PermissionCatalog.Actions
-                .Where(action => moduleGranted || codes.Contains(PermissionCatalog.GetActionCode(module.Id, action.Code)))
+            var moduleGranted = codes.Contains(module.Id);
+            var modulePageGranted = codes.Contains($"{module.Id}:page");
+            var actions = module.IncludeReverse
+                ? PermissionCatalog.Actions.Append(("reverse", "沖銷")).ToList()
+                : PermissionCatalog.Actions;
+            var moduleActions = actions
+                .Where(action => moduleGranted
+                    || (modulePageGranted && action.Code == "view")
+                    || codes.Contains(PermissionCatalog.GetActionCode(module.Id, action.Code)))
                 .Select(action => action.Code)
                 .ToList();
-            if (!moduleGranted && moduleActions.Count == 0)
+            var resourceAccess = PermissionCatalog.Resources
+                .Where(resource => resource.ModuleId == module.Id)
+                .Select(resource =>
+                {
+                    var resourceGranted = codes.Contains(resource.ModuleId);
+                    var resourcePageGranted = codes.Contains(PermissionCatalog.GetResourcePageCode(resource));
+                    var resourceActions = actions
+                        .Where(action => resourceGranted
+                            || (resourcePageGranted && action.Code == "view")
+                            || codes.Contains(PermissionCatalog.GetResourceActionCode(resource, action.Code)))
+                        .Select(action => action.Code)
+                        .ToList();
+                    return new ModuleAccessDto
+                    {
+                        ModuleId = $"{resource.ModuleId}:{resource.Id}",
+                        Permissions = resourceActions
+                    };
+                })
+                .Where(resource => resource.Permissions.Count > 0)
+                .ToList();
+            if (resourceAccess.Count > 0 && !moduleActions.Contains("view", StringComparer.OrdinalIgnoreCase))
+                moduleActions.Add("view");
+            if (!moduleGranted && moduleActions.Count == 0 && resourceAccess.Count == 0)
                 continue;
 
             access.Add(new ModuleAccessDto
@@ -439,6 +464,7 @@ public class SystemSettingsService : ISystemSettingsService
                 ModuleId = module.Id,
                 Permissions = moduleActions
             });
+            access.AddRange(resourceAccess);
         }
 
         return access;

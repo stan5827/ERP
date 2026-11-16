@@ -17,11 +17,16 @@ public class PermissionAuthorizeAttribute : Attribute
 {
     public string Module { get; set; } = null!;
     public string Action { get; set; } = null!;
+    public string[] AdditionalPermissionCodes { get; }
 
-    public PermissionAuthorizeAttribute(string module, string action)
+    public PermissionAuthorizeAttribute(
+        string module,
+        string action,
+        params string[] additionalPermissionCodes)
     {
         Module = module;
         Action = action;
+        AdditionalPermissionCodes = additionalPermissionCodes;
     }
 }
 
@@ -120,10 +125,20 @@ public class PermissionAuthorizeFilter : IAsyncAuthorizationFilter
             .ToListAsync(context.HttpContext.RequestAborted);
         var grantedCodes = userPermissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var requiredPermission = PermissionCatalog.GetActionCode(moduleId, action);
+        var hasResourceAccess = PermissionCatalog
+            .GetResourcesForAction(controllerName ?? string.Empty, actionName)
+            .Any(resource =>
+                (grantedCodes.Contains(PermissionCatalog.GetResourcePageCode(resource))
+                    && string.Equals(action, "view", StringComparison.OrdinalIgnoreCase))
+                || grantedCodes.Contains(PermissionCatalog.GetResourceActionCode(resource, action)));
         var hasAccess = grantedCodes.Contains(moduleId)
             || (string.Equals(action, "view", StringComparison.OrdinalIgnoreCase)
                 && grantedCodes.Contains($"{moduleId}:page"))
-            || grantedCodes.Contains(requiredPermission);
+            || grantedCodes.Contains(requiredPermission)
+            || hasResourceAccess
+            || ((moduleId is "productengineering" or "processengineering")
+                && grantedCodes.Contains(PermissionCatalog.GetActionCode("engineering", action)))
+            || (permissionAttr?.AdditionalPermissionCodes.Any(grantedCodes.Contains) ?? false);
 
         if (!hasAccess)
         {
@@ -160,6 +175,7 @@ public class PermissionAuthorizeFilter : IAsyncAuthorizationFilter
 // 記錄所有 API 操作的 Audit Log Filter
 public class AuditLogFilter : IAsyncActionFilter
 {
+    private const int MaxActionLength = 50;
     private readonly ErpGeneralDbContext _db;
     private readonly ILogger<AuditLogFilter> _logger;
 
@@ -209,10 +225,13 @@ public class AuditLogFilter : IAsyncActionFilter
 
             if (action != null && path.StartsWithSegments("/api"))
             {
+                var actionDescription = $"{action} {path}";
                 var log = new AuditLog
                 {
                     UserId = userId,
-                    Action = $"{action} {path}",
+                    Action = actionDescription.Length <= MaxActionLength
+                        ? actionDescription
+                        : actionDescription[..MaxActionLength],
                     TableName = ExtractTableName(path),
                     IpAddress = context.HttpContext.Connection.RemoteIpAddress?.ToString(),
                     UserAgent = context.HttpContext.Request.Headers["User-Agent"].FirstOrDefault(),

@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
 import {
   LayoutDashboard, ShoppingCart, Truck, Package, Factory,
-  ShieldCheck, Users, Landmark, Building2, PieChart,
+  ShieldCheck, Users, Landmark, Building2, PieChart, Settings,
   FlaskConical, Leaf, BrainCircuit, MessageSquare,
   HelpCircle,
   Scale, Network, DollarSign, GitBranch, CalendarDays,
@@ -17,7 +17,7 @@ import './Sidebar.css';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard, ShoppingCart, Truck, Package, Factory,
-  ShieldCheck, Users, Landmark, Building2, PieChart,
+  ShieldCheck, Users, Landmark, Building2, PieChart, Settings,
   FlaskConical, Leaf, BrainCircuit, MessageSquare, Scale, Network, DollarSign, GitBranch, CalendarDays,
   ClipboardList, CalendarClock, Map, Wrench, Scan,
   Link, Clock, FileOutput, Lightbulb, Activity,
@@ -47,6 +47,12 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'dashboard', label: '全廠戰情室', icon: 'LayoutDashboard', group: 'main' },
       { id: 'kpi', label: 'KPI 指標看板', icon: 'PieChart', group: 'main' },
+    ],
+  },
+  {
+    label: '協同作業',
+    items: [
+      { id: 'calendar', label: '行事曆', icon: 'CalendarDays', group: 'calendar' },
     ],
   },
   {
@@ -145,8 +151,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [, setHoveredItem] = useState<string | null>(null);
   const { themeName, setTheme } = useTheme();
-  const { hasModule, isLoading: roleLoading } = useRole();
-  const { data: badgesData } = useSidebarBadges();
+  const { hasModule, hasPermission, moduleAccess, isLoading: roleLoading } = useRole();
+  const { data: badgesData } = useSidebarBadges(!roleLoading && hasModule('dashboard'));
   const badges = badgesData?.data || {
     salesCount: 0,
     procurementCount: 0,
@@ -180,7 +186,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isModuleAccessible = (moduleId: string): boolean => {
     if (roleLoading) return false;
-    if (moduleId === 'customers') return hasModule('sales');
+    if (moduleId === 'customers') {
+      const hasScopedSalesAccess = moduleAccess.some(access => access.moduleId.startsWith('sales:'));
+      return hasScopedSalesAccess
+        ? hasPermission('sales:customers', 'view')
+        : hasModule('sales');
+    }
     if (moduleId === 'suppliers') return hasModule('suppliers');
     return hasModule(moduleId);
   };

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ErpBackend.DTOs;
+using ErpBackend.Filters;
 using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
@@ -75,6 +76,36 @@ public class BomsController : BaseController
     {
         var dto = await _bomService.GetCostRollupAsync(id);
         return dto == null ? NotFound(ApiHelper.FailOf<BomCostRollupDto>("找不到 BOM")) : Ok(dto);
+    }
+
+    /// <summary>Recalculates and approves the BOM rollup as the product SKU's standard cost.</summary>
+    [PermissionAuthorize("engineering", "approve")]
+    [HttpPost("{id:guid}/cost-rollup/approve")]
+    [ProducesResponseType(typeof(ApiResponse<BomStandardCostRollupApprovalDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ApiResponse<BomStandardCostRollupApprovalDto>>> ApproveCostRollup(
+        Guid id,
+        [FromBody] ApplyBomStandardCostRollupRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var (dto, status) = await _bomService.ApplyStandardCostRollupAsync(
+            id,
+            request.ExpectedTotalCost,
+            GetUserId(),
+            cancellationToken);
+
+        return status switch
+        {
+            "not_found" => NotFound(ApiHelper.FailOf<BomStandardCostRollupApprovalDto>("找不到 BOM 或產品 SKU")),
+            "inactive_bom" => Conflict(ApiHelper.FailOf<BomStandardCostRollupApprovalDto>("BOM 必須啟用且在有效期間內，才能核准標準成本")),
+            "obsolete_bom" => Conflict(ApiHelper.FailOf<BomStandardCostRollupApprovalDto>("此 BOM 已非最新有效版本，請改用最新版本核准")),
+            "invalid_bom" => BadRequest(ApiHelper.FailOf<BomStandardCostRollupApprovalDto>("BOM 必須至少包含一筆有效元件")),
+            "stale_cost" => Conflict(ApiHelper.FailOf<BomStandardCostRollupApprovalDto>("BOM 成本已變更，請重新試算並確認後再核准")),
+            _ => Ok(dto!)
+        };
     }
 
     [Authorize]

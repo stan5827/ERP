@@ -654,7 +654,15 @@ export const Procurement: React.FC = () => {
                           {pr.status === 'APPROVED' && (
                             <button className="btn-sm btn-outline" onClick={() => { setSelectedPr(pr); setShowAddPoFromPr(true); }}>轉PO</button>
                           )}
-                          <button className="action-btn" title="檢視" onClick={() => { setSelectedPr(pr); setShowEditPr(true); }}><Eye size={13} /></button>
+                          <button
+                            className="action-btn action-btn-view"
+                            title="檢視"
+                            aria-label={`檢視請購單 ${pr.prNumber}`}
+                            onClick={() => { setSelectedPr(pr); setShowEditPr(true); }}
+                          >
+                            <Eye size={16} strokeWidth={2} aria-hidden="true" />
+                            <span>檢視</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -742,7 +750,15 @@ export const Procurement: React.FC = () => {
                           {['confirmed', 'partial_received', 'partially_received'].includes(String(po.status || '').toLowerCase()) && (
                             <button className="btn-sm btn-primary" onClick={() => handleReceivePo(po)}>收料入庫</button>
                           )}
-                          <button className="action-btn" title="檢視" aria-label={`檢視採購單 ${po.poNumber || po.po_no}`} onClick={() => handleViewPo(po.id)}><Eye size={13} /></button>
+                          <button
+                            className="action-btn action-btn-view"
+                            title="檢視"
+                            aria-label={`檢視採購單 ${po.poNumber || po.po_no}`}
+                            onClick={() => handleViewPo(po.id)}
+                          >
+                            <Eye size={16} strokeWidth={2} aria-hidden="true" />
+                            <span>檢視</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -799,6 +815,8 @@ export const Procurement: React.FC = () => {
         open={showAdd || showEditPo} 
         title={selectedPo?.id ? `編輯採購單 ${selectedPo.poNumber}` : (selectedPr ? "從 PR 轉化採購指令 (三單匹配啟動)" : "智動化下達 PO")}
         width={1000}
+        dialogClassName="po-create-modal"
+        centered
         initialValues={selectedPo ? { ...selectedPo } : undefined}
         onClose={() => { setShowAdd(false); setShowEditPo(false); setSelectedPr(null); setPoItems([]); setSelectedPo(null); }}
         fields={poFields}
@@ -824,13 +842,18 @@ export const Procurement: React.FC = () => {
         }}
         customRenderers={{
           _poItems: (
-            <div className="items-editor">
+            <div className="items-editor po-items-editor">
               <div className="editor-header">
-                <h4>採購品項明細 (BOM/MRP 聯動)</h4>
-                <button type="button" className="btn-sm btn-outline" onClick={() => setPoItems([...poItems, { skuId: '', quantity: 1, unitPrice: 0 }])}>新增物料</button>
+                <div>
+                  <h4>採購品項明細</h4>
+                  <p>BOM / MRP 聯動 · 請確認品號、數量與採購單位</p>
+                </div>
+                <button type="button" className="btn-sm btn-outline po-add-item" onClick={() => setPoItems([...poItems, { skuId: '', quantity: 1, unitPrice: 0 }])}>
+                  <Plus size={14} /> 新增物料
+                </button>
               </div>
               <div className="items-grid">
-                <div className="item-row" style={{ gridTemplateColumns: '3fr 0.8fr 0.8fr 1fr 40px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, paddingBottom: 8 }}>
+                <div className="item-row po-item-header-row" style={{ gridTemplateColumns: '3fr 0.8fr 0.8fr 1fr 40px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, paddingBottom: 8 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--slate-500)' }}>物料品號 / 規格描述 *</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--slate-500)' }}>採購數量 *</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--slate-500)' }}>採購單位</div>
@@ -838,7 +861,7 @@ export const Procurement: React.FC = () => {
                   <div></div>
                 </div>
                 {poItems.map((item, i) => (
-                  <div key={i} className="item-row" style={{ gridTemplateColumns: '3fr 0.8fr 0.8fr 1fr 40px' }}>
+                  <div key={i} className="item-row po-item-row" style={{ gridTemplateColumns: '3fr 0.8fr 0.8fr 1fr 40px' }}>
                     <PurchaseSkuSearch
                       selectedLabel={item.skuLabel}
                       initialSearchTerm={item.skuSearchTerm}
@@ -866,6 +889,20 @@ export const Procurement: React.FC = () => {
                     <button type="button" className="btn-icon danger" onClick={() => setPoItems(poItems.filter((_, idx) => idx !== i))}><Trash2 size={14} /></button>
                   </div>
                 ))}
+                {poItems.length === 0 && (
+                  <div className="po-items-empty">
+                    <ShoppingBag size={20} />
+                    <strong>尚未加入採購品項</strong>
+                    <span>使用「新增物料」選取可採購品項，並輸入數量與單價。</span>
+                  </div>
+                )}
+              </div>
+              <div className="po-items-summary">
+                <span>{poItems.length} 項物料</span>
+                <strong>
+                  未稅預估
+                  <span>NT$ {poItems.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0).toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </strong>
               </div>
             </div>
           )
@@ -1321,8 +1358,17 @@ export const Procurement: React.FC = () => {
       <style>{`
         .module-page { color: var(--slate-200); position: relative; }
         .module-page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .breadcrumb { font-size: 11px; color: var(--gold-400); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+        .breadcrumb { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--gold-400); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
         .module-page-title { font-size: 24px; font-weight: 800; color: #fff; background: linear-gradient(90deg, #fff, var(--gold-400)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .module-page .header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+        .module-page .search-box { display: flex; align-items: center; gap: 10px; flex: 1 1 320px; width: clamp(260px, 25vw, 390px); min-width: 0; height: 40px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--glass-border); border-radius: 10px; background: var(--glass-bg); color: var(--slate-400); }
+        .module-page .search-box input { flex: 1; min-width: 0; width: 100%; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: var(--slate-100); font: inherit; font-size: 13px; }
+        .module-page .search-box input::placeholder { color: var(--slate-500); opacity: 1; }
+        .module-page .header-actions > .btn { flex: 0 0 auto; min-height: 40px; white-space: nowrap; }
+        @media (max-width: 900px) {
+          .module-page .header-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+          .module-page .search-box { flex: 1 1 260px; }
+        }
         
         /* KPI Cards */
         .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
@@ -1342,7 +1388,7 @@ export const Procurement: React.FC = () => {
         .lux-table { width: 100%; border-collapse: separate; border-spacing: 0 0; }
         .lux-table th { padding: 14px 20px; text-align: left; font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .lux-table td { padding: 16px 20px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.02); }
-        .mono-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--cobalt-400); }
+        .mono-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--theme-text); }
         .amount-label { font-family: 'JetBrains Mono', monospace; color: var(--amber-400); font-weight: 600; text-align: right; }
         
         /* Badges */
@@ -1356,6 +1402,11 @@ export const Procurement: React.FC = () => {
         .action-row { display: flex; gap: 8px; align-items: center; }
         .action-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; color: var(--slate-400); cursor: pointer; transition: all 0.2s; }
         .action-btn:hover { background: rgba(255,255,255,0.08); color: var(--lux-gold); }
+        .action-btn.action-btn-view { width: auto; min-width: 62px; height: 34px; gap: 6px; padding: 0 9px; color: var(--theme-text, #e2e8f0); font-size: 11px; font-weight: 600; white-space: nowrap; background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(124,58,237,0.14)); border: 1px solid rgba(148,163,184,0.32); border-radius: 9px; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+        .action-btn.action-btn-view svg { display: block; width: 16px; height: 16px; flex: 0 0 16px; stroke: currentColor; }
+        .action-btn.action-btn-view:hover { color: #fff; background: linear-gradient(135deg, rgba(59,130,246,0.42), rgba(124,58,237,0.32)); border-color: rgba(129,173,255,0.65); transform: translateY(-1px); box-shadow: 0 5px 14px rgba(59,130,246,0.28); }
+        .action-btn.action-btn-view:active { transform: translateY(0); }
+        .action-btn.action-btn-view:focus-visible { outline: 2px solid var(--theme-text); outline-offset: 2px; }
         
         /* Forms & PR/PO Editors */
         .form-input.mandatory { border-left: 3px solid #fbbf24 !important; }
@@ -1366,6 +1417,58 @@ export const Procurement: React.FC = () => {
         .pr-edit-table { width: 100%; border-collapse: collapse; }
         .pr-edit-table th { padding: 10px 12px; text-align: left; font-size: 11px; color: var(--slate-500); border-bottom: 2px solid rgba(255,255,255,0.05); text-transform: uppercase; }
         .pr-edit-table td { padding: 8px; }
+
+        .po-create-modal { max-width: calc(100vw - 32px); }
+        .po-create-modal-header { background: linear-gradient(110deg, rgba(37, 99, 235, 0.12), rgba(212, 175, 55, 0.06)); }
+        .po-create-modal-header h3 { font-size: 17px !important; letter-spacing: 0.01em; }
+        .po-create-modal-header button { color: var(--slate-400) !important; transition: color 0.18s, background 0.18s; }
+        .po-create-modal-header button:hover { color: var(--slate-100) !important; background: rgba(255,255,255,0.08) !important; }
+        .po-create-modal-form { padding: 22px 28px 20px !important; }
+        .po-create-modal-form > div:first-child { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 18px !important; }
+        .po-create-modal-form > div:first-child > div:nth-child(3) { grid-column: 1 / -1; }
+        .po-create-modal-form label { color: var(--slate-300) !important; font-size: 12px !important; letter-spacing: 0.02em !important; text-transform: none !important; }
+        .po-create-modal-form .form-input { min-height: 42px; border-radius: 10px; transition: border-color 0.18s, box-shadow 0.18s; }
+        .po-create-modal-form .form-input:focus { border-color: rgba(96, 165, 250, 0.8); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); outline: none; }
+        .po-create-modal-footer { margin-top: 18px !important; padding-top: 16px !important; }
+        .po-create-modal-footer > div:last-child { gap: 10px !important; }
+        .po-create-modal-footer .btn { min-height: 38px; border-radius: 9px; }
+        .po-create-modal .po-items-editor { margin-top: 0; padding: 20px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 14px; background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(8, 13, 24, 0.92)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.025); }
+        .po-create-modal .po-items-editor .editor-header { margin-bottom: 12px; padding-bottom: 14px; border-bottom-color: rgba(148, 163, 184, 0.14); }
+        .po-create-modal .po-items-editor .editor-header h4 { margin: 0; color: var(--slate-100); font-size: 15px; font-weight: 700; }
+        .po-create-modal .po-items-editor .editor-header p { margin: 5px 0 0; color: var(--slate-500); font-size: 11px; line-height: 1.5; }
+        .po-create-modal .po-add-item { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 9px; white-space: nowrap; }
+        .po-create-modal .po-item-header-row { grid-template-columns: minmax(0, 3fr) minmax(82px, 0.8fr) minmax(72px, 0.8fr) minmax(120px, 1fr) 36px !important; gap: 10px; margin-bottom: 0 !important; padding: 0 0 10px !important; border-bottom-color: rgba(148, 163, 184, 0.16) !important; }
+        .po-create-modal .po-item-header-row > div { color: var(--slate-400) !important; font-size: 10px !important; letter-spacing: 0.04em; }
+        .po-create-modal .po-item-row { grid-template-columns: minmax(0, 3fr) minmax(82px, 0.8fr) minmax(72px, 0.8fr) minmax(120px, 1fr) 36px !important; align-items: center; gap: 10px; margin: 0; padding: 12px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1); }
+        .po-create-modal .po-item-row > * { min-width: 0; }
+        .po-create-modal .po-item-row input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 40px; border-radius: 9px; }
+        .po-create-modal .po-item-row input[readonly] { color: var(--slate-400); background: rgba(255,255,255,0.035); }
+        .po-create-modal .po-item-row .btn-icon { width: 34px; height: 34px; border-radius: 9px; }
+        .po-create-modal .po-items-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; min-height: 116px; padding: 18px; color: var(--slate-500); text-align: center; }
+        .po-create-modal .po-items-empty svg { color: #60a5fa; opacity: 0.8; }
+        .po-create-modal .po-items-empty strong { color: var(--slate-300); font-size: 13px; }
+        .po-create-modal .po-items-empty span { font-size: 11px; line-height: 1.5; }
+        .po-create-modal .po-items-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 10px; background: rgba(255,255,255,0.025); color: var(--slate-400); font-size: 12px; }
+        .po-create-modal .po-items-summary strong { display: flex; align-items: center; gap: 12px; color: var(--slate-400); font-weight: 600; }
+        .po-create-modal .po-items-summary strong span { color: #fbbf24; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
+        @media (max-width: 760px) {
+          .po-create-modal-form { padding: 18px !important; }
+          .po-create-modal-form > div:first-child { grid-template-columns: minmax(0, 1fr); gap: 14px !important; }
+          .po-create-modal .po-items-editor { padding: 14px; }
+          .po-create-modal .po-item-header-row { display: none; }
+          .po-create-modal .po-item-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 9px; }
+          .po-create-modal .po-item-row > :first-child { grid-column: 1 / -1; }
+          .po-create-modal .po-item-row > :last-child { justify-self: end; align-self: end; }
+        }
+        @media (max-width: 440px) {
+          .po-create-modal { max-width: calc(100vw - 20px); }
+          .po-create-modal-header { padding: 14px 16px !important; }
+          .po-create-modal-form { padding: 14px !important; }
+          .po-create-modal .po-items-editor { padding: 12px; }
+          .po-create-modal .po-items-editor .editor-header { align-items: flex-start; gap: 10px; }
+          .po-create-modal .po-add-item { padding: 0 9px; font-size: 11px; }
+          .po-create-modal .po-items-summary { align-items: flex-start; flex-direction: column; }
+        }
 
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

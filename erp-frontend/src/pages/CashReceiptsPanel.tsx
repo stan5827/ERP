@@ -58,6 +58,7 @@ export const CashReceiptsPanel: React.FC = () => {
   const customers = customersQuery.data ?? [];
   const bankAccounts = (bankAccountsQuery.data ?? []).filter(account =>
     account.isActive && !!account.glAccountId
+      && account.glAccountIsActive && account.glAccountIsCashAccount
   );
   const receipts = receiptsQuery.data ?? [];
   const selectedReceipt = receipts.find(receipt => receipt.id === selectedReceiptId);
@@ -220,7 +221,7 @@ export const CashReceiptsPanel: React.FC = () => {
               <option value="">選擇有效的銀行／現金帳戶</option>
               {bankAccounts.map((account: BankAccountDto) => (
                 <option key={account.id} value={account.id}>
-                  {account.bankCode || account.bankName || '收款帳戶'} - {account.accountNumber || account.currency} ({account.currency})
+                  {account.bankCode || account.bankName || '收款帳戶'} - {account.accountName ? `${account.accountName} · ` : ''}{account.accountNumber || account.currency} ({account.currency})
                 </option>
               ))}
             </select>

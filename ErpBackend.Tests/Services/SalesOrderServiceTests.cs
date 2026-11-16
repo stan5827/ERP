@@ -1,5 +1,6 @@
 using ErpBackend.Data;
 using ErpBackend.DTOs;
+using ErpBackend.Models.Inventory;
 using ErpBackend.Models.Sales;
 using ErpBackend.Services;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,53 @@ namespace ErpBackend.Tests.Services;
 
 public class SalesOrderServiceTests
 {
+    [Fact]
+    public async Task GetSalesOrdersAsync_IncludesChineseSalesUnitName()
+    {
+        var options = new DbContextOptionsBuilder<ErpGeneralDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new ErpGeneralDbContext(options);
+        var sku = new Sku
+        {
+            SkuNumber = "FG-001",
+            SkuName = "測試商品",
+            Unit = "BRANCH",
+            SalesUom = new Uom { UomCode = "BRANCH", UomName = "支" }
+        };
+        var customer = new Customer
+        {
+            CustomerCode = "C-TEST",
+            CustomerName = "Test customer"
+        };
+        db.SalesOrders.Add(new SalesOrder
+        {
+            OrderNumber = "SO-TEST-UNIT",
+            CustomerId = customer.Id,
+            Customer = customer,
+            OrderDate = DateTime.UtcNow,
+            Items =
+            [
+                new SalesOrderItem
+                {
+                    LineNumber = 1,
+                    ProductId = sku.Id,
+                    SkuId = sku.Id,
+                    Sku = sku,
+                    Quantity = 1,
+                    UnitPrice = 100
+                }
+            ]
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new SalesOrderService(db, new StateMachineService()).GetSalesOrdersAsync();
+
+        var item = Assert.Single(Assert.Single(result).Items);
+        Assert.Equal("BRANCH", item.Unit);
+        Assert.Equal("支", item.UnitName);
+    }
+
     [Fact]
     public async Task UpdateStatusAsync_PersistsStatusChange()
     {

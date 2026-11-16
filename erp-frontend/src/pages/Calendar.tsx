@@ -5,9 +5,10 @@ import {
   Clock, MapPin, Users, Flag, Wrench, BookOpen, FolderOpen, Sun, CheckCircle2, Factory, Loader2, X, AlertTriangle,
   Edit2, Trash2, Calendar as CalendarIcon
 } from 'lucide-react';
-import { useCalendarRange, useCalendarCategories, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent, useMeetingRooms, useCreateCalendarCategory, useCreateMeetingRoom } from '../hooks/useApi';
+import { useCalendarRange, useCalendarCategories, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent, useMeetingRooms, useCreateCalendarCategory, useCreateMeetingRoom, useCompanyHolidays } from '../hooks/useApi';
 import { calendarApi } from '../api/api';
 import type { CalendarEventDto, CalendarCategoryDto } from '../api/api';
+import { getTaiwanHolidays, toDateKey, type TaiwanHoliday } from '../utils/taiwanHolidays';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -115,6 +116,7 @@ export const Calendar: React.FC = () => {
   const { data: rangeData, isLoading } = useCalendarRange(startStr, endStr);
   const { data: categoriesData } = useCalendarCategories();
   const { data: meetingRoomsData } = useMeetingRooms();
+  const { data: holidaysResponse } = useCompanyHolidays(range.start.getFullYear());
 
   const events = useMemo(() => {
     const raw = (rangeData?.data as CalendarEventDto[]) || [];
@@ -124,6 +126,33 @@ export const Calendar: React.FC = () => {
 
   const categories = (categoriesData?.data as CalendarCategoryDto[]) || [];
   const meetingRooms = meetingRoomsData?.data || [];
+  const holidays = useMemo(() => {
+    const builtIn = getTaiwanHolidays(range.start.getFullYear());
+    const years = new Set([range.start.getFullYear(), range.end.getFullYear()]);
+    for (const year of years) {
+      if (year !== range.start.getFullYear()) builtIn.push(...getTaiwanHolidays(year));
+    }
+    const stored = (holidaysResponse?.data || []) as Array<{
+      name: string;
+      date: string;
+      holidayType: string;
+    }>;
+    const merged = [...builtIn];
+    for (const holiday of stored) {
+      const date = holiday.date.slice(0, 10);
+      if (!merged.some(item => item.date === date && item.name === holiday.name)) {
+        merged.push({
+          date,
+          name: holiday.name,
+          holidayType: holiday.holidayType === 'national' ? 'national' : 'important',
+        });
+      }
+    }
+    return merged;
+  }, [range.start, range.end, holidaysResponse]);
+
+  const getHolidaysForDay = (day: Date): TaiwanHoliday[] =>
+    holidays.filter(holiday => holiday.date === toDateKey(day));
 
   const openForm = (event: CalendarEventDto | null) => {
     const startDate = new Date();
@@ -225,6 +254,20 @@ export const Calendar: React.FC = () => {
               <div style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--cobalt-400)' : 'var(--slate-300)', marginBottom: 3 }}>
                 {day.getDate()}
               </div>
+              {getHolidaysForDay(day).map((holiday, holidayIndex) => (
+                <div
+                  key={`${holiday.date}-${holidayIndex}`}
+                  title={holiday.name}
+                  style={{
+                    fontSize: 9, padding: '1px 4px', marginBottom: 1, borderRadius: 3,
+                    color: holiday.holidayType === 'national' ? '#FCA5A5' : '#FCD34D',
+                    background: holiday.holidayType === 'national' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.10)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}
+                >
+                  {holiday.name}
+                </div>
+              ))}
               {dayEvents.slice(0, 3).map((evt, ei) => (
                 <div
                   key={ei}
@@ -261,9 +304,15 @@ export const Calendar: React.FC = () => {
         <div style={{ background: 'rgba(255,255,255,0.04)' }} />
         {weekDays.map((day, i) => {
           const isToday = isSameDay(day, today);
+          const dayHolidays = getHolidaysForDay(day);
           return (
             <div key={i} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.04)', color: isToday ? 'var(--cobalt-400)' : 'var(--slate-400)' }}>
               {weekDayLabels[i]}<br />{day.getMonth() + 1}/{day.getDate()}
+              {dayHolidays.length > 0 && (
+                <div style={{ marginTop: 4, color: '#FCA5A5', fontSize: 9, fontWeight: 500 }}>
+                  {dayHolidays.map(holiday => holiday.name).join('、')}
+                </div>
+              )}
             </div>
           );
         })}
@@ -319,9 +368,29 @@ export const Calendar: React.FC = () => {
     const allDayEvents = dayEvents.filter(e => e.isAllDay);
     const timedEvents = dayEvents.filter(e => !e.isAllDay);
     const hours = Array.from({ length: 24 }, (_, i) => i);
+    const dayHolidays = getHolidaysForDay(currentDate);
 
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, overflow: 'hidden' }}>
+        {dayHolidays.length > 0 && (
+          <>
+            <div style={{ padding: '6px 8px', fontSize: 10, color: '#FCA5A5', background: 'rgba(239,68,68,0.08)' }}>假日</div>
+            <div style={{ padding: '4px', display: 'flex', flexWrap: 'wrap', gap: 4, background: 'rgba(239,68,68,0.08)' }}>
+              {dayHolidays.map((holiday, index) => (
+                <div
+                  key={`${holiday.date}-${index}`}
+                  style={{
+                    fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                    color: holiday.holidayType === 'national' ? '#FCA5A5' : '#FCD34D',
+                    background: 'rgba(255,255,255,0.04)',
+                  }}
+                >
+                  {holiday.name}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {/* All-day events */}
         {allDayEvents.length > 0 && (
           <>

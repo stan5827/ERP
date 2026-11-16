@@ -56,6 +56,24 @@ public class UsersController : BaseController
         };
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse>> Update(Guid id, [FromBody] UpdateUserRequestDto request)
+    {
+        var actorId = GetUserId();
+        if (actorId == Guid.Empty)
+            return Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
+
+        var (found, status) = await _userService.UpdateAsync(id, request, actorId);
+        if (status == "invalid_email")
+            return BadRequest(ApiHelper.Fail("Email is invalid"));
+        if (!found)
+            return status == "not_found"
+                ? NotFound(ApiHelper.Fail("User not found"))
+                : Unauthorized(ApiHelper.Fail("Authenticated user identity is required"));
+
+        return Ok("User updated successfully");
+    }
+
     [HttpPut("{id:guid}/roles")]
     public async Task<ActionResult<ApiResponse>> UpdateRoles(Guid id, [FromBody] UpdateUserRolesRequest request)
     {

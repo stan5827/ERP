@@ -4,6 +4,7 @@ import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { departmentsApi, jobTitlesApi, jobGradesApi, approvalsApi } from '../api/api';
+import { getApplicableJobTitles } from '../utils/hrOrganization';
 
 function toPascalCase(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -33,6 +34,7 @@ const applicableDeptTypeOptions = [
   { value: '', label: '全部' },
   { value: 'production', label: '生產部門' },
   { value: 'admin', label: '管理部門' },
+  { value: 'finance', label: '財務部門' },
   { value: 'service', label: '服務部門' },
 ];
 
@@ -51,7 +53,7 @@ interface DepartmentRecord {
   displayOrder?: number;
   description?: string;
   isActive?: boolean;
-  employeeCount: number;
+  employeeCount?: number;
   children?: DepartmentRecord[];
 }
 
@@ -65,7 +67,7 @@ interface JobGradeRecord {
   overtimeRate: number;
   travelLimit: number;
   approvalLimit: number;
-  employeeCount: number;
+  employeeCount?: number;
   description?: string;
 }
 
@@ -77,7 +79,7 @@ interface JobTitleRecord {
   gradeCode?: string;
   applicableDeptType?: string;
   isSupervisor: boolean;
-  employeeCount: number;
+  employeeCount?: number;
   description?: string;
 }
 
@@ -118,7 +120,7 @@ function isDepartmentRecord(value: unknown): value is DepartmentRecord {
     && typeof value.id === 'string'
     && typeof value.deptCode === 'string'
     && typeof value.deptName === 'string'
-    && typeof value.employeeCount === 'number'
+    && (value.employeeCount === undefined || typeof value.employeeCount === 'number')
     && (value.children === undefined || (Array.isArray(value.children) && value.children.every(isDepartmentRecord)));
 }
 
@@ -133,7 +135,7 @@ function isJobGradeRecord(value: unknown): value is JobGradeRecord {
     && typeof value.overtimeRate === 'number'
     && typeof value.travelLimit === 'number'
     && typeof value.approvalLimit === 'number'
-    && typeof value.employeeCount === 'number';
+    && (value.employeeCount === undefined || typeof value.employeeCount === 'number');
 }
 
 function isJobTitleRecord(value: unknown): value is JobTitleRecord {
@@ -142,7 +144,7 @@ function isJobTitleRecord(value: unknown): value is JobTitleRecord {
     && typeof value.titleCode === 'string'
     && typeof value.titleName === 'string'
     && typeof value.isSupervisor === 'boolean'
-    && typeof value.employeeCount === 'number';
+    && (value.employeeCount === undefined || typeof value.employeeCount === 'number');
 }
 
 function isApprovalAuthorityRecord(value: unknown): value is ApprovalAuthorityRecord {
@@ -161,6 +163,7 @@ function isApprovalAuthorityRecord(value: unknown): value is ApprovalAuthorityRe
 export const OrganizationManagement: React.FC = () => {
   const [activeView, setActiveView] = useState<OrganizationView>('departments');
   const [search, setSearch] = useState('');
+  const [titleDepartmentFilter, setTitleDepartmentFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState<DepartmentRecord[]>([]);
   const [departmentTree, setDepartmentTree] = useState<DepartmentRecord[]>([]);
@@ -193,12 +196,14 @@ export const OrganizationManagement: React.FC = () => {
         const res = await jobGradesApi.list();
         setGrades((res.data?.data ?? []).filter(isJobGradeRecord));
       } else if (activeView === 'titles') {
-        const [titlesRes, gradesRes] = await Promise.all([
+        const [titlesRes, gradesRes, departmentsRes] = await Promise.all([
           jobTitlesApi.list(),
           jobGradesApi.list(),
+          departmentsApi.flat(),
         ]);
         setTitles((titlesRes.data?.data ?? []).filter(isJobTitleRecord));
         setGrades((gradesRes.data?.data ?? []).filter(isJobGradeRecord));
+        setDepartments((departmentsRes.data?.data ?? []).filter(isDepartmentRecord));
       } else if (activeView === 'approvals') {
         const [authRes, gradesRes] = await Promise.all([
           approvalsApi.authorities(),
@@ -345,9 +350,9 @@ export const OrganizationManagement: React.FC = () => {
             <span style={{ fontSize: 10, padding: '2px 6px', background: `${typeConfig.color}20`, color: typeConfig.color, borderRadius: 3, marginRight: 8 }}>
               {typeConfig.label}
             </span>
-            {node.employeeCount > 0 && (
+            {(node.employeeCount ?? 0) > 0 && (
               <span style={{ fontSize: 10, padding: '2px 6px', background: 'var(--slate-700)', color: 'var(--slate-400)', borderRadius: 3 }}>
-                {node.employeeCount} 人
+                {node.employeeCount ?? 0} 人
               </span>
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
@@ -360,6 +365,21 @@ export const OrganizationManagement: React.FC = () => {
       );
     });
   };
+
+  const selectedTitleDepartment = departments.find(department => department.id === titleDepartmentFilter);
+  const titlesForDepartment = titleDepartmentFilter
+    ? getApplicableJobTitles(titles, selectedTitleDepartment)
+    : titles;
+  const filteredTitles = titlesForDepartment.filter(title => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return true;
+
+    const departmentLabel = applicableDeptTypeOptions.find(option => option.value === title.applicableDeptType)?.label
+      ?? title.applicableDeptType
+      ?? '全部';
+    return [title.titleCode, title.titleName, title.gradeCode, departmentLabel, title.description]
+      .some(value => value?.toLocaleLowerCase().includes(query));
+  });
 
   return (
     <div className="module-page page-enter">
@@ -383,11 +403,44 @@ export const OrganizationManagement: React.FC = () => {
         ))}
       </div>
 
-      <div className="glass-card" style={{ padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'center' }}>
+      {activeView === 'titles' && (
+        <div className="role-guide-banner">
+          <div className="role-guide-icon"><UserCheck size={24} /></div>
+          <div>
+            <h3>職稱代表員工在公司擔任的工作</h3>
+            <p>設定職稱名稱後，可選擇預設職等、適用部門及是否為主管職。建立完成後，就能在員工資料中選用。</p>
+          </div>
+        </div>
+      )}
+
+      <div className={`glass-card${activeView === 'titles' ? ' job-title-toolbar' : ''}`} style={{ padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'center' }}>
         <div className="filter-search" style={{ flex: 1, maxWidth: 300 }}>
           <Search size={13} style={{ color: 'var(--slate-500)' }} />
-          <input className="search-input" placeholder="搜尋..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input
+            className="search-input"
+            placeholder={activeView === 'titles' ? '搜尋職稱、代碼、職等或部門...' : '搜尋...'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
+        {activeView === 'titles' && (
+          <select
+            value={titleDepartmentFilter}
+            onChange={e => setTitleDepartmentFilter(e.target.value)}
+            aria-label="依部門篩選職稱"
+            style={{ padding: '8px 12px', background: 'var(--slate-800)', border: '1px solid var(--slate-700)', borderRadius: 6, color: 'var(--slate-300)', fontSize: 13, outline: 'none' }}
+          >
+            <option value="">全部部門</option>
+            {departments.filter(department => department.isActive !== false).map(department => (
+              <option key={department.id} value={department.id}>
+                {department.deptCode} - {department.deptName}
+              </option>
+            ))}
+          </select>
+        )}
+        {activeView === 'titles' && (
+          <span className="job-title-result-count">共 {filteredTitles.length} 個職稱</span>
+        )}
         {activeView === 'departments' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingDept(null); setShowDeptModal(true); }}><Plus size={13} />新增部門</button>}
         {activeView === 'grades' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingGrade(null); setShowGradeModal(true); }}><Plus size={13} />新增職等</button>}
         {activeView === 'titles' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingTitle(null); setShowTitleModal(true); }}><Plus size={13} />新增職稱</button>}
@@ -421,7 +474,7 @@ export const OrganizationManagement: React.FC = () => {
                       <td className="mono" style={{ color: g.approvalLimit > 0 ? 'var(--emerald-300)' : 'var(--slate-600)' }}>
                         {g.approvalLimit > 0 ? g.approvalLimit.toLocaleString() : '無'}
                       </td>
-                      <td><span style={{ padding: '2px 8px', background: 'var(--slate-700)', borderRadius: 4, fontSize: 12 }}>{g.employeeCount}</span></td>
+                      <td><span style={{ padding: '2px 8px', background: 'var(--slate-700)', borderRadius: 4, fontSize: 12 }}>{g.employeeCount ?? 0}</span></td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button className="icon-action-btn" onClick={() => { setEditingGrade(g); setShowGradeModal(true); }}><Edit2 size={13} /></button>
@@ -436,31 +489,67 @@ export const OrganizationManagement: React.FC = () => {
           )}
 
           {activeView === 'titles' && (
-            <div className="glass-card" style={{ overflow: 'hidden' }}>
-              <table className="data-table">
-                <thead><tr><th>職稱代碼</th><th>職稱名稱</th><th>預設職等</th><th>適用部門</th><th>主管職</th><th>人數</th><th>操作</th></tr></thead>
-                <tbody>
-                  {titles.filter(t => !search || t.titleCode.includes(search) || t.titleName.includes(search)).map(t => (
-                    <tr key={t.id}>
-                      <td className="mono" style={{ color: 'var(--cobalt-300)', fontWeight: 700 }}>{t.titleCode}</td>
-                      <td style={{ fontWeight: 500 }}>{t.titleName}</td>
-                      <td>{t.gradeCode ? <span style={{ padding: '2px 8px', background: 'var(--slate-700)', borderRadius: 4, fontSize: 12 }}>{t.gradeCode}</span> : <span style={{ color: 'var(--slate-500)' }}>—</span>}</td>
-                      <td style={{ color: 'var(--slate-400)', fontSize: 12 }}>
-                        {applicableDeptTypeOptions.find(option => option.value === t.applicableDeptType)?.label ?? t.applicableDeptType ?? '全部'}
-                      </td>
-                      <td><span style={{ fontSize: 11, padding: '2px 8px', background: t.isSupervisor ? 'rgba(16,185,129,0.15)' : 'var(--slate-700)', color: t.isSupervisor ? 'var(--emerald-400)' : 'var(--slate-500)', borderRadius: 4 }}>{t.isSupervisor ? '是' : '否'}</span></td>
-                      <td><span style={{ padding: '2px 8px', background: 'var(--slate-700)', borderRadius: 4, fontSize: 12 }}>{t.employeeCount}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="icon-action-btn" onClick={() => { setEditingTitle(t); setShowTitleModal(true); }}><Edit2 size={13} /></button>
-                          <button className="icon-action-btn" style={{ color: 'var(--crimson-400)' }} onClick={() => handleDelete('job-titles', t.id)}><Trash2 size={13} /></button>
+            filteredTitles.length === 0 ? (
+              <div className="glass-card role-empty-state">
+                {search ? `找不到符合「${search}」的職稱。` : '尚無職稱資料，請新增第一個職稱。'}
+              </div>
+            ) : (
+              <div className="role-card-grid job-title-card-grid">
+                {filteredTitles.map(title => {
+                  const TitleIcon = title.isSupervisor ? Shield : UserCheck;
+                  const departmentLabel = applicableDeptTypeOptions.find(option => option.value === title.applicableDeptType)?.label
+                    ?? title.applicableDeptType
+                    ?? '全部部門';
+                  return (
+                    <article className="role-card glass-card" key={title.id}>
+                      <div className="role-card-heading">
+                        <div className="role-card-icon"><TitleIcon size={22} /></div>
+                        <div className="role-card-title">
+                          <div className="role-card-badges">
+                            <span className="role-kind-badge system">{title.titleCode}</span>
+                            <span className={`role-kind-badge${title.isSupervisor ? ' system' : ''}`}>
+                              {title.isSupervisor ? '主管職' : '一般職稱'}
+                            </span>
+                          </div>
+                          <h3>{title.titleName}</h3>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                      <p className="role-card-description">
+                        {title.description || (title.isSupervisor
+                          ? '主管職稱，可用於員工任用與主管職務辨識。'
+                          : '可供員工資料選用，並可設定預設職等與適用部門。')}
+                      </p>
+                      <div className="job-title-card-meta">
+                        <div className="job-title-meta-item">
+                          <span>預設職等</span>
+                          <strong>{title.gradeCode || '尚未指定'}</strong>
+                        </div>
+                        <div className="job-title-meta-item">
+                          <span>適用範圍</span>
+                          <strong>{departmentLabel}</strong>
+                        </div>
+                      </div>
+                      <div className="role-card-footer">
+                        <span className="role-permission-count"><Users size={14} /> {title.employeeCount ?? 0} 位員工</span>
+                        <div className="role-card-actions">
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setEditingTitle(title); setShowTitleModal(true); }}>
+                            <Edit2 size={14} /> 編輯
+                          </button>
+                          <button
+                            className="icon-action-btn"
+                            onClick={() => handleDelete('job-titles', title.id)}
+                            title="刪除職稱"
+                            aria-label={`刪除職稱 ${title.titleName}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )
           )}
 
           {activeView === 'approvals' && (

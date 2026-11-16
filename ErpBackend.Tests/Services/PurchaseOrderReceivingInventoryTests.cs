@@ -163,6 +163,8 @@ public class PurchaseOrderReceivingInventoryTests
         Assert.Equal(15750m, purchaseOrder.ReceivedAmount);
         Assert.Equal("received", purchaseOrder.Status);
         Assert.Equal(150m, sku.Qty);
+        Assert.Equal(157.5m, sku.LatestPurchaseCost);
+        Assert.Equal(0m, sku.StandardCost);
         var lot = await db.InventoryLots.SingleAsync();
         Assert.Equal(100m, lot.Qty);
         Assert.Equal("quarantine", lot.Status);

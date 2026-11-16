@@ -365,6 +365,39 @@ public class Payroll
     public ICollection<PayrollDetail> Details { get; set; } = new List<PayrollDetail>();
 }
 
+public class PayrollPolicyVersion
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required, MaxLength(50)] public string VersionCode { get; set; } = null!;
+    [Required] public DateOnly EffectiveFrom { get; set; }
+    [Required, MaxLength(200)] public string ApprovalDocumentReference { get; set; } = null!;
+    [Required] public string PolicyJson { get; set; } = "{}";
+    [Required, MaxLength(30)] public string Status { get; set; } = "draft";
+    [Required] public Guid CreatedByUserId { get; set; }
+    [Required] public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    [Required] public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid? SubmittedByUserId { get; set; }
+    public DateTimeOffset? SubmittedAt { get; set; }
+    public Guid? FinanceReviewerUserId { get; set; }
+    public DateTimeOffset? FinanceReviewedAt { get; set; }
+    [MaxLength(1000)] public string? ReviewComment { get; set; }
+
+    public ICollection<PayrollPolicyAuditEvent> AuditEvents { get; set; } = new List<PayrollPolicyAuditEvent>();
+}
+
+public class PayrollPolicyAuditEvent
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required] public Guid PayrollPolicyVersionId { get; set; }
+    [Required, MaxLength(30)] public string Action { get; set; } = null!;
+    [Required] public Guid ActorUserId { get; set; }
+    [Required] public DateTimeOffset OccurredAt { get; set; } = DateTimeOffset.UtcNow;
+    [MaxLength(2000)] public string? Details { get; set; }
+
+    [ForeignKey(nameof(PayrollPolicyVersionId))]
+    public PayrollPolicyVersion PolicyVersion { get; set; } = null!;
+}
+
 public class PayrollDetail
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();

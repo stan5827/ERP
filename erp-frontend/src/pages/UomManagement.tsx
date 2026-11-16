@@ -40,7 +40,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const uomTypeConfig: Record<string, { label: string; color: string }> = {
-  數量: { label: '數量', color: 'var(--cobalt-400)' },
+  數量: { label: '數量', color: 'var(--theme-text)' },
   重量: { label: '重量', color: 'var(--emerald-400)' },
   長度: { label: '長度', color: 'var(--amber-400)' },
   面積: { label: '面積', color: 'var(--violet-400)' },
@@ -264,7 +264,7 @@ export const UomManagement: React.FC = () => {
                       const typeConfig = uomTypeConfig[u.uomType] ?? { label: u.uomType, color: 'var(--slate-400)' };
                       return (
                         <tr key={u.id}>
-                          <td className="mono" style={{ color: 'var(--cobalt-300)', fontWeight: 600 }}>{u.uomCode}</td>
+                          <td className="mono" style={{ color: 'var(--theme-text)', fontWeight: 600 }}>{u.uomCode}</td>
                           <td style={{ fontWeight: 500 }}>{u.uomName}</td>
                           <td style={{ color: 'var(--slate-400)', fontSize: 12 }}>{u.uomNameEn ?? '—'}</td>
                           <td>
@@ -322,7 +322,7 @@ export const UomManagement: React.FC = () => {
                     filteredConversions.map(c => (
                       <tr key={c.id}>
                         <td>
-                          <span className="mono" style={{ color: 'var(--cobalt-300)' }}>{c.fromUomCode}</span>
+                          <span className="mono" style={{ color: 'var(--theme-text)' }}>{c.fromUomCode}</span>
                           <div style={{ fontSize: 11, color: 'var(--slate-500)' }}>{c.fromUomName}</div>
                         </td>
                         <td style={{ textAlign: 'center', color: 'var(--slate-500)' }}>

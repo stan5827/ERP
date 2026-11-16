@@ -15,6 +15,7 @@ public interface IAuthService
     Task<LoginResponse?> LoginAsync(LoginRequest request);
     Task<(bool Success, string? Error)> ChangePasswordAsync(Guid userId, string oldPassword, string newPassword);
     Task<bool> ResetUserPasswordAsync(string username, string newPassword, Guid resetByUserId);
+    Task<bool> RecoverAdminPasswordAsync(string username, string newPassword, string operatorIdentity);
 }
 
 public class AuthService : IAuthService
@@ -112,6 +113,13 @@ public class AuthService : IAuthService
 
         var token = GenerateJwtToken(user.Id, user.EmployeeId, user.Username, user.SecurityVersion, roles, permissions);
 
+        var employeeName = user.EmployeeId.HasValue
+            ? await _db.Employees
+                .Where(employee => employee.Id == user.EmployeeId.Value && employee.Status == "active")
+                .Select(employee => employee.ChineseName)
+                .FirstOrDefaultAsync()
+            : null;
+
         user.LastLoginAt = now;
         AddLoginAuditEvent(user.Id, user.Id, "LOGIN_SUCCESS", "User authenticated successfully.", now);
         await _db.SaveChangesAsync();
@@ -121,6 +129,7 @@ public class AuthService : IAuthService
         {
             UserId = user.Id,
             EmployeeId = user.EmployeeId,
+            EmployeeName = employeeName,
             Username = user.Username,
             Email = user.Email,
             Token = token,
@@ -230,15 +239,66 @@ public class AuthService : IAuthService
 
     public async Task<bool> ResetUserPasswordAsync(string username, string newPassword, Guid resetByUserId)
     {
-        if (string.IsNullOrWhiteSpace(newPassword)
-            || newPassword.Length < 8
-            || !System.Text.RegularExpressions.Regex.IsMatch(newPassword, @"[A-Za-z]")
-            || !System.Text.RegularExpressions.Regex.IsMatch(newPassword, @"[0-9]")
-            || resetByUserId == Guid.Empty)
+        if (resetByUserId == Guid.Empty)
             return false;
 
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
         if (user == null)
+            return false;
+
+        return await ResetPasswordAsync(
+            user,
+            newPassword,
+            resetByUserId,
+            "USER_PASSWORD_RESET",
+            "Password reset by an authorized administrator.",
+            resetByUserId);
+    }
+
+    public async Task<bool> RecoverAdminPasswordAsync(string username, string newPassword, string operatorIdentity)
+    {
+        if (string.IsNullOrWhiteSpace(operatorIdentity)
+            || operatorIdentity.Length > 80
+            || operatorIdentity.Any(char.IsControl))
+            return false;
+
+        var user = await _db.Users
+            .Include(account => account.UserRoles)
+            .ThenInclude(userRole => userRole.Role)
+            .FirstOrDefaultAsync(account => account.Username == username);
+        if (user == null
+            || !user.IsActive
+            || !user.UserRoles.Any(userRole =>
+                userRole.Role.IsActive && userRole.Role.RoleName == "Admin"))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(newPassword)
+            || newPassword.Length < 16
+            || !System.Text.RegularExpressions.Regex.IsMatch(newPassword, @"[A-Za-z]")
+            || !System.Text.RegularExpressions.Regex.IsMatch(newPassword, @"[0-9]"))
+            return false;
+
+        return await ResetPasswordAsync(
+            user,
+            newPassword,
+            null,
+            "USER_PASSWORD_RECOVERY",
+            $"Offline administrator recovery. Operator: {operatorIdentity}",
+            null);
+    }
+
+    private async Task<bool> ResetPasswordAsync(
+        User user,
+        string newPassword,
+        Guid? resetByUserId,
+        string auditAction,
+        string auditDetails,
+        Guid? loginEventActorId)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword)
+            || newPassword.Length < 8
+            || !System.Text.RegularExpressions.Regex.IsMatch(newPassword, @"[A-Za-z]")
+            || !System.Text.RegularExpressions.Regex.IsMatch(newPassword, @"[0-9]"))
             return false;
 
         var passwordHistory = await _db.PasswordHistories
@@ -271,14 +331,23 @@ public class AuthService : IAuthService
         user.SecurityVersion = checked(user.SecurityVersion + 1);
         _db.AuditLogs.Add(new AuditLog
         {
-            Action = "USER_PASSWORD_RESET",
+            Action = auditAction,
             EntityType = nameof(User),
             EntityId = user.Id,
             UserId = resetByUserId,
             TableName = "Users",
-            Details = "Password reset by an authorized administrator."
+            Details = auditDetails
         });
-        AddLoginAuditEvent(resetByUserId, user.Id, "LOGIN_LOCKOUT_RELEASED", "Lockout cleared during password reset.", DateTime.UtcNow);
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Action = "LOGIN_LOCKOUT_RELEASED",
+            EntityType = nameof(User),
+            EntityId = user.Id,
+            UserId = loginEventActorId,
+            TableName = "Users",
+            Details = "Lockout cleared during password recovery.",
+            CreatedAt = DateTime.UtcNow
+        });
 
         await _db.SaveChangesAsync();
         return true;

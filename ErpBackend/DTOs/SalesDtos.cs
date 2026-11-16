@@ -95,6 +95,7 @@ public class QuoteItemDto
     public string? SkuNumber { get; set; }
     public string? SkuName { get; set; }
     public string? Unit { get; set; }
+    public string? UnitName { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal DiscountRate { get; set; }
@@ -179,6 +180,7 @@ public class SalesOrderItemDto
     public string? SkuNumber { get; set; }
     public string? SkuName { get; set; }
     public string? Unit { get; set; }
+    public string? UnitName { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal DiscountRate { get; set; }

@@ -158,6 +158,78 @@ public class MaterialIssueServiceTests
     }
 
     [Fact]
+    public async Task Post_UsesPurchaseReceiptCostForSelectedLot()
+    {
+        await using var db = CreateDbContext();
+        var (workOrder, sku, _, warehouse) = SeedWorkOrder(db, stockQty: 0);
+        const string lotNumber = "LOT-COST-1";
+        const decimal receivedQuantity = 10m;
+        sku.LotControlled = true;
+        sku.Qty = receivedQuantity;
+        sku.LatestPurchaseCost = 999m;
+        sku.StandardCost = 5m;
+        var binLocation = new BinLocation
+        {
+            WarehouseId = warehouse.Id,
+            LocationCode = "BIN-1"
+        };
+        db.BinLocations.Add(binLocation);
+        db.InventoryLots.Add(new InventoryLot
+        {
+            SkuId = sku.Id,
+            LotNumber = lotNumber,
+            Qty = receivedQuantity,
+            WarehouseId = warehouse.Id,
+            BinLocationId = binLocation.Id
+        });
+        db.InventoryTransactions.Add(new InventoryTransaction
+        {
+            TrxId = "GR-COST-001",
+            SkuId = sku.Id,
+            Type = "purchase_receipt",
+            QtyChange = receivedQuantity,
+            QtyBefore = 0,
+            QtyAfter = receivedQuantity,
+            LotNumber = lotNumber,
+            WarehouseId = warehouse.Id,
+            BinLocationId = binLocation.Id,
+            UnitCost = 150m,
+            TotalCost = 1500m
+        });
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var (draft, draftStatus) = await service.CreateDraftAsync(workOrder.Id);
+        Assert.Equal("ok", draftStatus);
+
+        var (posted, status) = await service.PostAsync(
+            draft!.Id,
+            new PostMaterialIssueRequestDto
+            {
+                Allocations =
+                [
+                    new MaterialIssueAllocationRequestDto
+                    {
+                        IssueItemId = Assert.Single(draft.Items).Id,
+                        WarehouseId = warehouse.Id,
+                        BinLocationId = binLocation.Id,
+                        LotNumber = lotNumber,
+                        IssuedQty = 2m
+                    }
+                ]
+            },
+            Guid.NewGuid());
+
+        Assert.Equal("ok", status);
+        var issueTransaction = await db.InventoryTransactions
+            .SingleAsync(transaction => transaction.Type == "work_order_issue");
+        Assert.Equal(150m, issueTransaction.UnitCost);
+        Assert.Equal(300m, issueTransaction.TotalCost);
+        var allocation = await db.MaterialIssueItemAllocations.SingleAsync();
+        Assert.Equal(150m, allocation.UnitCost);
+    }
+
+    [Fact]
     public async Task Post_WhenStockIsInsufficient_DoesNotWriteInventoryTransaction()
     {
         await using var db = CreateDbContext();

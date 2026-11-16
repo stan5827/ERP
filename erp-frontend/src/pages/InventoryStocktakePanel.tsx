@@ -6,6 +6,7 @@ import type {
   WarehouseDto,
 } from '../api/inventory';
 import { LotQrCamera } from '../components/LotQrCamera';
+import { useRole } from '../contexts/useRole';
 import { parseLotQr } from '../utils/lotQr';
 
 type LotQrData = ReturnType<typeof parseLotQr>;
@@ -20,6 +21,9 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function InventoryStocktakePanel() {
+  const { currentRole, hasPermission } = useRole();
+  const canPostStocktake = currentRole === 'admin'
+    || hasPermission('inventory:stocktake', 'execute');
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
   const [warehouseCode, setWarehouseCode] = useState('');
   const [rawQr, setRawQr] = useState('');
@@ -177,9 +181,11 @@ export function InventoryStocktakePanel() {
               <label>盤點差異<input className="form-input" value={Number(countedQty || 0) - balance.systemQty} readOnly /></label>
             </div>
             <div>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => void postCount()} disabled={busy}>
-                {busy ? '過帳中…' : '確認差異並過帳'}
-              </button>
+              {canPostStocktake && (
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => void postCount()} disabled={busy}>
+                  {busy ? '過帳中…' : '確認差異並過帳'}
+                </button>
+              )}
             </div>
           </div>
         )}

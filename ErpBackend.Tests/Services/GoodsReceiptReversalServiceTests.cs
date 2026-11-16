@@ -85,6 +85,40 @@ public class GoodsReceiptReversalServiceTests
     }
 
     [Fact]
+    public async Task ReverseAsync_RecalculatesLatestPurchaseCostFromLastValidReceipt()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        fixture.Sku.Qty = 150m;
+        fixture.Sku.LatestPurchaseCost = 150m;
+        fixture.OriginalTransaction.QtyBefore = 50m;
+        fixture.OriginalTransaction.QtyAfter = 150m;
+        fixture.OriginalTransaction.UnitCost = 150m;
+        fixture.OriginalTransaction.TotalCost = 15000m;
+        fixture.OriginalTransaction.CreatedAt = DateTime.UtcNow;
+        fixture.Db.InventoryTransactions.Add(new InventoryTransaction
+        {
+            TrxId = "GR-PREVIOUS-001",
+            SkuId = fixture.Sku.Id,
+            Type = "purchase_receipt",
+            QtyChange = 50m,
+            QtyBefore = 0m,
+            QtyAfter = 50m,
+            WarehouseId = fixture.Warehouse.Id,
+            BinLocationId = fixture.BinLocation.Id,
+            UnitCost = 120m,
+            TotalCost = 6000m,
+            CreatedAt = fixture.OriginalTransaction.CreatedAt.AddHours(-1)
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        await fixture.Service.ReverseAsync(
+            fixture.Receipt.Id, "沖銷最新收貨", fixture.ActorId, CancellationToken.None);
+
+        Assert.Equal(120m, fixture.Sku.LatestPurchaseCost);
+        Assert.Equal(0m, fixture.Sku.StandardCost);
+    }
+
+    [Fact]
     public async Task ReverseAsync_RejectsIncorrectOriginalQuantitySnapshot()
     {
         await using var fixture = await CreateFixtureAsync();

@@ -49,6 +49,8 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<OvertimeRequest> OvertimeRequests => Set<OvertimeRequest>();
     public DbSet<ShiftSchedule> ShiftSchedules => Set<ShiftSchedule>();
     public DbSet<Payroll> Payrolls => Set<Payroll>();
+    public DbSet<PayrollPolicyVersion> PayrollPolicyVersions => Set<PayrollPolicyVersion>();
+    public DbSet<PayrollPolicyAuditEvent> PayrollPolicyAuditEvents => Set<PayrollPolicyAuditEvent>();
     public DbSet<PayrollDetail> PayrollDetails => Set<PayrollDetail>();
     public DbSet<PayrollAnomaly> PayrollAnomalies => Set<PayrollAnomaly>();
     public DbSet<PayrollCorrection> PayrollCorrections => Set<PayrollCorrection>();
@@ -137,6 +139,7 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<WipReportAuditEvent> WipReportAuditEvents => Set<WipReportAuditEvent>();
     public DbSet<EquipmentUsageRecord> EquipmentUsageRecords => Set<EquipmentUsageRecord>();
     public DbSet<ScrapRecord> ScrapRecords { get; set; } = null!;
+    public DbSet<FqcScrapApprovalEvent> FqcScrapApprovalEvents => Set<FqcScrapApprovalEvent>();
     public DbSet<ApsScheduleResult> ApsScheduleResults { get; set; } = null!;
     public DbSet<Equipment> Equipments => Set<Equipment>();
     public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
@@ -555,6 +558,7 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<IpqcReportItem> IpqcReportItems => Set<IpqcReportItem>();
     public DbSet<OqcReport> OqcReports => Set<OqcReport>();
     public DbSet<InspectionTemplate> InspectionTemplates => Set<InspectionTemplate>();
+    public DbSet<InspectionTemplateSku> InspectionTemplateSkus => Set<InspectionTemplateSku>();
     public DbSet<InspectionTemplateItem> InspectionTemplateItems => Set<InspectionTemplateItem>();
     public DbSet<ProcessInspectionReport> ProcessInspectionReports => Set<ProcessInspectionReport>();
     public DbSet<ProcessInspectionReportItem> ProcessInspectionReportItems => Set<ProcessInspectionReportItem>();
@@ -673,6 +677,14 @@ if (entityType.ClrType.GetProperty("CreatedAt") == null)
         modelBuilder.Entity<ShiftSchedule>().HasIndex(s => new { s.EmployeeId, s.YearMonth }).IsUnique();
         modelBuilder.Entity<Payroll>().HasIndex(p => new { p.EmployeeId, p.PeriodStart, p.PeriodEnd });
         modelBuilder.Entity<Payroll>().HasIndex(p => p.Status);
+        modelBuilder.Entity<PayrollPolicyVersion>().HasIndex(p => p.VersionCode).IsUnique();
+        modelBuilder.Entity<PayrollPolicyVersion>().HasIndex(p => new { p.Status, p.EffectiveFrom });
+        modelBuilder.Entity<PayrollPolicyAuditEvent>()
+            .HasOne(e => e.PolicyVersion)
+            .WithMany(p => p.AuditEvents)
+            .HasForeignKey(e => e.PayrollPolicyVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PayrollPolicyAuditEvent>().HasIndex(e => new { e.PayrollPolicyVersionId, e.OccurredAt });
         modelBuilder.Entity<PayrollDetail>().HasOne(pd => pd.Payroll).WithMany(p => p.Details).HasForeignKey(pd => pd.PayrollId);
         modelBuilder.Entity<PayrollAnomaly>().HasOne(pa => pa.Employee).WithMany().HasForeignKey(pa => pa.EmployeeId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<PayrollCorrection>().HasOne(pc => pc.Anomaly).WithMany().HasForeignKey(pc => pc.AnomalyId).OnDelete(DeleteBehavior.Restrict);
@@ -701,7 +713,9 @@ if (entityType.ClrType.GetProperty("CreatedAt") == null)
         // Sku relations
         modelBuilder.Entity<Sku>().HasIndex(s => s.SkuNumber).IsUnique();
         modelBuilder.Entity<Sku>().HasIndex(s => s.Barcode);
-        modelBuilder.Entity<InventoryLot>().HasIndex(il => new { il.SkuId, il.LotNumber }).IsUnique();
+        modelBuilder.Entity<InventoryLot>()
+            .HasIndex(il => new { il.SkuId, il.LotNumber, il.WarehouseId, il.BinLocationId })
+            .IsUnique();
         modelBuilder.Entity<SerialNumber>().HasIndex(sn => sn.SerialNo).IsUnique();
         modelBuilder.Entity<InventoryTransaction>().HasIndex(it => it.CreatedAt);
         modelBuilder.Entity<InventoryTransaction>().HasIndex(it => new { it.SkuId, it.CreatedAt });
@@ -1042,6 +1056,9 @@ if (entityType.ClrType.GetProperty("CreatedAt") == null)
 
         // ========== Cost Center: Indexes & Relations ==========
         modelBuilder.Entity<CostCenter>().HasIndex(cc => cc.CostCenterCode).IsUnique();
+        modelBuilder.Entity<CostCenter>().ToTable(table => table.HasCheckConstraint(
+            "CK_CostCenters_AreaSquareMeters_NonNegative",
+            "\"AreaSquareMeters\" IS NULL OR \"AreaSquareMeters\" >= 0"));
         modelBuilder.Entity<CostCenter>().HasOne(cc => cc.ParentCostCenter).WithMany(cc => cc.ChildCostCenters).HasForeignKey(cc => cc.ParentCostCenterId);
         modelBuilder.Entity<CostCenter>().HasOne(cc => cc.Department).WithMany().HasForeignKey(cc => cc.DepartmentId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<CostCenter>().HasOne(cc => cc.WorkCenter).WithMany().HasForeignKey(cc => cc.WorkCenterId).OnDelete(DeleteBehavior.SetNull);
@@ -1197,6 +1214,7 @@ if (entityType.ClrType.GetProperty("CreatedAt") == null)
             .HasForeignKey(mapping => mapping.GLAccountId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<AccountingEntry>().HasOne(ae => ae.Voucher).WithMany(v => v.Entries).HasForeignKey(ae => ae.VoucherId);
+        modelBuilder.Entity<AccountingEntry>().HasOne(ae => ae.WorkOrder).WithMany().HasForeignKey(ae => ae.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<AccountingPeriod>().HasIndex(period => period.PeriodCode).IsUnique();
 
         // ========== Budget: Relations ==========
@@ -1238,15 +1256,31 @@ if (entityType.ClrType.GetProperty("CreatedAt") == null)
         modelBuilder.Entity<OqcReport>().HasIndex(oqr => oqr.ReportNumber).IsUnique();
         modelBuilder.Entity<InspectionTemplate>().HasIndex(t => new { t.TemplateCode, t.Version }).IsUnique();
         modelBuilder.Entity<InspectionTemplate>().HasOne(t => t.Operation).WithMany().HasForeignKey(t => t.OperationId).OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<InspectionTemplate>().HasOne(t => t.ProductSku).WithMany().HasForeignKey(t => t.ProductSkuId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InspectionTemplateSku>().HasKey(ts => new { ts.TemplateId, ts.ProductSkuId });
+        modelBuilder.Entity<InspectionTemplateSku>().HasOne(ts => ts.Template).WithMany(t => t.ProductSkus)
+            .HasForeignKey(ts => ts.TemplateId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<InspectionTemplateSku>().HasOne(ts => ts.ProductSku).WithMany()
+            .HasForeignKey(ts => ts.ProductSkuId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<InspectionTemplateItem>().HasOne(i => i.Template).WithMany(t => t.Items).HasForeignKey(i => i.TemplateId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ProcessInspectionReport>().HasIndex(r => r.ReportNumber).IsUnique();
         modelBuilder.Entity<ProcessInspectionReport>().HasIndex(r => new { r.WorkOrderId, r.OperationSeq, r.LotNumber });
         modelBuilder.Entity<FqcInspectionLot>().HasIndex(lot => lot.InspectionNumber).IsUnique();
         modelBuilder.Entity<FqcInspectionLot>().HasIndex(lot => new { lot.WorkOrderId, lot.LotNumber }).IsUnique();
+        modelBuilder.Entity<FqcInspectionLot>().HasIndex(lot => lot.ReworkSourceInspectionLotId).IsUnique();
+        modelBuilder.Entity<FqcInspectionLot>()
+            .HasOne(lot => lot.ReworkSourceInspectionLot)
+            .WithOne(lot => lot.ReworkInspectionLot)
+            .HasForeignKey<FqcInspectionLot>(lot => lot.ReworkSourceInspectionLotId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<ProductionReceipt>().HasIndex(receipt => receipt.ReceiptNumber).IsUnique();
         modelBuilder.Entity<ProductionReceiptItem>().HasIndex(item => new { item.ProductionReceiptId, item.FqcInspectionLotId }).IsUnique();
         modelBuilder.Entity<ScrapRecord>().HasIndex(item => item.FqcInspectionLotId).IsUnique();
+        modelBuilder.Entity<FqcScrapApprovalEvent>().HasIndex(item => new { item.ScrapRecordId, item.OccurredAt });
+        modelBuilder.Entity<FqcScrapApprovalEvent>()
+            .HasOne(item => item.ScrapRecord)
+            .WithMany(record => record.ApprovalEvents)
+            .HasForeignKey(item => item.ScrapRecordId)
+            .OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ProductionReceiptItem>().HasOne(item => item.FqcInspectionLot).WithMany(lot => lot.ReceiptItems).HasForeignKey(item => item.FqcInspectionLotId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<FqcInspectionFinding>().HasOne(finding => finding.FqcInspectionLot).WithMany(lot => lot.Findings).HasForeignKey(finding => finding.FqcInspectionLotId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ProcessInspectionReport>().HasOne(r => r.WorkOrder).WithMany().HasForeignKey(r => r.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
@@ -1345,7 +1379,8 @@ if (entityType.ClrType.GetProperty("CreatedAt") == null)
 
                 // Keep cascade for detail lines
                 if (dependentTable.EndsWith("Item") || dependentTable.EndsWith("Detail") ||
-                    dependentTable.EndsWith("Reply") || dependentTable.EndsWith("Version"))
+                    dependentTable.EndsWith("Reply") || dependentTable.EndsWith("Version") ||
+                    relationship.DeclaringEntityType.ClrType == typeof(InspectionTemplateSku))
                 {
                     continue; // Keep cascade
                 }

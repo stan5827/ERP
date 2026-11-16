@@ -32,11 +32,54 @@
 ```powershell
 # 建立一次性本機密鑰檔（不提交），每個值均使用隨機值
 # 啟動／查詢僅限 UAT project 的服務
-docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/docker-compose.uat.yml up -d --build
+docker-compose.uat.yml up -d --build
 docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/docker-compose.uat.yml ps
 ```
 
 移除 UAT 資料時，須先確認目前 Compose project 明確為 `erp-uat`，再由負責人核准移除該 project 專屬 volume；不得對一般 `deployment/docker-compose.yml` 執行 `down -v`。
+
+### 管理員帳號離線復原（僅限維運人員）
+
+若所有管理員均無法登入，後端提供互動式 `recover-admin` 維運命令；它不是 HTTP API，不會建立帳號、啟用停用帳號或授予管理員角色。命令只接受既有且啟用中的 Admin 帳號，會寫入稽核事件、清除登入鎖定、使既有 Token 失效，並要求該帳號下次登入變更密碼。
+
+- 執行前須取得系統／資料庫負責人核准，確認目標環境與帳號，並完成資料庫備份。
+- 在目標環境的受控終端執行；不得透過瀏覽器、HTTP endpoint、公開 runner 或聊天傳遞密碼。
+- 密碼只能在互動提示輸入，不可放在命令列、環境變數、shell script 或日誌。使用至少 16 個字元且含英文字母與數字的新密碼。
+- `--operator` 必須填寫核准單號或可追責的維運人員識別碼；此值會記入稽核紀錄。
+- 復原不會繞過停用狀態或管理員角色檢查；若帳號停用或已無 Admin 角色，先走既有身分治理／授權流程，不可用直接 SQL 改權限。
+
+如果管理員仍可登入、只需要重設其他使用者密碼，需另外設定網頁管理功能使用的 `ADMIN_RESET_SECRET`。離線 `recover-admin` 不使用此密鑰。UAT Compose 會將 `deployment/.env.uat.local` 中的 `ADMIN_RESET_SECRET` 傳給 backend；未設定時網頁重設 API 維持停用（HTTP 503）。由維運人員在受控 PowerShell 產生並追加一次性隨機值（此命令不輸出密鑰）：
+
+```powershell
+$envFile = "deployment/.env.uat.local"
+if (-not (Test-Path $envFile)) { throw "UAT env file is missing." }
+if (Select-String -Path $envFile -Pattern '^\s*ADMIN_RESET_SECRET\s*=' -Quiet) {
+    throw "ADMIN_RESET_SECRET already exists; rotate/manage it through the approved secret process."
+}
+$bytes = New-Object byte[] 48
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $rng.GetBytes($bytes)
+    $secret = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    Add-Content -Path $envFile -Value "ADMIN_RESET_SECRET=$secret"
+} finally {
+    $rng.Dispose()
+    [Array]::Clear($bytes, 0, $bytes.Length)
+    Remove-Variable secret -ErrorAction SilentlyContinue
+}
+docker compose --env-file $envFile -p erp-uat -f deployment/docker-compose.uat.yml up -d --no-deps backend
+```
+
+使用者需從受控的密鑰管理位置取用該值並輸入管理頁面；不要在聊天、截圖或一般文件中揭露。只把密鑰設定在本機 `.env.uat.local` 不會自動更新正在執行的容器，必須重新建立 backend 容器。正式環境需使用正式環境專用密鑰管理方式設定相同環境變數；禁止重用 UAT 密鑰。
+
+UAT 範例（先確認 `erp-uat` PostgreSQL 正常運作；命令會要求輸入確認字串及兩次隱藏密碼）：
+
+```powershell
+docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/docker-compose.uat.yml build backend
+docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/docker-compose.uat.yml run --rm backend recover-admin --username admin --operator "UAT-INC-20261104-01" --confirm
+```
+
+範例中的 `admin` 須換成目標資料庫內實際存在的啟用中管理員帳號。正式環境只能由正式環境授權維運人員依相同流程執行，並使用正式環境受保護的 Compose 環境檔與 project；不得使用 UAT 的環境檔、密碼或資料庫。執行後應確認命令成功及 `USER_PASSWORD_RECOVERY` 稽核事件，再由帳號持有人登入並立即設定個人密碼。
 
 ## 執行前檢查
 
@@ -52,7 +95,7 @@ docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/doc
 ### UAT-01：登入、角色與登出
 
 **負責人：** 各部門測試代表、系統管理員
-
+docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/
 - [ ] 以核准帳號登入，確認顯示的使用者與所屬角色正確。
 - [ ] 確認使用者只看到該角色授權的模組與資料。
 - [ ] 登出後重新整理頁面或直接開啟受保護頁面，確認不會沿用已登出的工作階段。
@@ -143,27 +186,47 @@ docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/doc
 - [ ] 若日後已取得核准且隔離的測試薪資資料，再驗證本人可讀取已發放明細、金額與期間正確。
 - [ ] 嘗試存取另一名員工的測試明細，確認伺服器端拒絕且不洩露資料。
 - [ ] 不執行薪資計算、不建立假薪資、不變更正式薪資狀態；公式與法規參數需先由 HR 核定。
+- [ ] 政策版本工作流部署到隔離 UAT 後，以合成政策測試草稿、欄位完整性檢查及 HR 送審；未確認正式核定文件時送審必須遭拒。
+- [ ] 以不同的合成財務帳號檢視政策內容、確認覆核意見與稽核事件；同一人覆核、缺少財務確認或覆核意見必須遭拒。
+- [ ] 即使政策版本記錄為已覆核，`CalculationEnabled` 必須維持 `false`，計薪 API 必須仍回 HTTP 503，且不得新增薪資、傳票或薪資單。
 
 **通過條件：** 本人資料範圍及空資料狀態正確；未授權跨員工存取遭拒。薪資計算與薪資內容若未核定，標記為未驗收。
+
+### UAT-09：薪資政策版本與雙人覆核控制（僅隔離 UAT）
+
+**負責人：** HR 薪資管理者、財務覆核者、系統管理員
+
+- [ ] 使用 `uat-hr` 建立只有合成內容的政策草稿；缺少法規表格／官方文件時，送審必須遭拒並顯示缺漏。
+- [ ] 未確認正式核定文件時，HR 送審及財務覆核均必須遭拒；不得以虛構的官方確認完成核准。
+- [ ] 只有在合成 UAT 文件明確標示為測試且由負責人核准時，才可測試 HR 送審、不同財務使用者覆核、送審後不可編輯與具名稽核事件。
+- [ ] 確認無權限帳號遭拒；即使政策覆核成功，計薪 API 仍須回 HTTP 503，且 `Payroll`、會計傳票及薪資單資料均不得增加。
+- [ ] 僅使用隔離 UAT 與合成資料；不套用正式薪資規則、不核算／過帳薪資、不發布薪資單。
+
+**通過條件：** 伺服器端權限、完整性與雙人限制皆符合預期；資料庫無非預期薪資副作用。此項技術驗證不代表正式薪資政策已獲 HR／財務核定。
+
+**政策工作流狀態：** 2026-11-04 已將新版 backend／Web 部署到隔離 UAT，並套用 `20261104124904_AddPayrollPolicyReviewWorkflow`；migration 前已建立 UAT 資料庫備份。API/Web 健康檢查及政策表／migration history 驗證通過，政策表目前均為 0 筆。尚未完成已登入的 HR／財務瀏覽器操作：目前沒有 `uat-finance-reviewer` 帳號，共享的 UAT 頁面仍顯示登入畫面；實際 UAT 計薪 API 503 尚待登入後驗證。不得以程式測試或 migration 套用取代業務驗收及正式核定。
 
 ## 結果紀錄與簽認
 
 | 案例 | 結果（通過／失敗／阻塞／未執行） | 執行人／日期 | 脫敏證據位置 | 缺失單號／負責人 |
 |---|---|---|---|---|
-| UAT-01 登入與權限 | 部分通過：四種合成角色 Web 登入、選單及登出／刷新通過；待 Key User 簽認 | 系統預檢／2026-11-04 | 本機 UAT 瀏覽器驗證（下列紀錄） | 待部門 Key User 簽認 |
+| UAT-01 登入與權限 | 部分通過：操作員可進入庫存頁且顯示「新增品碼」；覆核者可進入庫存頁且按鈕已隱藏。兩者頁面載入仍有側欄徽章、單位及收貨 API 403；待權限修正及 Key User 簽認 | 系統預檢／2026-11-05 | UAT 瀏覽器與只讀角色權限查詢（下列紀錄） | 待系統／倉管 Key User |
 | UAT-02 領料與庫存 | 部分通過：合成領料過帳及重複送出防護；待倉管 UI 驗收與簽認 | 系統預檢／2026-11-04 | 本機 UAT 庫存異動（下列紀錄） | 待倉管 Key User 簽認 |
-| UAT-03 庫存盤點 | QR 盤點程式與資料庫 migration 已部署至隔離 UAT；掃描、差異過帳與授權阻擋仍待實測 | 系統部署／2026-11-04 | UAT API/Web 健康檢查及 migration history | 待倉管 Key User 簽認 |
+| UAT-03 庫存盤點 | 部分通過：新批號差異 +1 經乾淨重建 backend 後過帳成功；資料庫確認 `CreatedBy`、`HandlerId`、關聯 `AuditLogs.UserId` 均對應操作員。相機實掃與倉管 Key User 簽認未完成 | 系統預檢／2026-11-05 | UAT 瀏覽器、backend health、唯讀資料庫查詢（下列紀錄） | 待相機實測及倉管 Key User 簽認 |
 | UAT-04 生產報工 | 部分通過：合成報工、主管核准及不重複扣料；待生產 UI 驗收與簽認 | 系統預檢／2026-11-04 | 本機 UAT API／工單進度（下列紀錄） | 待生產 Key User 簽認 |
 | UAT-05 現場打卡 | 未執行實際打卡：App 登入與考勤頁可用；待核准地點／實際裝置驗收 | 系統預檢／2026-11-04 | 本機 UAT 瀏覽器／API readiness | 待 HR／員工代表於核准地點操作 |
-| UAT-06 請假保護行為 | 部分通過：合成帳號送出遭 503 阻擋且資料筆數不變；請假流程未驗收 | 系統預檢／2026-11-04 | 本機 UAT ESS API 狀態碼與筆數（下列紀錄） | 待 HR 核定班表／假日與餘額規則 |
+| UAT-06 請假保護行為 | 部分通過：ESS 建立申請先前遭 503 阻擋且資料筆數不變；本次 HR 請假清單 API 回 404，UI 未能驗收 | 系統預檢／2026-11-05 | 本機 UAT ESS API、HR 瀏覽器及資料筆數（下列紀錄） | HR 請假 API 路徑待修正；待 HR 核定班表／假日與餘額規則 |
 | UAT-07 薪資明細與隔離 | 部分通過：合成員工無已發放薪資；未計算薪資或驗證公式 | 系統預檢／2026-11-04 | 本機 UAT ESS API 筆數（下列紀錄） | 待 HR 核定政策與資料 |
-| UAT-08 QR 盤點與 FQC | QR 解析、App/Web 掃描入口及 FQC 效期欄位已部署；實機相機、盤點過帳及 FQC 人工判定仍待實測 | 系統部署／2026-11-04 | UAT API/Web 健康檢查及 migration history | 待倉管／品保 Key User 簽認 |
+| UAT-08 QR 盤點與 FQC | 阻塞：QR 盤點技術過帳與稽核已驗證；無品質合成帳號，唯一合成工單仍為 `in_progress`；FQC、相機掃描及人工判定未執行 | 系統預檢／2026-11-05 | UAT 瀏覽器及隔離資料庫（下列紀錄） | 待建立品質合成帳號、完成工單並由品保 Key User 排程／簽認 |
+| UAT-09 薪資政策版本與雙人覆核 | HR 政策頁無版本且儲存草稿停用；未計薪或新增薪資資料。財務獨立覆核與登入後計薪保護仍待驗證 | 系統預檢／2026-11-05 | UAT HR 瀏覽器、政策／薪資資料筆數 | 待 HR 核定政策及具名合成財務覆核帳號 |
 
 ### 本機技術預檢與執行紀錄（非業務簽認）
 
 驗證日期：2026-11-04（UTC+08:00）。以下服務檢查與部署均指向隔離 UAT；未連接一般 Compose／正式資料。UAT 資料庫中的既有合成資料保留供後續 Key User 驗收。
 
 - **部署確認：** UAT API `http://localhost:5102/health` 與 Web `http://localhost:5176/` 回應 HTTP 200，API、Web、PostgreSQL 容器健康。EF migration `20261104095819_AddFqcLotExpiryDate` 已登記，`FqcInspectionLots.ExpiryDate` 欄位存在。這只確認部署與服務可用，不代表業務流程驗收。
+- **UAT-09 政策工作流部署：** 確認 Compose project 為 `erp-uat`，PostgreSQL 使用專屬 volume；migration 前備份後，部署新版 backend／Web 並套用 `20261104124904_AddPayrollPolicyReviewWorkflow`。`__EFMigrationsHistory` 已登記該 migration，`PayrollPolicyVersions` 與 `PayrollPolicyAuditEvents` 均存在且筆數為 0；API/Web 均 HTTP 200。未新增政策或薪資資料。政策 API 未登入回 HTTP 401；實際登入角色、HR 送審阻擋與登入後計薪 HTTP 503 尚未驗證。
+- **UAT-09 自動化保護測試（非 UAT UI 簽認）：** `PayrollPolicyWorkflowIntegrationTests` 與 `PayrollControllerIntegrationTests` 共 8 項通過，涵蓋缺漏欄位、官方來源確認、異人覆核、權限、核准後不可編輯及計薪 fail-closed；這些測試使用隔離的測試資料庫，不代表已由 UAT 使用者操作。
 - **UAT-01 Web 瀏覽器：** 以 HR、生產操作員、生產主管及一般員工四個合成帳號逐一登入；登入後角色名稱及可見模組與角色相符（一般員工未顯示 HR／庫存／生產管理選單）。逐一登出後畫面回到登入頁，刷新仍維持登出；瀏覽器頁面錯誤為 0。Web UI 技術預檢通過，仍待各部門 Key User 簽認。
 - **員工 App：** Expo Web `5177` 已重新啟動並設定 `EXPO_PUBLIC_API_BASE_URL=http://localhost:5102/api/erp`；登入頁與 JS bundle 可載入，App 單元測試及 TypeScript build 通過。尚未以帳號登入或操作相機／盤點／FQC。HEADLESS 瀏覽器沒有核准現場的真實定位，未按上／下班打卡，避免建立不實出勤紀錄。
 - HR 帳號查詢員工 API：200；一般員工查詢同一 HR API：403。
@@ -174,7 +237,7 @@ docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/doc
 - **UAT-04 合成 WIP：** 生產操作員送出報工 `WIR-813068850830-0003`（良品 2），生產主管核准後工序完成量為 2、工單狀態為 `in_progress`；核准前後原料結餘均為 40，確認 WIP 核准未再次扣料。
 - **UAT-06 請假保護：** 合成員工送出有效日期的 ESS 請假申請回應 HTTP 503；該員工申請筆數前後均為 0，確認目前未設定班表／假日規則時 fail-closed，沒有建立申請。
 - **UAT-07 薪資資料：** 合成員工 ESS 已發放薪資筆數為 0；未執行薪資計算或產生薪資資料。
-- **UAT-03／08 QR 盤點與 FQC：** 新版已部署且效期 migration 已套用；本次只完成服務及 schema 驗證，未建立新的盤點／FQC 寫入資料，未完成實際 QR 相機掃描、差異覆核過帳、重複／過期防護或 FQC 人工判定驗收。需由 Key User 使用合成資料完成操作並記錄結果。
+- **截至 2026-11-04 的 UAT-03／08 預檢：** 新版已部署且效期 migration 已套用；當時只完成服務及 schema 驗證，未完成實際 QR 相機掃描、差異覆核過帳、重複／過期防護或 FQC 人工判定驗收。
 - **UAT-05 實地打卡：** 只確認 App 登入與考勤頁載入；實際打卡須由員工在 HR 核准地點、以實際裝置完成，伺服器時間／紀錄再由 HR 核對。
 - QR 掃描已納入本次 MVP；實機相機與業務流程仍待驗收。請假業務流程、薪資公式驗收及各部門簽認亦未完成；本紀錄不得視為完整 UAT 通過或上線核准。
 
@@ -186,3 +249,72 @@ docker compose --env-file deployment/.env.uat.local -p erp-uat -f deployment/doc
 - 系統／營運負責人：__________________　日期：____________
 
 任何「失敗」或「阻塞」案例均須記錄缺失、影響範圍、負責人及預計處理日期。請假與薪資的已知限制，在政策、功能及測試完成並經業務負責人簽認前，不得標示為可上線。
+
+## 2026-11-05 業務核定窗口與 UAT 排程追蹤
+
+| 工作項目 | 負責窗口 | 核定／驗收狀態 |
+|---|---|---|
+| 請假、打卡政策；薪資政策起草 | 人資主管 | 已指派角色窗口；本次回覆尚未提供實際規則、官方依據或核定文件，政策仍待核定。 |
+| 薪資政策獨立財務覆核 | 資產管理人員 | 使用者確認此職務為核准的財務覆核窗口；執行 UAT 前仍須確認具名帳號有獨立覆核權限，且不得與起草／送審者為同一人。 |
+| QR 盤點 UAT | 倉管人員 | 已指派角色窗口；需以合成料號、批號及核准測試倉庫執行 UAT-03／08。 |
+| FQC UAT 與人工品質判定 | 倉儲主管 | 已指派角色窗口；需安排合成批號、抽樣資料及獨立品質判定人員，掃描本身不得放行。 |
+| QR／FQC UAT 時段 | 待排程 | 尚未提供日期與時段。 |
+| 實地打卡核准地點 | 待確認 | 「TAIWAN」不足以識別核准廠區；須由 HR 指定公司廠區／辦公地點及實際測試人員，不需在此記錄精確座標。 |
+
+### 尚待 HR／財務核定的規則
+
+- **請假：** 適用假別及資格、額度來源與累計／生效日、按日／小時／半日計算及進位方式、班表與假日日曆、申請提前期、簽核層級、取消／撤銷及假額回補。
+- **打卡：** 班別及上下班時段、遲到／早退寬限、加班認定與核准、補卡／更正流程、核准測試地點及圍欄由誰維護。
+- **薪資：** 計薪週期及生效日、薪資與津貼項目、加班及請假扣薪基礎、各項法定費率／級距與官方來源版本、扣繳與自提、金額進位、雇主負擔及總帳對應、正式核准文件。
+
+在 HR 提供並核定適用規則、財務完成獨立覆核且保存依據前，薪資計算保持停用；不得以建議範例、測試資料或口頭假設取代正式政策。UAT 日期與打卡廠區未確認前，QR／FQC 與現場打卡案例維持「未排程／未執行」。
+
+### 2026-11-05 隔離 UAT 現場執行紀錄（技術結果，非業務簽認）
+
+- **隔離確認：** UAT PostgreSQL 使用 `erp-uat_uat_postgres_data`，正式資料庫使用不同的 `deployment_postgres_data`；UAT PostgreSQL 未發布主機連接埠。本次僅操作 `http://localhost:5176/` 與隔離資料庫，未連接或修改正式環境。
+- **UAT-01 倉儲角色：** `uat-warehouse-operator` 與 `uat-warehouse-approver` 均可登入，側邊選單僅顯示庫存與條碼。兩角色登入後預設儀表板皆顯示「無法載入系統資料」，瀏覽器記錄多筆 403；需修正受限角色的預設頁面或提供明確權限提示。覆核角色沒有 `inventory:create` 權限，但庫存頁仍顯示「新增品碼」按鈕；僅確認按鈕可見，未送出新增。
+- **UAT-01 權限設定唯讀核對：** 倉儲作業角色具 `inventory:view/create/execute` 與 `barcode:view`；倉儲覆核角色具 `inventory:view/execute/approve` 與 `barcode:view`。未修改角色設定。`uat-employee` 目前沒有指派角色，未以此帳號進行員工自助服務驗收。
+- **UAT-03 QR 負向測試：** 格式錯誤的 QR `UAT-invalid-qr` 顯示格式錯誤訊息；實盤數輸入 `-1` 顯示「實盤數必須是大於或等於零的數字」，未進入確認過帳流程。
+- **UAT-03 QR 正向測試：** 以 `uat-warehouse-operator` 在 `FW02` 查詢合成料號 `UAT-SYNTH-20261104-172535-COMP` 的新批號 `UAT-QR-TEST-20261105-01`，效期 `2027-12-31`。帳面批號數 0、實盤數 1，經畫面明確確認後成功過帳，交易單 `STK-20261105104354-16701ac2`。資料庫確認異動為 `ADJUST_IN`／`Stocktake`、變更 `+1`，FW02 料號總量由 41 增至 42，批號量為 1。此為隔離 UAT 合成資料，應保留作後續驗收，不得部署至正式環境。
+- **UAT-03 稽核失敗：** 上述庫存異動有 `InventoryTransactions` 交易列，但 `CreatedBy` 與 `HandlerId` 皆為空，且該交易在 `AuditLogs` 無關聯紀錄。現有交易明細可追蹤數量變化，尚不足以識別執行者；稽核要求未通過，需修正後重測。
+- **UAT-06 請假 UI：** HR 帳號可開啟請假審批頁，但載入清單時 API 回 404，介面顯示 0 筆。前次 ESS 有效申請回 503 且筆數不變的預檢仍有效，但本次未重送申請；HR 請假 UI／API 整合未通過。
+- **UAT-09 薪資保護：** HR 薪資政策頁顯示尚無政策版本，空白政策的「儲存草稿」按鈕停用；薪資核算顯示 0 筆。本次未建立政策、薪資或請假資料，未執行計薪。財務覆核帳號及政策仍待核定。
+- **UAT-08 FQC／相機：** 未執行 FQC 或相機掃描。隔離資料庫沒有 FQC 批次，唯一合成工單仍為 `in_progress`，且尚無品質檢驗合成登入帳號；需先準備合成完成工單、品質角色帳號及 Key User，再執行人工判定流程。
+- **未簽認／未完成：** 本次記錄僅為系統技術驗收；HR、倉管、品保及財務尚未簽認。請假與薪資政策、現場打卡、FQC、相機實機、重複過帳防護及庫存稽核缺失未完成前，不得標示為完整 UAT 通過或上線核准。
+
+### 2026-11-05 工程修復進度（未部署、非 UAT 通過）
+
+- **庫存稽核：** 程式已加入登入者 `CreatedBy`／`HandlerId` 及與庫存異動關聯的 `AuditLogs` 寫入；盤點交易與稽核紀錄同次儲存。先前 UAT 交易不會回填或變更，須在隔離 UAT 以新的合成交易重測。
+- **角色首頁／按鈕：** 前端已改為依帳號可用權限選擇首頁，無可用模組時顯示提示；「新增品碼」按鈕依 `inventory:create` 隱藏。
+- **請假路由：** 前端請假 API 路徑已改為與後端 `/api/erp/leave-requests` 一致。此修復僅處理 404 路由；請假建立及核准目前仍受 fail-closed 規則限制，不能視為請假流程完成。
+- **驗證：** 前端建置成功，Vitest 12 個測試檔、38 個測試通過；以 .NET 10.0.403 SDK 容器執行稽核與 RBAC 回歸測試，16 項全數通過。現有 UAT 前端與後端健康端點均回 HTTP 200。修復仍未部署到 UAT。
+- **FQC／相機：** 尚未建立品質合成帳號或完成工單，也未排定相機實測時段；需由品保 Key User 提供測試時段並在隔離 UAT 執行及簽認。
+
+### 2026-11-05 19:25 隔離 UAT 修復部署（技術驗證，非業務簽認）
+
+- **部署範圍：** 由乾淨 detached worktree 建置，只包含本次庫存稽核、角色可用首頁／SKU 新增按鈕、請假路徑修復；排除目前工作樹中的薪資政策與資料庫遷移等未驗收變更。僅重建 UAT backend/frontend，未重啟 PostgreSQL；資料卷仍為 `erp-uat_uat_postgres_data`。
+- **容器健康：** UAT backend、frontend 健康檢查均為 healthy；`/health` 與前端首頁均回 HTTP 200。
+- **請假路由：** 未登入的 `GET /api/erp/leave-requests` 回 HTTP 401（非 404）；以既有 `uat-hr` 瀏覽器工作階段開啟「請假審批」頁時未觀察到 4xx，清單顯示 0 筆。這僅確認路由與 UI 載入，不代表請假建立／核准可用；其 fail-closed 限制仍在。
+- **自動化驗證：** 前端 build 成功；Vitest 12 個測試檔、38 個測試通過；.NET 10 SDK 容器中的稽核與 RBAC 測試 16 項通過；建置的 UAT Docker images 成功。
+- **尚未驗證：** 倉儲操作／覆核帳號及新 QR 盤點交易的後續驗證結果已記錄於下節；FQC／相機實測與 Key User 簽認仍未完成。
+- **FQC／相機：** 仍未建立品質合成帳號、完成工單或安排相機實測；需品保 Key User 安排後再執行並簽認。此次部署不代表完整 UAT 通過或上線核准。
+
+### 2026-11-05 19:30 後續倉儲角色與 QR 重測（技術驗證，非業務簽認）
+
+- **倉儲操作員：** `uat-warehouse-operator` 登入後直接進入「庫存管理中心」，「新增品碼」可見；未送出新增品碼。
+- **倉儲覆核者：** `uat-warehouse-approver` 登入後可進入「庫存管理中心」，「新增品碼」已隱藏。兩角色的庫存頁均可顯示 SKU 清單；本輪未修改角色或其他資料。
+- **仍有 403：** 覆核者重新載入時，`GET /api/erp/dashboard/sidebar-badges`、`GET /api/erp/goods-receipts`、`GET /api/erp/uoms` 回 HTTP 403。唯讀權限查詢確認兩個 UAT 倉儲角色均未指派 `dashboard:view`、`procurement:view`、`uom:view`；應先釐清最小必要權限及前端不需資料的查詢，再修正與部署。預設登入頁為庫存管理，並未驗證全廠戰情室儀表板。
+- **QR 新批號重測：** 操作員在 `FW02` 選擇合成料號 `UAT-SYNTH-20261104-172535-COMP`、新批號 `UAT-QR-TEST-20261105-02`、效期 `2027-12-31`；帳面數 0，實盤數 1（差異 +1）。首次過帳回 HTTP 500，Backend log 顯示 PostgreSQL 拒絕 `DateTimeKind.Unspecified` 寫入 `timestamp with time zone`；唯讀查詢確認當時該批號的 `InventoryLots`、`InventoryTransactions` 及關聯 `AuditLogs` 均為 0，未留下部分資料。
+- **乾淨重建與重測：** 為排除 backend image 與來源不一致，以 detached worktree 僅帶入盤點稽核相關的 `InventoryController.cs`、`AuditInterceptor.cs`、`InventoryService.cs` 重建 `erp-backend:uat`；只更新 backend，未重啟 PostgreSQL 或修改角色。backend health 回報 healthy／database connected。相同批號在重新讀取帳面數後再次確認並過帳成功，畫面回報異動單 `STK-20261105115845-ff7e7c75`。
+- **過帳與稽核核對：** 唯讀資料庫確認只有 1 筆該批號交易，類型 `ADJUST_IN`、變更 `+1`、倉庫結餘由 42 增至 43；`InventoryTransaction.CreatedBy`、`HandlerId` 及關聯 `AuditLogs.UserId` 相同，均對應 `uat-warehouse-operator`。批號庫存為 1、效期 `2027-12-31`。首次失敗未留資料，僅成功重測寫入一筆合成交易。
+- **隔離回歸測試：** 使用臨時 PostgreSQL 16 資料庫，對同一 stocktake service 啟用登入者 `AuditInterceptor` 後，`PostStocktake_NormalizesExpiryDateToUtcAndPersistsInventory` 通過（1/1）。臨時測試容器已移除。乾淨重建後的 UAT API 重測成功；首次失敗的具體執行時差異仍未定位，不應據此推定所有日期輸入情境都已覆蓋。
+- **FQC 阻塞：** 唯讀資料庫查詢顯示 `FqcInspectionLots` 為 0；目前唯一合成工單 `WO-811355314705-0001` 狀態為 `in_progress`（計畫數 5、實際數 2），且 UAT 帳號清單沒有品質測試帳號。QR／FQC 時段仍未排定；未建立工單、帳號、FQC 批次或相機判定資料。
+- **結論：** 倉儲新增按鈕權限及本次合成 QR 過帳／稽核技術檢查通過；側欄徽章、單位及收貨 API 的 403 仍待處理。FQC／相機尚未執行，仍待各業務負責人簽認；不得標記整體 UAT 通過或視為正式上線核准。
+
+### 2026-11-05 倉儲角色非必要 403 修正（已部署至隔離 UAT）
+
+- 側欄徽章查詢現在僅在使用者具有 `dashboard` 模組權限時啟用；庫存頁面的收貨查詢與「收貨紀錄」頁籤僅對具有採購檢視權限的使用者啟用／顯示。
+- 單位清單 GET 同時接受 `inventory:view` 與既有 `uom:view`，只開放讀取清單以支援庫存品碼表單，不改變單位新增、修改或刪除權限。
+- 已新增 RBAC 測試覆蓋庫存檢視者、單位管理檢視者及無權限者；`PermissionRbacTests` 使用 .NET 10 SDK 容器通過 14/14。前端 build、Vitest（38/38）及 standalone runtime（3 項檢查）均通過；本機 .NET 8 SDK 無法直接建置目標為 .NET 10 的專案。
+- 20:31 已以乾淨 detached worktree 建置並部署 `erp-backend:uat`、`erp-frontend:uat` 至 `erp-uat` Compose project；backend／frontend 及 PostgreSQL 均未刪除資料，UAT backend 健康檢查與前端 HTTP 均為 200。部署後仍須以倉儲操作／覆核帳號重測，確認三項 API 不再產生非必要 403，且收貨頁籤對無採購檢視權者隱藏。
+- FQC 帳號、可檢驗合成工單及相機測試時段仍待管理員與品保負責人安排，本次修正未建立相關資料。

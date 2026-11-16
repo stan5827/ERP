@@ -12,6 +12,22 @@ public class GLAccountDto
     public string AccountType { get; set; } = "Asset";
     public bool IsActive { get; set; }
     public bool IsCashAccount { get; set; }
+    public Guid? ParentAccountId { get; set; }
+}
+
+public class CreateGLAccountRequestDto
+{
+    [Required, MaxLength(20)]
+    public string AccountCode { get; set; } = null!;
+
+    [Required, MaxLength(100)]
+    public string AccountName { get; set; } = null!;
+
+    [Required, MaxLength(20)]
+    public string AccountType { get; set; } = "Asset";
+
+    public bool IsCashAccount { get; set; }
+    public Guid? ParentAccountId { get; set; }
 }
 
 public class JournalEntryDto
@@ -37,6 +53,7 @@ public class AccountingVoucherEntryDto
     public string AccountCode { get; set; } = null!;
     public string AccountName { get; set; } = null!;
     public Guid? CostCenterId { get; set; }
+    public Guid? WorkOrderId { get; set; }
     public decimal DebitAmount { get; set; }
     public decimal CreditAmount { get; set; }
     public string? Memo { get; set; }
@@ -70,6 +87,7 @@ public class AccountingVoucherLineRequestDto
     [Range(typeof(decimal), "0", "999999999999999")]
     public decimal CreditAmount { get; set; }
     public Guid? CostCenterId { get; set; }
+    public Guid? WorkOrderId { get; set; }
     [MaxLength(200)]
     public string? Memo { get; set; }
 }
@@ -227,9 +245,13 @@ public class BankAccountDto
     public string? BankCode { get; set; }
     public string? BankName { get; set; }
     public string? AccountNumber { get; set; }
+    public string? BranchName { get; set; }
+    public string? AccountName { get; set; }
     public Guid? GLAccountId { get; set; }
     public string? GLAccountCode { get; set; }
     public string? GLAccountName { get; set; }
+    public bool? GLAccountIsActive { get; set; }
+    public bool? GLAccountIsCashAccount { get; set; }
     public string Currency { get; set; } = "TWD";
     public decimal CurrentBalance { get; set; }
     public bool IsActive { get; set; }
@@ -261,13 +283,30 @@ public class LoanDto
 
 public class CreateBankAccountRequest
 {
-    public string? BankCode { get; set; }
-    public string? BankName { get; set; }
-    public string? AccountNumber { get; set; }
-    public string? AccountName { get; set; }
+    [MaxLength(10)] public string? BankCode { get; set; }
+    [Required, MaxLength(100)] public string BankName { get; set; } = null!;
+    [Required, MaxLength(30)] public string AccountNumber { get; set; } = null!;
+    [MaxLength(100)] public string? BranchName { get; set; }
+    [MaxLength(100)] public string? AccountName { get; set; }
     public Guid? GLAccountId { get; set; }
-    public string? Currency { get; set; }
+    [Required, MaxLength(10)] public string Currency { get; set; } = "TWD";
     public decimal? CurrentBalance { get; set; }
+}
+
+public class UpdateBankAccountRequestDto
+{
+    [MaxLength(10)] public string? BankCode { get; set; }
+    [Required, MaxLength(100)] public string BankName { get; set; } = null!;
+    [Required, MaxLength(30)] public string AccountNumber { get; set; } = null!;
+    [MaxLength(100)] public string? BranchName { get; set; }
+    [MaxLength(100)] public string? AccountName { get; set; }
+    public Guid? GLAccountId { get; set; }
+    [Required, MaxLength(10)] public string Currency { get; set; } = "TWD";
+}
+
+public class SetBankAccountStatusRequestDto
+{
+    public bool IsActive { get; set; }
 }
 
 public class UpdateBankAccountGlMappingDto

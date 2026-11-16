@@ -12,6 +12,7 @@ public interface IUserService
     Task<List<UserDto>> GetAllAsync(string? search = null, int page = 1, int pageSize = 20, int? totalCount = null);
     Task<UserDto?> GetByIdAsync(Guid id);
     Task<(UserDto? dto, string status)> CreateAsync(CreateUserRequest request, Guid createdByUserId);
+    Task<(bool found, string status)> UpdateAsync(Guid id, UpdateUserRequestDto request, Guid updatedByUserId);
     Task<(bool found, string status)> UpdateRolesAsync(Guid id, UpdateUserRolesRequest request, Guid updatedByUserId);
     Task<(bool found, string status)> DeleteAsync(Guid id, Guid deactivatedByUserId);
     Task<(bool found, string status)> UnlockAsync(Guid id, Guid unlockedByUserId);
@@ -137,6 +138,36 @@ public class UserService : IUserService
             .FirstAsync(u => u.Id == user.Id);
 
         return (MapToDto(created), "ok");
+    }
+
+    public async Task<(bool found, string status)> UpdateAsync(Guid id, UpdateUserRequestDto request, Guid updatedByUserId)
+    {
+        if (updatedByUserId == Guid.Empty) return (false, "actor_required");
+        if (request == null) return (false, "invalid_email");
+
+        var user = await _db.Users.FirstOrDefaultAsync(account => account.Id == id);
+        if (user == null) return (false, "not_found");
+
+        var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+        if (email != null && email.Length > 200) return (false, "invalid_email");
+
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            user.Email = email;
+            user.UpdatedAt = DateTime.UtcNow;
+            _db.AuditLogs.Add(new AuditLog
+            {
+                Action = "USER_UPDATED",
+                EntityType = nameof(User),
+                EntityId = user.Id,
+                UserId = updatedByUserId,
+                TableName = "Users",
+                Details = email == null ? "User email cleared." : "User email updated."
+            });
+            await _db.SaveChangesAsync();
+        }
+
+        return (true, "ok");
     }
 
     public async Task<(bool found, string status)> UpdateRolesAsync(

@@ -9,10 +9,19 @@ namespace ErpBackend.Services;
 public class FinanceService : IFinanceService
 {
     private readonly ErpGeneralDbContext _db;
+    private readonly IManufacturingCostAllocationService _manufacturingCostAllocationService;
 
     public FinanceService(ErpGeneralDbContext db)
+        : this(db, new ManufacturingCostAllocationService(db))
+    {
+    }
+
+    public FinanceService(
+        ErpGeneralDbContext db,
+        IManufacturingCostAllocationService manufacturingCostAllocationService)
     {
         _db = db;
+        _manufacturingCostAllocationService = manufacturingCostAllocationService;
     }
 
     public async Task<List<GLAccountDto>> GetChartOfAccountsAsync()
@@ -27,8 +36,63 @@ public class FinanceService : IFinanceService
             AccountName = a.AccountName,
             AccountType = a.AccountType,
             IsActive = a.IsActive,
-            IsCashAccount = a.IsCashAccount
+            IsCashAccount = a.IsCashAccount,
+            ParentAccountId = a.ParentAccountId
         }).ToList();
+    }
+
+    public async Task<(bool success, string status, GLAccountDto? account)> CreateGLAccountAsync(
+        CreateGLAccountRequestDto request)
+    {
+        var accountCode = request.AccountCode?.Trim();
+        var accountName = request.AccountName?.Trim();
+        var accountType = request.AccountType?.Trim();
+        var supportedTypes = new[] { "Asset", "Liability", "Equity", "Revenue", "Expense" };
+
+        if (string.IsNullOrWhiteSpace(accountCode) || accountCode.Length > 20)
+            return (false, "invalid_account_code", null);
+        if (string.IsNullOrWhiteSpace(accountName) || accountName.Length > 100)
+            return (false, "invalid_account_name", null);
+        var canonicalAccountType = supportedTypes.FirstOrDefault(type =>
+            type.Equals(accountType, StringComparison.OrdinalIgnoreCase));
+        if (canonicalAccountType is null)
+            return (false, "invalid_account_type", null);
+        if (request.IsCashAccount && canonicalAccountType != "Asset")
+            return (false, "cash_account_must_be_asset", null);
+        if (await _db.GLAccounts.AnyAsync(account => account.AccountCode == accountCode))
+            return (false, "duplicate_account_code", null);
+
+        if (request.ParentAccountId.HasValue)
+        {
+            var parent = await _db.GLAccounts
+                .FirstOrDefaultAsync(account => account.Id == request.ParentAccountId.Value);
+            if (parent is null || !parent.IsActive ||
+                !parent.AccountType.Equals(canonicalAccountType, StringComparison.OrdinalIgnoreCase))
+                return (false, "invalid_parent_account", null);
+        }
+
+        var account = new GLAccount
+        {
+            AccountCode = accountCode,
+            AccountName = accountName,
+            AccountType = canonicalAccountType,
+            IsCashAccount = request.IsCashAccount,
+            ParentAccountId = request.ParentAccountId,
+            IsActive = true
+        };
+        _db.GLAccounts.Add(account);
+        await _db.SaveChangesAsync();
+
+        return (true, "ok", new GLAccountDto
+        {
+            Id = account.Id,
+            AccountCode = account.AccountCode,
+            AccountName = account.AccountName,
+            AccountType = account.AccountType,
+            IsActive = account.IsActive,
+            IsCashAccount = account.IsCashAccount,
+            ParentAccountId = account.ParentAccountId
+        });
     }
 
     public async Task<List<GLAccountMappingDto>> GetAccountingMappingsAsync()
@@ -147,54 +211,96 @@ public class FinanceService : IFinanceService
 
     public async Task<(bool success, string status)> CloseAccountingPeriodAsync(Guid periodId)
     {
-        var period = await _db.AccountingPeriods.FirstOrDefaultAsync(item => item.Id == periodId);
-        if (period is null)
-            return (false, "not_found");
-        if (period.IsClosed)
-            return (false, "already_closed");
-
-        var start = period.StartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var endExclusive = period.EndDate == DateOnly.MaxValue
-            ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
-            : period.EndDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var periodVouchers = _db.AccountingVouchers.Where(voucher =>
-            voucher.VoucherDate >= start && voucher.VoucherDate < endExclusive);
-        if (await periodVouchers.AnyAsync(voucher => voucher.Status != "Posted"))
-            return (false, "unposted_vouchers");
-
-        var postedVoucherIds = await periodVouchers
-            .Select(voucher => voucher.Id)
-            .ToListAsync();
-        var postedEntries = await _db.AccountingEntries
-            .Where(entry => postedVoucherIds.Contains(entry.VoucherId))
-            .Select(entry => new
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable)
+            : null;
+        try
+        {
+            var period = await _db.AccountingPeriods.FirstOrDefaultAsync(item => item.Id == periodId);
+            if (period is null)
             {
-                entry.VoucherId,
-                entry.DebitAmount,
-                entry.CreditAmount
-            })
-            .ToListAsync();
-        var balancesByVoucher = postedEntries
-            .GroupBy(entry => entry.VoucherId)
-            .ToDictionary(
-                group => group.Key,
-                group => (
-                    Debit: group.Sum(entry => entry.DebitAmount),
-                    Credit: group.Sum(entry => entry.CreditAmount)));
-        if (postedVoucherIds.Any(voucherId =>
-                !balancesByVoucher.TryGetValue(voucherId, out var totals) ||
-                totals.Debit != totals.Credit))
-            return (false, "unbalanced_vouchers");
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+                return (false, "not_found");
+            }
+            if (period.IsClosed)
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+                return (false, "already_closed");
+            }
 
-        var debitTotal = postedEntries.Sum(entry => entry.DebitAmount);
-        var creditTotal = postedEntries.Sum(entry => entry.CreditAmount);
-        if (debitTotal != creditTotal)
-            return (false, "unbalanced_vouchers");
+            var start = period.StartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endExclusive = period.EndDate == DateOnly.MaxValue
+                ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+                : period.EndDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var periodVouchers = _db.AccountingVouchers.Where(voucher =>
+                voucher.VoucherDate >= start && voucher.VoucherDate < endExclusive);
+            if (await periodVouchers.AnyAsync(voucher => voucher.Status != "Posted"))
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+                return (false, "unposted_vouchers");
+            }
 
-        period.IsClosed = true;
-        period.ClosedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-        return (true, "ok");
+            var allocation = await _manufacturingCostAllocationService.AllocatePeriodAsync(period);
+            if (!allocation.success)
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+                return (false, allocation.status);
+            }
+
+            var postedVoucherIds = await periodVouchers
+                .Select(voucher => voucher.Id)
+                .ToListAsync();
+            var postedEntries = await _db.AccountingEntries
+                .Where(entry => postedVoucherIds.Contains(entry.VoucherId))
+                .Select(entry => new
+                {
+                    entry.VoucherId,
+                    entry.DebitAmount,
+                    entry.CreditAmount
+                })
+                .ToListAsync();
+            var balancesByVoucher = postedEntries
+                .GroupBy(entry => entry.VoucherId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (
+                        Debit: group.Sum(entry => entry.DebitAmount),
+                        Credit: group.Sum(entry => entry.CreditAmount)));
+            if (postedVoucherIds.Any(voucherId =>
+                    !balancesByVoucher.TryGetValue(voucherId, out var totals) ||
+                    totals.Debit != totals.Credit))
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+                return (false, "unbalanced_vouchers");
+            }
+
+            var debitTotal = postedEntries.Sum(entry => entry.DebitAmount);
+            var creditTotal = postedEntries.Sum(entry => entry.CreditAmount);
+            if (debitTotal != creditTotal)
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync();
+                return (false, "unbalanced_vouchers");
+            }
+
+            period.IsClosed = true;
+            period.ClosedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            if (transaction is not null)
+                await transaction.CommitAsync();
+            return (true, "ok");
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<List<JournalEntryDto>> GetJournalEntriesAsync(string docNo)
@@ -259,10 +365,7 @@ public class FinanceService : IFinanceService
         }).ToList();
     }
 
-    public Task SeedAccountsAsync()
-    {
-        return Task.CompletedTask;
-    }
+    public Task SeedAccountsAsync() => GLAccountSeeder.SeedAsync(_db);
 
     public async Task SeedBankAccountsAsync()
     {
@@ -325,7 +428,8 @@ public class FinanceService : IFinanceService
     {
         var accounts = await _db.BankAccounts
             .Include(account => account.GLAccount)
-            .Where(b => b.IsActive)
+            .OrderBy(account => account.BankName)
+            .ThenBy(account => account.AccountNumber)
             .ToListAsync();
         return accounts.Select(a => new BankAccountDto
         {
@@ -333,9 +437,13 @@ public class FinanceService : IFinanceService
             BankCode = a.BankCode,
             BankName = a.BankName,
             AccountNumber = a.AccountNumber,
+            BranchName = a.BranchName,
+            AccountName = a.AccountName,
             GLAccountId = a.GLAccountId,
             GLAccountCode = a.GLAccount?.AccountCode,
             GLAccountName = a.GLAccount?.AccountName,
+            GLAccountIsActive = a.GLAccount?.IsActive,
+            GLAccountIsCashAccount = a.GLAccount?.IsCashAccount,
             Currency = a.Currency,
             CurrentBalance = a.CurrentBalance,
             IsActive = a.IsActive
@@ -344,25 +452,56 @@ public class FinanceService : IFinanceService
 
     public async Task<bool> CreateBankAccountAsync(CreateBankAccountRequest request)
     {
-        if (request.GLAccountId.HasValue &&
-            !await _db.GLAccounts.AnyAsync(account =>
-                account.Id == request.GLAccountId.Value && account.IsActive && account.IsCashAccount))
+        if (!await IsValidCashAccountAsync(request.GLAccountId))
         {
             return false;
         }
 
         var account = new BankAccount
         {
-            BankCode = request.BankCode,
-            BankName = request.BankName,
-            AccountNumber = request.AccountNumber,
-            AccountName = request.AccountName,
+            BankCode = NormalizeOptional(request.BankCode),
+            BankName = request.BankName.Trim(),
+            AccountNumber = request.AccountNumber.Trim(),
+            BranchName = NormalizeOptional(request.BranchName),
+            AccountName = NormalizeOptional(request.AccountName),
             GLAccountId = request.GLAccountId,
-            Currency = request.Currency ?? "TWD",
+            Currency = request.Currency.Trim().ToUpperInvariant(),
             CurrentBalance = request.CurrentBalance ?? 0
         };
 
         _db.BankAccounts.Add(account);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<(bool success, string status)> UpdateBankAccountAsync(
+        Guid bankAccountId,
+        UpdateBankAccountRequestDto request)
+    {
+        var account = await _db.BankAccounts.FirstOrDefaultAsync(item => item.Id == bankAccountId);
+        if (account == null)
+            return (false, "not_found");
+        if (!await IsValidCashAccountAsync(request.GLAccountId))
+            return (false, "invalid_gl_account");
+
+        account.BankCode = NormalizeOptional(request.BankCode);
+        account.BankName = request.BankName.Trim();
+        account.AccountNumber = request.AccountNumber.Trim();
+        account.BranchName = NormalizeOptional(request.BranchName);
+        account.AccountName = NormalizeOptional(request.AccountName);
+        account.GLAccountId = request.GLAccountId;
+        account.Currency = request.Currency.Trim().ToUpperInvariant();
+        await _db.SaveChangesAsync();
+        return (true, "updated");
+    }
+
+    public async Task<bool> SetBankAccountStatusAsync(Guid bankAccountId, bool isActive)
+    {
+        var account = await _db.BankAccounts.FirstOrDefaultAsync(item => item.Id == bankAccountId);
+        if (account == null)
+            return false;
+
+        account.IsActive = isActive;
         await _db.SaveChangesAsync();
         return true;
     }
@@ -379,6 +518,15 @@ public class FinanceService : IFinanceService
         await _db.SaveChangesAsync();
         return true;
     }
+
+    private Task<bool> IsValidCashAccountAsync(Guid? glAccountId) =>
+        !glAccountId.HasValue
+            ? Task.FromResult(true)
+            : _db.GLAccounts.AnyAsync(account =>
+                account.Id == glAccountId.Value && account.IsActive && account.IsCashAccount);
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public async Task<List<InvestmentDto>> GetInvestmentsAsync(string? category)
     {

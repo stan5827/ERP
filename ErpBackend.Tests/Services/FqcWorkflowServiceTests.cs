@@ -3,6 +3,7 @@ using ErpBackend.DTOs;
 using ErpBackend.Models.Finance;
 using ErpBackend.Models.Inventory;
 using ErpBackend.Models.MES;
+using ErpBackend.Models.QA;
 using ErpBackend.Models.Sales;
 using ErpBackend.Services;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,107 @@ namespace ErpBackend.Tests.Services;
 
 public class FqcWorkflowServiceTests
 {
+    [Fact]
+    public void InventoryLotIndex_AllowsSameLotAcrossDifferentLocations()
+    {
+        using var db = CreateDbContext();
+
+        var index = db.Model.FindEntityType(typeof(InventoryLot))!
+            .GetIndexes()
+            .Single(candidate => candidate.IsUnique &&
+                candidate.Properties.Any(property => property.Name == nameof(InventoryLot.LotNumber)));
+
+        Assert.Equal(
+            new[]
+            {
+                nameof(InventoryLot.SkuId),
+                nameof(InventoryLot.LotNumber),
+                nameof(InventoryLot.WarehouseId),
+                nameof(InventoryLot.BinLocationId)
+            },
+            index.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
+    public async Task GetWorkOrderOptionsAsync_SearchesWorkOrderSkuAndProductName()
+    {
+        await using var db = CreateDbContext();
+        await SeedWorkOrderAsync(db);
+        var service = CreateService(db);
+
+        var byWorkOrder = await service.GetWorkOrderOptionsAsync("WO-FQC-001");
+        var bySku = await service.GetWorkOrderOptionsAsync("FG-001");
+        var byName = await service.GetWorkOrderOptionsAsync("Finished product");
+
+        Assert.All(new[] { byWorkOrder, bySku, byName }, options =>
+        {
+            var option = Assert.Single(options);
+            Assert.Equal("WO-FQC-001", option.WoNumber);
+            Assert.Equal("FG-001", option.ProductSkuNumber);
+            Assert.Equal("Finished product", option.ProductSkuName);
+        });
+    }
+
+    [Fact]
+    public async Task GetDefaultFinishedLotAsync_UsesApprovedLotFromFinalOperation()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedWorkOrderAsync(db);
+        db.WipReports.Add(new WipReport
+        {
+            ReportNumber = "WIP-FQC-NONFINAL",
+            WorkOrderId = seeded.WorkOrderId,
+            OperationSeq = 5,
+            Status = "approved",
+            CompletedQty = 15,
+            FinishedLotNumber = "NONFINAL-LOT"
+        });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetDefaultFinishedLotAsync(seeded.WorkOrderId);
+
+        Assert.NotNull(result);
+        Assert.Equal("FG-LOT-001", result.LotNumber);
+        Assert.Equal(100m, result.ProducedQty);
+    }
+
+    [Fact]
+    public async Task GetWarehouseOptionsAsync_ListsActiveWarehousesAndSelectableBins()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedWorkOrderAsync(db);
+        var inactiveWarehouse = new Warehouse
+        {
+            WarehouseCode = "INACTIVE",
+            WarehouseName = "Inactive warehouse",
+            IsActive = false
+        };
+        db.Warehouses.Add(inactiveWarehouse);
+        db.BinLocations.AddRange(
+            new BinLocation
+            {
+                WarehouseId = seeded.WarehouseId,
+                LocationCode = "FQC-HOLD",
+                IsActive = true
+            },
+            new BinLocation
+            {
+                WarehouseId = seeded.WarehouseId,
+                LocationCode = "DISABLED",
+                IsActive = false
+            });
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var warehouses = await service.GetWarehouseOptionsAsync();
+        var bins = await service.GetBinLocationOptionsAsync(seeded.WarehouseId);
+
+        var warehouse = Assert.Single(warehouses);
+        Assert.Equal("FG", warehouse.WarehouseCode);
+        var bin = Assert.Single(bins);
+        Assert.Equal("A-01", bin.LocationCode);
+    }
+
     [Fact]
     public async Task CreateInspectionLotAsync_UsesFinalOperationReportedQuantityForFinishedLot()
     {
@@ -45,7 +147,9 @@ public class FqcWorkflowServiceTests
         await using var db = CreateDbContext();
         var seeded = await SeedWorkOrderAsync(db);
         var service = CreateService(db);
-        var inspection = await CreateInspectionAsync(service, seeded.WorkOrderId, critical: true);
+        var expiryDate = new DateTime(2028, 4, 30);
+        var inspection = await CreateInspectionAsync(
+            service, seeded.WorkOrderId, critical: true, expiryDate: expiryDate);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.DecideInspectionLotAsync(
             inspection.Id,
@@ -70,6 +174,9 @@ public class FqcWorkflowServiceTests
         Assert.Equal("Failed", failed.InspectionStatus);
         Assert.Equal(100m, failed.QuarantinedQty);
         Assert.Equal(100m, (await db.Skus.SingleAsync()).Qty);
+        var quarantinedLot = await db.InventoryLots.SingleAsync();
+        Assert.Equal(expiryDate, quarantinedLot.ExpiryDate);
+        Assert.Equal(DateTimeKind.Utc, quarantinedLot.ExpiryDate!.Value.Kind);
         Assert.Equal("FQC-HOLD", await db.BinLocations
             .Where(bin => bin.LocationCode == "FQC-HOLD")
             .Select(bin => bin.LocationCode)
@@ -131,7 +238,9 @@ public class FqcWorkflowServiceTests
         Assert.Equal(48m, secondReceipt.Quantity);
         Assert.Equal(100m, (await db.Skus.SingleAsync()).Qty);
         Assert.Equal(98m, (await db.WorkOrders.SingleAsync()).ReceivedQty);
-        Assert.Equal(expiryDate, (await db.InventoryLots.FirstAsync()).ExpiryDate);
+        var inventoryLot = await db.InventoryLots.FirstAsync();
+        Assert.Equal(expiryDate, inventoryLot.ExpiryDate);
+        Assert.Equal(DateTimeKind.Utc, inventoryLot.ExpiryDate!.Value.Kind);
         Assert.Equal(2, await db.AccountingVouchers.CountAsync(voucher => voucher.ReferenceType == "ProductionReceipt"));
         Assert.Equal(2, await db.InventoryTransactions.CountAsync(transaction => transaction.Type == "production_receipt"));
         Assert.Equal(2m, await db.InventoryTransactions
@@ -242,12 +351,17 @@ public class FqcWorkflowServiceTests
                 DecisionBy = "QA lead"
             });
 
-        var scrapNote = await service.CreateScrapNoteAsync(inspection.Id, "不可修復", "Finance pending");
+        var scrapNote = await service.CreateScrapNoteAsync(
+            inspection.Id,
+            "03",
+            "不可修復",
+            Guid.NewGuid(),
+            "Warehouse Operator");
 
         Assert.Equal(100m, scrapNote.Quantity);
         Assert.Equal(600m, await db.ScrapRecords.Select(record => record.CostAmount).SingleAsync());
-        Assert.Equal("pending_accounting", scrapNote.Status);
-        Assert.Equal("ScrapPendingAccounting", (await db.FqcInspectionLots.SingleAsync()).DispositionStatus);
+        Assert.Equal("pending_quality_review", scrapNote.Status);
+        Assert.Equal("ScrapPendingQualityReview", (await db.FqcInspectionLots.SingleAsync()).DispositionStatus);
         Assert.Equal(100m, (await db.FqcInspectionLots.SingleAsync()).QuarantinedQty);
         Assert.Equal(100m, (await db.Skus.SingleAsync()).Qty);
         Assert.DoesNotContain(await db.InventoryTransactions.ToListAsync(),
@@ -255,6 +369,202 @@ public class FqcWorkflowServiceTests
         Assert.Empty(await db.AccountingVouchers.ToListAsync());
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.CreateReworkWorkOrderAsync(inspection.Id, "PMC"));
+    }
+
+    [Fact]
+    public async Task ScrapApproval_RequiresQualityBeforeFinanceAndNeverPostsInventoryOrVoucher()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedWorkOrderAsync(db);
+        await AddWorkOrderActualCostAsync(db, seeded.WorkOrderId);
+        var service = CreateService(db);
+        var inspection = await CreateInspectionAsync(service, seeded.WorkOrderId);
+        await service.DecideInspectionLotAsync(
+            inspection.Id,
+            new DecideFqcInspectionLotRequestDto
+            {
+                InspectionStatus = "Failed",
+                ApprovedQty = 0,
+                WarehouseId = seeded.WarehouseId,
+                DecisionBy = "QA lead"
+            });
+        var requestorId = Guid.NewGuid();
+        var qaId = Guid.NewGuid();
+        var financeId = Guid.NewGuid();
+        var scrap = await service.CreateScrapNoteAsync(
+            inspection.Id, "03", "不可修復", requestorId, "Warehouse Operator");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.DecideFqcScrapFinanceAsync(scrap.Id, financeId, "Finance", true, null));
+
+        await service.DecideFqcScrapQualityAsync(scrap.Id, qaId, "QA lead", true, "確認不可修復");
+        await service.DecideFqcScrapFinanceAsync(scrap.Id, financeId, "Finance Manager", true, "核准");
+
+        var updatedScrap = await db.ScrapRecords.SingleAsync();
+        var updatedLot = await db.FqcInspectionLots.SingleAsync();
+        Assert.Equal("approved_pending_disposal", updatedScrap.ScrapStatus);
+        Assert.Equal("ScrapApprovedPendingExecution", updatedLot.DispositionStatus);
+        Assert.Equal(3, await db.FqcScrapApprovalEvents.CountAsync());
+        Assert.Equal(100m, updatedLot.QuarantinedQty);
+        Assert.Equal(100m, (await db.Skus.SingleAsync()).Qty);
+        Assert.DoesNotContain(await db.InventoryTransactions.ToListAsync(),
+            transaction => transaction.Type == "scrap");
+        Assert.Empty(await db.AccountingVouchers.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ScrapRejection_CanOnlyBeResubmittedByRequesterAndRestartsQualityReview()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedWorkOrderAsync(db);
+        await AddWorkOrderActualCostAsync(db, seeded.WorkOrderId);
+        var service = CreateService(db);
+        var inspection = await CreateInspectionAsync(service, seeded.WorkOrderId);
+        await service.DecideInspectionLotAsync(
+            inspection.Id,
+            new DecideFqcInspectionLotRequestDto
+            {
+                InspectionStatus = "Failed",
+                ApprovedQty = 0,
+                WarehouseId = seeded.WarehouseId,
+                DecisionBy = "QA lead"
+            });
+        var requestorId = Guid.NewGuid();
+        var scrap = await service.CreateScrapNoteAsync(
+            inspection.Id, "03", "不可修復", requestorId, "Warehouse Operator");
+
+        await service.DecideFqcScrapQualityAsync(scrap.Id, Guid.NewGuid(), "QA lead", false, "補充檢驗依據");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ResubmitFqcScrapNoteAsync(
+            scrap.Id, "03", "補充說明", Guid.NewGuid(), "Other Operator"));
+        await service.ResubmitFqcScrapNoteAsync(
+            scrap.Id, "03", "已補充檢驗依據", requestorId, "Warehouse Operator");
+
+        Assert.Equal("pending_quality_review", (await db.ScrapRecords.SingleAsync()).ScrapStatus);
+        Assert.Equal(
+            new[] { "submitted", "rejected", "resubmitted" },
+            await db.FqcScrapApprovalEvents
+                .OrderBy(item => item.OccurredAt)
+                .Select(item => item.Decision)
+                .ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task ReworkReinspection_CannotCloseBeforeFqcReceiptAndClosesOnceReconciled()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedWorkOrderAsync(db, includeAccountingAccounts: true);
+        var service = CreateService(db);
+        var originalInspection = await CreateInspectionAsync(service, seeded.WorkOrderId);
+        await service.DecideInspectionLotAsync(
+            originalInspection.Id,
+            new DecideFqcInspectionLotRequestDto
+            {
+                InspectionStatus = "Failed",
+                ApprovedQty = 0,
+                WarehouseId = seeded.WarehouseId,
+                DecisionBy = "QA lead"
+            });
+        var reworkDisposition = await service.CreateReworkWorkOrderAsync(originalInspection.Id, "PMC");
+        var reworkOrder = await db.WorkOrders
+            .Include(order => order.Materials)
+            .Include(order => order.Operations)
+            .SingleAsync(order => order.Id == reworkDisposition.ReworkWorkOrderId);
+        reworkOrder.Status = "pending_fqc";
+        var reworkMaterial = Assert.Single(reworkOrder.Materials);
+        reworkMaterial.IssuedQty = reworkMaterial.RequiredQty;
+        var sourceLot = await db.FqcInspectionLots.SingleAsync(item => item.Id == originalInspection.Id);
+        sourceLot.QuarantinedQty = 0;
+        sourceLot.DispositionStatus = "ReworkIssued";
+        db.WipReports.Add(new WipReport
+        {
+            ReportNumber = "WIP-REWORK-001",
+            WorkOrderId = reworkOrder.Id,
+            OperationSeq = 10,
+            Status = "approved",
+            CompletedQty = reworkOrder.PlannedQty,
+            FinishedLotNumber = originalInspection.LotNumber
+        });
+        await db.SaveChangesAsync();
+
+        var reinspection = await service.CreateInspectionLotAsync(new CreateFqcInspectionLotRequestDto
+        {
+            WorkOrderId = reworkOrder.Id,
+            LotNumber = originalInspection.LotNumber,
+            SampledQty = 10,
+            DefectiveQty = 0,
+            InspectorName = "Re-inspector"
+        });
+
+        Assert.Equal(originalInspection.Id, reinspection.ReworkSourceInspectionLotId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CloseReworkWorkOrderAsync(reworkOrder.Id, "PMC"));
+
+        await service.DecideInspectionLotAsync(
+            reinspection.Id,
+            new DecideFqcInspectionLotRequestDto
+            {
+                InspectionStatus = "Passed",
+                ApprovedQty = reinspection.ProducedQty,
+                WarehouseId = seeded.WarehouseId,
+                DecisionBy = "QA lead"
+            });
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CloseReworkWorkOrderAsync(reworkOrder.Id, "PMC"));
+
+        await AddWorkOrderActualCostAsync(db, reworkOrder.Id);
+        await service.CreateProductionReceiptAsync(new CreateProductionReceiptRequestDto
+        {
+            FqcInspectionLotId = reinspection.Id,
+            Quantity = reinspection.ProducedQty,
+            WarehouseId = seeded.WarehouseId,
+            BinLocationId = seeded.GoodBinId
+        });
+
+        await service.CloseReworkWorkOrderAsync(reworkOrder.Id, "PMC");
+
+        Assert.Equal("completed", (await db.WorkOrders.SingleAsync(item => item.Id == reworkOrder.Id)).Status);
+        Assert.Equal("ReworkCompleted",
+            (await db.FqcInspectionLots.SingleAsync(item => item.Id == originalInspection.Id)).DispositionStatus);
+    }
+
+    [Fact]
+    public async Task ReworkWorkOrder_CannotCreateASecondReworkCycle()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedWorkOrderAsync(db);
+        var service = CreateService(db);
+        var originalInspection = await CreateInspectionAsync(service, seeded.WorkOrderId);
+        await service.DecideInspectionLotAsync(
+            originalInspection.Id,
+            new DecideFqcInspectionLotRequestDto
+            {
+                InspectionStatus = "Failed",
+                ApprovedQty = 0,
+                WarehouseId = seeded.WarehouseId,
+                DecisionBy = "QA lead"
+            });
+        var rework = await service.CreateReworkWorkOrderAsync(originalInspection.Id, "PMC");
+        var reworkOrder = await db.WorkOrders.SingleAsync(item => item.Id == rework.ReworkWorkOrderId);
+        var reworkInspection = new FqcInspectionLot
+        {
+            InspectionNumber = "FQC-REWORK-001",
+            WorkOrderId = reworkOrder.Id,
+            ProductSkuId = reworkOrder.ProductSkuId,
+            LotNumber = "FG-LOT-001",
+            ProducedQty = 100,
+            SampledQty = 10,
+            InspectorName = "Inspector",
+            InspectionStatus = "Failed",
+            ReworkSourceInspectionLotId = originalInspection.Id,
+            WorkOrder = reworkOrder,
+            ProductSku = (await db.Skus.SingleAsync())
+        };
+        db.FqcInspectionLots.Add(reworkInspection);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateReworkWorkOrderAsync(reworkInspection.Id, "PMC"));
     }
 
     [Fact]

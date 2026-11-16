@@ -133,6 +133,26 @@ public class BomCostRollupDto
     [JsonPropertyName("totalCost")] public decimal TotalCost { get; set; }
 }
 
+/// <summary>Confirms the previewed total before applying a BOM standard-cost rollup.</summary>
+public sealed record ApplyBomStandardCostRollupRequestDto
+{
+    [Range(typeof(decimal), "0", "79228162514264337593543950335")]
+    public required decimal ExpectedTotalCost { get; init; }
+}
+
+/// <summary>Reports the standard cost approved and applied from a BOM rollup.</summary>
+public sealed record BomStandardCostRollupApprovalDto(
+    Guid BomId,
+    string BomCode,
+    Guid ProductSkuId,
+    string ProductSkuNumber,
+    decimal PreviousStandardCost,
+    decimal AppliedStandardCost,
+    decimal MaterialCost,
+    decimal LaborCost,
+    decimal OverheadCost,
+    DateTimeOffset ApprovedAt);
+
 public class BomTreeNodeDto
 {
     public Guid SkuId { get; set; }
@@ -168,6 +188,7 @@ public class JobTitleDto
     public string? ApplicableDeptType { get; set; }
     public bool IsSupervisor { get; set; }
     public bool IsActive { get; set; }
+    public int EmployeeCount { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -206,6 +227,36 @@ public class WorkOrderDto
     public DateTime CreatedAt { get; set; }
     public List<WorkOrderOperationDto> Operations { get; set; } = new();
     public List<WorkOrderMaterialDto> Materials { get; set; } = new();
+}
+
+public class WorkOrderTransferCandidateDto
+{
+    public Guid SalesOrderId { get; set; }
+    public string OrderNumber { get; set; } = null!;
+    public string? CustomerName { get; set; }
+    public DateTime OrderDate { get; set; }
+    public DateTime? ExpectedDeliveryDate { get; set; }
+    public string? OrderRemarks { get; set; }
+    public List<WorkOrderTransferCandidateItemDto> Items { get; set; } = new();
+}
+
+public class WorkOrderTransferCandidateItemDto
+{
+    public int LineNumber { get; set; }
+    public string? SkuNumber { get; set; }
+    public string? SkuName { get; set; }
+    public string? Specification { get; set; }
+    public string? CustomerItemCode { get; set; }
+    public decimal Quantity { get; set; }
+    public string? Unit { get; set; }
+    public bool NeedManufacturing { get; set; }
+    public bool NeedOutsourcing { get; set; }
+    public bool IsOutsourced { get; set; }
+    public bool IsAlreadyTransferred { get; set; }
+    public bool WillCreateWorkOrder { get; set; }
+    public DateTime? PlannedStartDate { get; set; }
+    public DateTime? PlannedFinishDate { get; set; }
+    public string? LineRemarks { get; set; }
 }
 
 public class CreateSupplyOrdersResultDto

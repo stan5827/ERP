@@ -12,8 +12,10 @@ public class RoutingsController : BaseController
     public RoutingsController(IRoutingService routingService) => _routingService = routingService;
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<RoutingDto>>>> GetRoutings([FromQuery] Guid? productSkuId)
-        => Ok(await _routingService.GetRoutingsAsync(productSkuId));
+    public async Task<ActionResult<ApiResponse<List<RoutingDto>>>> GetRoutings(
+        [FromQuery] Guid? productSkuId,
+        [FromQuery] Guid? operationId)
+        => Ok(await _routingService.GetRoutingsAsync(productSkuId, operationId));
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<RoutingDto>>> GetRouting(Guid id)

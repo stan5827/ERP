@@ -1,0 +1,25 @@
+@baseUrl = http://localhost:5100
+@token = replace-with-local-access-token
+@bomId = 00000000-0000-0000-0000-000000000001
+
+### Preview BOM standard-cost rollup
+GET {{baseUrl}}/api/erp/boms/{{bomId}}/cost-rollup
+Authorization: Bearer {{token}}
+
+### Approve and apply the previewed rollup
+POST {{baseUrl}}/api/erp/boms/{{bomId}}/cost-rollup/approve
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "expectedTotalCost": 260
+}
+
+### Reject an invalid negative cost
+POST {{baseUrl}}/api/erp/boms/{{bomId}}/cost-rollup/approve
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "expectedTotalCost": -1
+}

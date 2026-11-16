@@ -148,7 +148,7 @@ public class AccountingService : IAccountingService
             PostedAt = DateTime.UtcNow
         };
 
-        // 1. 借方：應收帳款 (1131)
+        // 1. 借方：應收帳款 (1136)
         var arAccount = await RequireMappedAccountAsync("accounts_receivable");
         voucher.Entries.Add(new AccountingEntry
         {
@@ -158,7 +158,7 @@ public class AccountingService : IAccountingService
             Memo = $"客戶應收帳款 - {invoice.InvoiceNumber}"
         });
 
-        // 2. 貸方：銷貨收入 (4101)
+        // 2. 貸方：銷貨收入 (4111)
         var revenueAccount = await RequireMappedAccountAsync("sales_revenue");
         voucher.Entries.Add(new AccountingEntry
         {
@@ -529,7 +529,7 @@ public class AccountingService : IAccountingService
             PostedAt = DateTime.UtcNow
         };
 
-        // 1. 借方：存貨/原料 (1201 - 假設代碼)
+        // 1. 借方：原料存貨 (1201)
         var inventoryAccount = await RequireMappedAccountAsync("raw_material_inventory");
         voucher.Entries.Add(new AccountingEntry
         {
@@ -539,7 +539,7 @@ public class AccountingService : IAccountingService
             Memo = $"採購商品/物料 - {ap.ApNumber}"
         });
 
-        // 2. 借方：進項稅額 (1202 - 假設代碼)
+        // 2. 借方：進項稅額 (1202)
         if (ap.TaxAmount > 0)
         {
             var taxAccount = await RequireMappedAccountAsync("input_tax");
@@ -552,7 +552,7 @@ public class AccountingService : IAccountingService
             });
         }
 
-        // 3. 貸方：應付帳款 (2101)
+        // 3. 貸方：應付帳款 (2141)
         var apAccount = await RequireMappedAccountAsync("accounts_payable");
         voucher.Entries.Add(new AccountingEntry
         {
@@ -592,7 +592,7 @@ public class AccountingService : IAccountingService
             PostedAt = DateTime.UtcNow
         };
 
-        // 1. 借方：存貨-成品 (1205)
+        // 1. 借方：製成品 (1241)
         var fgAccount = await RequireMappedAccountAsync("finished_goods_inventory");
         voucher.Entries.Add(new AccountingEntry
         {
@@ -602,7 +602,7 @@ public class AccountingService : IAccountingService
             Memo = $"成品入庫 - 工單: {wo.WoNumber}"
         });
 
-        // 2. 貸方：在製品 (1206)
+        // 2. 貸方：在製品 (1221)
         var wipAccount = await RequireMappedAccountAsync("work_in_progress");
         voucher.Entries.Add(new AccountingEntry
         {
@@ -952,31 +952,7 @@ public class AccountingService : IAccountingService
     }
 
     /// <summary>
-    /// 初始化開發用的基本會計科目
+    /// 初始化標準會計科目表
     /// </summary>
-    public async Task SeedDefaultAccountsAsync()
-    {
-        var accounts = new List<GLAccount>
-        {
-            new GLAccount { AccountCode = "1131", AccountName = "應收帳款", AccountType = "Asset" },
-            new GLAccount { AccountCode = "4101", AccountName = "銷貨收入", AccountType = "Revenue" },
-            new GLAccount { AccountCode = "2101", AccountName = "應付帳款", AccountType = "Liability" },
-            new GLAccount { AccountCode = "1201", AccountName = "存貨-原料", AccountType = "Asset" },
-            new GLAccount { AccountCode = "1202", AccountName = "進項稅額", AccountType = "Asset" },
-            new GLAccount { AccountCode = "2201", AccountName = "銷項稅額", AccountType = "Liability" },
-            new GLAccount { AccountCode = "1205", AccountName = "存貨-成品", AccountType = "Asset" },
-            new GLAccount { AccountCode = "1206", AccountName = "在製品 (WIP)", AccountType = "Asset" },
-            new GLAccount { AccountCode = "1101", AccountName = "現金", AccountType = "Asset", IsCashAccount = true },
-            new GLAccount { AccountCode = "1103", AccountName = "銀行存款", AccountType = "Asset", IsCashAccount = true }
-        };
-
-        foreach (var acc in accounts)
-        {
-            if (!await _db.GLAccounts.AnyAsync(a => a.AccountCode == acc.AccountCode))
-            {
-                _db.GLAccounts.Add(acc);
-            }
-        }
-        await _db.SaveChangesAsync();
-    }
+    public Task SeedDefaultAccountsAsync() => GLAccountSeeder.SeedAsync(_db);
 }

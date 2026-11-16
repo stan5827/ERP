@@ -78,6 +78,18 @@ jobs:
         working-directory: erp-frontend
         run: npm run test:e2e
 
+      - name: Install employee app dependencies
+        working-directory: erp-employee-app
+        run: npm ci
+
+      - name: Build employee app
+        working-directory: erp-employee-app
+        run: npm run build
+
+      - name: Test employee app
+        working-directory: erp-employee-app
+        run: npm test
+
       - name: Upload coverage
         if: always()
         uses: codecov/codecov-action@v4

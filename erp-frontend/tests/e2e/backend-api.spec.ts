@@ -10,28 +10,28 @@ test.describe('Backend API Integration', () => {
     expect(body.status).toBe('healthy');
   });
 
-  test('GET /api/erp/kpis/ping returns operational', async ({ request }) => {
+  test('GET /api/erp/kpis/ping rejects anonymous access', async ({ request }) => {
     const response = await request.get(`${apiBase}/api/erp/kpis/ping`);
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(401);
   });
 
-  test('GET /api/erp/budgets/ping returns operational', async ({ request }) => {
+  test('GET /api/erp/budgets/ping rejects anonymous access', async ({ request }) => {
     const response = await request.get(`${apiBase}/api/erp/budgets/ping`);
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(401);
   });
 
-  test('GET /api/erp/llm/ping returns pong', async ({ request }) => {
+  test('GET /api/erp/llm/ping rejects anonymous access', async ({ request }) => {
     const response = await request.get(`${apiBase}/api/erp/llm/ping`);
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(401);
   });
 
-  test('GET /api/erp/kpis/dashboard returns KPI data', async ({ request }) => {
+  test('GET /api/erp/kpis/dashboard rejects anonymous access', async ({ request }) => {
     const response = await request.get(`${apiBase}/api/erp/kpis/dashboard?fromDate=2026-01-01&toDate=2026-12-31`);
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(401);
   });
 
-  test('GET /api/erp/budgets/alerts returns alerts list', async ({ request }) => {
+  test('GET /api/erp/budgets/alerts rejects anonymous access', async ({ request }) => {
     const response = await request.get(`${apiBase}/api/erp/budgets/alerts`);
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(401);
   });
 });

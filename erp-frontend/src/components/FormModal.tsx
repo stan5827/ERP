@@ -15,6 +15,7 @@ export interface FormField {
   min?: number;
   max?: number;
   step?: number;
+  readOnly?: boolean;
   onBlur?: (name: string, value: string) => void;
   sameAs?: string;
   searchable?: boolean;
@@ -46,6 +47,8 @@ interface FormModalProps {
   ) => void;
   onFieldDefaultChange?: (setFieldDefaults: (fieldName: string, defaultValue: unknown) => void) => void;
   children?: React.ReactNode;
+  dialogClassName?: string;
+  centered?: boolean;
   hiddenFields?: string[];
   isWizard?: boolean;
   wizardConfig?: {
@@ -249,7 +252,8 @@ function renderField(field: FormField, value: unknown, error: string | undefined
             if (field.onBlur) field.onBlur(field.name, String(val ?? ''));
           }}
           placeholder={field.placeholder}
-          min={field.min} max={field.max} step={field.step} />
+          min={field.min} max={field.max} step={field.step}
+          readOnly={field.readOnly} />
       )}
       {field.description && <div style={{ fontSize: 11, color: 'var(--slate-500)', marginTop: 4, lineHeight: 1.4 }}>{field.description}</div>}
       {error && <div style={{ fontSize: 11, color: 'var(--crimson-400)', marginTop: 4 }}>{error}</div>}
@@ -263,7 +267,7 @@ function renderField(field: FormField, value: unknown, error: string | undefined
   );
 }
 
-export function FormModal({ open, title, tabs, fields, initialValues, onClose, onSubmit, width = 600, customRenderers, onChangeData, onFieldDefaultChange, children, hiddenFields = [], isWizard = false, wizardConfig }: FormModalProps) {
+export function FormModal({ open, title, tabs, fields, initialValues, onClose, onSubmit, width = 600, customRenderers, onChangeData, onFieldDefaultChange, children, hiddenFields = [], isWizard = false, wizardConfig, dialogClassName, centered = false }: FormModalProps) {
   const hasTabs = tabs && tabs.length > 0;
   const isWizardMode = isWizard && !!wizardConfig;
   const wizardStepCount = isWizardMode ? wizardConfig!.stepTitles.length : 0;
@@ -486,9 +490,9 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
         inset: 0, 
         zIndex: 1000, 
         display: 'flex', 
-        alignItems: 'flex-start', 
+        alignItems: centered ? 'center' : 'flex-start',
         justifyContent: 'center', 
-        paddingTop: '40px' 
+        padding: centered ? '16px' : '40px 0 0'
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -505,6 +509,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
       
       {/* 內容卡片 */}
       <div 
+        className={dialogClassName}
         style={{ 
           position: 'relative', 
           width, 
@@ -520,7 +525,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
           boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 1px rgba(255,255,255,0.15)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--glass-border)', borderTop: '0px', borderLeft: '0px', borderRight: '0px', flexShrink: 0 }}>
+        <div className={dialogClassName ? `${dialogClassName}-header` : undefined} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--glass-border)', borderTop: '0px', borderLeft: '0px', borderRight: '0px', flexShrink: 0 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--slate-100)', fontFamily: 'var(--font-display)', margin: 0 }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--slate-500)', padding: 4, borderRadius: 6 }}>
             <X size={18} />
@@ -603,7 +608,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ flex: 1, overflow: 'auto', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+        <form className={dialogClassName ? `${dialogClassName}-form` : undefined} onSubmit={handleSubmit} style={{ flex: 1, overflow: 'auto', padding: '20px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
             {children || (
               <>
@@ -632,7 +637,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
             )}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
+          <div className={dialogClassName ? `${dialogClassName}-footer` : undefined} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--glass-border)', flexShrink: 0 }}>
             {hasTabs ? (
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className="btn btn-ghost btn-sm" disabled={activeTab === 0} onClick={() => setActiveTab(i => i - 1)}

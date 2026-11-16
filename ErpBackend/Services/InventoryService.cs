@@ -3,6 +3,7 @@ using System.Data;
 using ErpBackend.Data;
 using ErpBackend.DTOs;
 using ErpBackend.Models.Inventory;
+using ErpBackend.Models.System;
 
 namespace ErpBackend.Services;
 
@@ -12,7 +13,7 @@ public interface IInventoryService
     Task<object> CheckATPAsync(string skuCode, decimal requestedQty);
     Task<object> AdjustBalanceAsync(InventoryAdjustRequest request);
     Task<InventoryStocktakeBalanceDto?> GetStocktakeBalanceAsync(string skuCode, string warehouseCode, string lotNumber);
-    Task<InventoryStocktakeResultDto> PostStocktakeAsync(InventoryStocktakeRequestDto request);
+    Task<InventoryStocktakeResultDto> PostStocktakeAsync(InventoryStocktakeRequestDto request, Guid actorUserId);
     Task<object> PostTransactionAsync(InventoryTransactionRequest request);
     Task<object> GetTransactionsAsync(string? skuCode, string? warehouseCode, string? type, DateTime? fromDate, DateTime? toDate);
     Task<object> GetSummaryAsync(string? warehouseCode);
@@ -224,8 +225,12 @@ public class InventoryService : IInventoryService
         };
     }
 
-    public async Task<InventoryStocktakeResultDto> PostStocktakeAsync(InventoryStocktakeRequestDto request)
+    public async Task<InventoryStocktakeResultDto> PostStocktakeAsync(
+        InventoryStocktakeRequestDto request,
+        Guid actorUserId)
     {
+        if (actorUserId == Guid.Empty)
+            throw new ArgumentException("無法識別過帳操作人員", nameof(actorUserId));
         if (string.IsNullOrWhiteSpace(request.SkuCode) ||
             string.IsNullOrWhiteSpace(request.WarehouseCode) ||
             string.IsNullOrWhiteSpace(request.LotNumber) ||
@@ -270,7 +275,7 @@ public class InventoryService : IInventoryService
             existingWarehouseId != warehouse.Id && inventoryLot.Qty > 0)
             throw new InvalidOperationException("此批號目前登記於其他倉庫，請先確認批號庫存位置");
 
-        var expiryDate = request.ExpiryDate.Value.Date;
+        var expiryDate = DateTime.SpecifyKind(request.ExpiryDate.Value.Date, DateTimeKind.Utc);
         var expiryDateChanged = inventoryLot is null || inventoryLot.ExpiryDate?.Date != expiryDate;
         if (inventoryLot is null)
         {
@@ -298,7 +303,7 @@ public class InventoryService : IInventoryService
         {
             var now = DateTime.UtcNow;
             trxId = $"STK-{now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..27];
-            _db.InventoryTransactions.Add(new InventoryTransaction
+            var postedTransaction = new InventoryTransaction
             {
                 TrxId = trxId,
                 SkuId = sku.Id,
@@ -309,7 +314,20 @@ public class InventoryService : IInventoryService
                 WarehouseId = warehouse.Id,
                 LotNumber = lotNumber,
                 RelatedDocType = "Stocktake",
+                HandlerId = actorUserId,
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? "QR 盤點過帳" : request.Notes.Trim(),
+                CreatedAt = now
+            };
+            _db.InventoryTransactions.Add(postedTransaction);
+            _db.Entry(postedTransaction).Property<Guid?>("CreatedBy").CurrentValue = actorUserId;
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = actorUserId,
+                Action = "stocktake.posted",
+                EntityType = nameof(InventoryTransaction),
+                EntityId = postedTransaction.Id,
+                Details = $"交易 {trxId}；料號 {sku.SkuNumber}；倉庫 {warehouse.WarehouseCode}；批號 {lotNumber}；數量變更 {qtyChange}",
+                TableName = nameof(ErpGeneralDbContext.InventoryTransactions),
                 CreatedAt = now
             });
             sku.Qty += qtyChange;

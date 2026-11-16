@@ -36,16 +36,17 @@ public class ProcessInspectionService : IProcessInspectionService
         var query = _db.InspectionTemplates
             .AsNoTracking()
             .Include(t => t.Operation)
-            .Include(t => t.ProductSku)
+            .Include(t => t.ProductSkus).ThenInclude(ts => ts.ProductSku)
             .Include(t => t.Items)
             .AsQueryable();
         if (operationId.HasValue) query = query.Where(t => t.OperationId == operationId.Value);
         if (productSkuId.HasValue)
-            query = query.Where(t => t.ProductSkuId == null || t.ProductSkuId == productSkuId.Value);
+            query = query.Where(t => !t.ProductSkus.Any() ||
+                t.ProductSkus.Any(ts => ts.ProductSkuId == productSkuId.Value));
 
         var templates = await query
             .OrderBy(t => t.Operation!.OperationCode)
-            .ThenBy(t => t.ProductSkuId == null)
+            .ThenBy(t => !t.ProductSkus.Any())
             .ThenBy(t => t.TemplateCode)
             .ToListAsync();
         return templates.Select(ToTemplateDto).ToList();
@@ -56,7 +57,7 @@ public class ProcessInspectionService : IProcessInspectionService
         var template = await _db.InspectionTemplates
             .AsNoTracking()
             .Include(t => t.Operation)
-            .Include(t => t.ProductSku)
+            .Include(t => t.ProductSkus).ThenInclude(ts => ts.ProductSku)
             .Include(t => t.Items)
             .FirstOrDefaultAsync(t => t.Id == id);
         return template == null ? null : ToTemplateDto(template);
@@ -76,7 +77,7 @@ public class ProcessInspectionService : IProcessInspectionService
             TemplateCode = request.TemplateCode.Trim(),
             TemplateName = request.TemplateName.Trim(),
             OperationId = request.OperationId,
-            ProductSkuId = request.ProductSkuId,
+            ProductSkus = ToTemplateSkus(request.ProductSkuIds),
             IsActive = request.IsActive,
             Notes = request.Notes?.Trim(),
             Items = request.Items.OrderBy(i => i.SortOrder).Select(ToTemplateItem).ToList()
@@ -91,6 +92,7 @@ public class ProcessInspectionService : IProcessInspectionService
     {
         var template = await _db.InspectionTemplates
             .Include(t => t.Items)
+            .Include(t => t.ProductSkus)
             .FirstOrDefaultAsync(t => t.Id == id);
         if (template == null) return (null, "not_found");
 
@@ -103,7 +105,12 @@ public class ProcessInspectionService : IProcessInspectionService
         template.TemplateCode = request.TemplateCode.Trim();
         template.TemplateName = request.TemplateName.Trim();
         template.OperationId = request.OperationId;
-        template.ProductSkuId = request.ProductSkuId;
+        var requestedSkuIds = request.ProductSkuIds.Distinct().ToHashSet();
+        foreach (var existingSku in template.ProductSkus.Where(ts => !requestedSkuIds.Contains(ts.ProductSkuId)).ToList())
+            _db.InspectionTemplateSkus.Remove(existingSku);
+        var existingSkuIds = template.ProductSkus.Select(ts => ts.ProductSkuId).ToHashSet();
+        foreach (var skuId in requestedSkuIds.Where(skuId => !existingSkuIds.Contains(skuId)))
+            template.ProductSkus.Add(new InspectionTemplateSku { TemplateId = template.Id, ProductSkuId = skuId });
         template.Version++;
         template.IsActive = request.IsActive;
         template.Notes = request.Notes?.Trim();
@@ -140,9 +147,9 @@ public class ProcessInspectionService : IProcessInspectionService
         var templates = await _db.InspectionTemplates
             .AsNoTracking()
             .Where(t => t.IsActive && operationIds.Contains(t.OperationId) &&
-                (t.ProductSkuId == null || t.ProductSkuId == workOrder.ProductSkuId))
+                (!t.ProductSkus.Any() || t.ProductSkus.Any(ts => ts.ProductSkuId == workOrder.ProductSkuId)))
             .Include(t => t.Operation)
-            .Include(t => t.ProductSku)
+            .Include(t => t.ProductSkus).ThenInclude(ts => ts.ProductSku)
             .Include(t => t.Items)
             .ToListAsync();
 
@@ -151,8 +158,12 @@ public class ProcessInspectionService : IProcessInspectionService
             .Select(operation =>
             {
                 var eligible = templates.Where(t => t.OperationId == operation.OperationId);
-                var productTemplates = eligible.Where(t => t.ProductSkuId == workOrder.ProductSkuId).ToList();
-                var selected = productTemplates.Count > 0 ? productTemplates : eligible.Where(t => t.ProductSkuId == null).ToList();
+                var productTemplates = eligible
+                    .Where(t => t.ProductSkus.Any(ts => ts.ProductSkuId == workOrder.ProductSkuId))
+                    .ToList();
+                var selected = productTemplates.Count > 0
+                    ? productTemplates
+                    : eligible.Where(t => t.ProductSkus.Count == 0).ToList();
                 return new WorkOrderInspectionOperationDto
                 {
                     OperationSeq = operation.OperationSeq,
@@ -199,10 +210,12 @@ public class ProcessInspectionService : IProcessInspectionService
 
         var template = await _db.InspectionTemplates
             .Include(t => t.Items)
+            .Include(t => t.ProductSkus)
             .FirstOrDefaultAsync(t => t.Id == request.TemplateId);
         if (template == null || !template.IsActive) return (null, "template_not_found");
         if (template.OperationId != operation.OperationId ||
-            (template.ProductSkuId.HasValue && template.ProductSkuId != workOrder.ProductSkuId))
+            (template.ProductSkus.Count > 0 &&
+             !template.ProductSkus.Any(ts => ts.ProductSkuId == workOrder.ProductSkuId)))
             return (null, "template_mismatch");
 
         var responses = request.Items ?? new List<CreateProcessInspectionItemRequestDto>();
@@ -310,9 +323,9 @@ public class ProcessInspectionService : IProcessInspectionService
         var templates = await _db.InspectionTemplates
             .AsNoTracking()
             .Where(t => t.IsActive && operationIds.Contains(t.OperationId) &&
-                (t.ProductSkuId == null || skuIds.Contains(t.ProductSkuId.Value)))
+                (!t.ProductSkus.Any() || t.ProductSkus.Any(ts => skuIds.Contains(ts.ProductSkuId))))
             .Include(t => t.Operation)
-            .Include(t => t.ProductSku)
+            .Include(t => t.ProductSkus).ThenInclude(ts => ts.ProductSku)
             .Include(t => t.Items)
             .ToListAsync();
         var reports = await _db.ProcessInspectionReports
@@ -338,9 +351,9 @@ public class ProcessInspectionService : IProcessInspectionService
             var expected = itemWorkOrders.SelectMany(w => w.Operations.Select(operation =>
             {
                 var eligible = templates.Where(t => t.OperationId == operation.OperationId &&
-                    (t.ProductSkuId == null || t.ProductSkuId == w.ProductSkuId));
-                var exact = eligible.Where(t => t.ProductSkuId == w.ProductSkuId).ToList();
-                var template = (exact.Count > 0 ? exact : eligible.Where(t => t.ProductSkuId == null).ToList())
+                    (t.ProductSkus.Count == 0 || t.ProductSkus.Any(ts => ts.ProductSkuId == w.ProductSkuId)));
+                var exact = eligible.Where(t => t.ProductSkus.Any(ts => ts.ProductSkuId == w.ProductSkuId)).ToList();
+                var template = (exact.Count > 0 ? exact : eligible.Where(t => t.ProductSkus.Count == 0).ToList())
                     .OrderByDescending(t => t.Version).FirstOrDefault();
                 return (WorkOrder: w, Operation: operation, Template: template);
             })).ToList();
@@ -405,8 +418,10 @@ public class ProcessInspectionService : IProcessInspectionService
             request.OperationId == Guid.Empty || request.Items.Count == 0)
             return "invalid";
         if (!await _db.Operations.AnyAsync(o => o.Id == request.OperationId)) return "operation_not_found";
-        if (request.ProductSkuId.HasValue &&
-            !await _db.Skus.AnyAsync(s => s.Id == request.ProductSkuId.Value)) return "sku_not_found";
+        var productSkuIds = request.ProductSkuIds.Distinct().ToList();
+        if (productSkuIds.Count > 0 &&
+            await _db.Skus.CountAsync(s => productSkuIds.Contains(s.Id)) != productSkuIds.Count)
+            return "sku_not_found";
         if (request.Items.Any(i => string.IsNullOrWhiteSpace(i.ItemCode) ||
             string.IsNullOrWhiteSpace(i.ItemName) || !InputTypes.Contains(i.InputType) ||
             i.LowerLimit.HasValue && i.UpperLimit.HasValue && i.LowerLimit > i.UpperLimit))
@@ -415,12 +430,23 @@ public class ProcessInspectionService : IProcessInspectionService
         if (request.Items.Select(i => i.ItemCode.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != request.Items.Count)
             return "invalid";
 
-        if (request.IsActive && await _db.InspectionTemplates.AnyAsync(t =>
-            t.Id != currentId && t.IsActive && t.OperationId == request.OperationId &&
-            t.ProductSkuId == request.ProductSkuId))
-            return "active_template_exists";
+        if (request.IsActive)
+        {
+            var activeTemplates = _db.InspectionTemplates.Where(t =>
+                t.Id != currentId && t.IsActive && t.OperationId == request.OperationId);
+            var hasConflict = productSkuIds.Count == 0
+                ? await activeTemplates.AnyAsync(t => !t.ProductSkus.Any())
+                : await activeTemplates.AnyAsync(t =>
+                    t.ProductSkus.Any(ts => productSkuIds.Contains(ts.ProductSkuId)));
+            if (hasConflict) return "active_template_exists";
+        }
         return "ok";
     }
+
+    private static List<InspectionTemplateSku> ToTemplateSkus(IEnumerable<Guid> productSkuIds) =>
+        productSkuIds.Distinct()
+            .Select(productSkuId => new InspectionTemplateSku { ProductSkuId = productSkuId })
+            .ToList();
 
     private static InspectionTemplateItem ToTemplateItem(SaveInspectionTemplateItemRequestDto item) => new()
     {
@@ -468,9 +494,14 @@ public class ProcessInspectionService : IProcessInspectionService
         OperationId = template.OperationId,
         OperationCode = template.Operation?.OperationCode,
         OperationName = template.Operation?.OperationName,
-        ProductSkuId = template.ProductSkuId,
-        ProductSkuNumber = template.ProductSku?.SkuNumber,
-        ProductSkuName = template.ProductSku?.SkuName,
+        ProductSkus = template.ProductSkus
+            .OrderBy(ts => ts.ProductSku.SkuNumber)
+            .Select(ts => new InspectionTemplateProductDto
+            {
+                Id = ts.ProductSkuId,
+                SkuNumber = ts.ProductSku.SkuNumber,
+                SkuName = ts.ProductSku.SkuName
+            }).ToList(),
         Version = template.Version,
         IsActive = template.IsActive,
         Notes = template.Notes,

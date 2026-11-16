@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ErpBackend.DTOs;
+using ErpBackend.Filters;
 using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
@@ -16,6 +17,7 @@ public class UomsController : BaseController
     }
 
     [HttpGet]
+    [PermissionAuthorize("inventory", "view", "uom:view")]
     public async Task<ActionResult<ApiResponse<List<UomDto>>>> GetUoms(
         [FromQuery] string? uomType,
         [FromQuery] bool? isActive,

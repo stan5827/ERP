@@ -12,11 +12,32 @@ namespace ErpBackend.Services;
 
 public interface IFqcWorkflowService
 {
+    Task<List<FqcWorkOrderOptionDto>> GetWorkOrderOptionsAsync(
+        string? search, CancellationToken cancellationToken = default);
+    Task<FqcFinishedLotOptionDto?> GetDefaultFinishedLotAsync(
+        Guid workOrderId, CancellationToken cancellationToken = default);
+    Task<List<FqcWarehouseOptionDto>> GetWarehouseOptionsAsync(
+        CancellationToken cancellationToken = default);
+    Task<List<FqcBinLocationOptionDto>> GetBinLocationOptionsAsync(
+        Guid warehouseId, CancellationToken cancellationToken = default);
     Task<List<FqcInspectionLotDto>> GetInspectionLotsAsync(Guid? workOrderId, CancellationToken cancellationToken = default);
     Task<FqcInspectionLotDto> CreateInspectionLotAsync(CreateFqcInspectionLotRequestDto request, CancellationToken cancellationToken = default);
     Task<FqcInspectionLotDto> DecideInspectionLotAsync(Guid id, DecideFqcInspectionLotRequestDto request, CancellationToken cancellationToken = default);
     Task<FqcInspectionLotDto> CreateReworkWorkOrderAsync(Guid id, string dispositionBy, CancellationToken cancellationToken = default);
-    Task<FqcScrapNoteDto> CreateScrapNoteAsync(Guid id, string reason, string dispositionBy, CancellationToken cancellationToken = default);
+    Task<FqcScrapNoteDto> CreateScrapNoteAsync(
+        Guid id, string reasonCode, string reason, Guid requesterUserId, string requesterName,
+        CancellationToken cancellationToken = default);
+    Task<FqcScrapNoteDto> ResubmitFqcScrapNoteAsync(
+        Guid scrapRecordId, string reasonCode, string reason, Guid requesterUserId, string requesterName,
+        CancellationToken cancellationToken = default);
+    Task<FqcScrapNoteDto> DecideFqcScrapQualityAsync(
+        Guid scrapRecordId, Guid actorUserId, string actorName, bool approve, string? comments,
+        CancellationToken cancellationToken = default);
+    Task<FqcScrapNoteDto> DecideFqcScrapFinanceAsync(
+        Guid scrapRecordId, Guid actorUserId, string actorName, bool approve, string? comments,
+        CancellationToken cancellationToken = default);
+    Task CloseReworkWorkOrderAsync(
+        Guid workOrderId, string closedBy, CancellationToken cancellationToken = default);
     Task<ProductionReceiptDto> CreateProductionReceiptAsync(CreateProductionReceiptRequestDto request, CancellationToken cancellationToken = default);
     Task<List<ProductionReceiptDto>> GetProductionReceiptsAsync(Guid? workOrderId, CancellationToken cancellationToken = default);
 }
@@ -38,6 +59,110 @@ public class FqcWorkflowService : IFqcWorkflowService
         _workOrderCosting = workOrderCosting;
     }
 
+    public async Task<List<FqcWorkOrderOptionDto>> GetWorkOrderOptionsAsync(
+        string? search,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.WorkOrders
+            .AsNoTracking()
+            .Include(workOrder => workOrder.ProductSku)
+            .AsQueryable();
+        var searchTerm = search?.Trim();
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            query = query.Where(workOrder =>
+                workOrder.WoNumber.Contains(searchTerm)
+                || (workOrder.ProductSku != null
+                    && (workOrder.ProductSku.SkuNumber.Contains(searchTerm)
+                        || workOrder.ProductSku.SkuName.Contains(searchTerm))));
+        }
+
+        return await query
+            .OrderByDescending(workOrder => workOrder.UpdatedAt)
+            .ThenByDescending(workOrder => workOrder.CreatedAt)
+            .Take(100)
+            .Select(workOrder => new FqcWorkOrderOptionDto
+            {
+                Id = workOrder.Id,
+                WoNumber = workOrder.WoNumber,
+                ProductSkuId = workOrder.ProductSkuId,
+                ProductSkuNumber = workOrder.ProductSku == null ? null : workOrder.ProductSku.SkuNumber,
+                ProductSkuName = workOrder.ProductSku == null ? null : workOrder.ProductSku.SkuName,
+                Status = workOrder.Status
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<FqcFinishedLotOptionDto?> GetDefaultFinishedLotAsync(
+        Guid workOrderId,
+        CancellationToken cancellationToken = default)
+    {
+        var finalOperationSeq = await _db.WorkOrderOperations
+            .AsNoTracking()
+            .Where(operation => operation.WorkOrderId == workOrderId)
+            .MaxAsync(operation => (int?)operation.OperationSeq, cancellationToken);
+        if (!finalOperationSeq.HasValue)
+            return null;
+
+        var result = await _db.WipReports
+            .AsNoTracking()
+            .Where(report => report.WorkOrderId == workOrderId
+                && report.OperationSeq == finalOperationSeq.Value
+                && report.Status == "approved"
+                && report.FinishedLotNumber != null
+                && report.FinishedLotNumber != ""
+                && !_db.FqcInspectionLots.Any(lot =>
+                    lot.WorkOrderId == workOrderId
+                    && lot.LotNumber == report.FinishedLotNumber))
+            .GroupBy(report => report.FinishedLotNumber!)
+            .Select(group => new
+            {
+                LotNumber = group.Key,
+                ProducedQty = group.Sum(report => report.CompletedQty),
+                LastReportedAt = group.Max(report => report.CreatedAt)
+            })
+            .OrderByDescending(lot => lot.LastReportedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (result is null)
+            return null;
+
+        return new FqcFinishedLotOptionDto
+        {
+            LotNumber = result.LotNumber,
+            ProducedQty = result.ProducedQty
+        };
+    }
+
+    public Task<List<FqcWarehouseOptionDto>> GetWarehouseOptionsAsync(
+        CancellationToken cancellationToken = default) =>
+        _db.Warehouses
+            .AsNoTracking()
+            .Where(warehouse => warehouse.IsActive)
+            .OrderBy(warehouse => warehouse.WarehouseCode)
+            .Select(warehouse => new FqcWarehouseOptionDto
+            {
+                Id = warehouse.Id,
+                WarehouseCode = warehouse.WarehouseCode,
+                WarehouseName = warehouse.WarehouseName
+            })
+            .ToListAsync(cancellationToken);
+
+    public Task<List<FqcBinLocationOptionDto>> GetBinLocationOptionsAsync(
+        Guid warehouseId,
+        CancellationToken cancellationToken = default) =>
+        _db.BinLocations
+            .AsNoTracking()
+            .Where(bin => bin.WarehouseId == warehouseId
+                && bin.IsActive
+                && bin.LocationCode != QuarantineLocationCode)
+            .OrderBy(bin => bin.LocationCode)
+            .Select(bin => new FqcBinLocationOptionDto
+            {
+                Id = bin.Id,
+                LocationCode = bin.LocationCode
+            })
+            .ToListAsync(cancellationToken);
+
     public async Task<List<FqcInspectionLotDto>> GetInspectionLotsAsync(
         Guid? workOrderId,
         CancellationToken cancellationToken = default)
@@ -46,6 +171,9 @@ public class FqcWorkflowService : IFqcWorkflowService
             .AsNoTracking()
             .Include(lot => lot.WorkOrder)
             .Include(lot => lot.ProductSku)
+            .Include(lot => lot.ReworkSourceInspectionLot)
+            .Include(lot => lot.ScrapRecords)
+                .ThenInclude(record => record.ApprovalEvents)
             .AsQueryable();
         if (workOrderId.HasValue)
             query = query.Where(lot => lot.WorkOrderId == workOrderId.Value);
@@ -76,6 +204,7 @@ public class FqcWorkflowService : IFqcWorkflowService
         var workOrder = await _db.WorkOrders
             .Include(order => order.ProductSku)
             .Include(order => order.Operations)
+            .Include(order => order.Materials)
             .FirstOrDefaultAsync(order => order.Id == request.WorkOrderId, cancellationToken)
             ?? throw new KeyNotFoundException("找不到工單");
         if (workOrder.Operations.Count == 0)
@@ -97,6 +226,33 @@ public class FqcWorkflowService : IFqcWorkflowService
         if (request.SampledQty > producedQty)
             throw new ArgumentException("FQC 抽樣數不可大於此批號的已報工良品數");
 
+        FqcInspectionLot? reworkSourceLot = null;
+        if (string.Equals(workOrder.WoType, "rework", StringComparison.OrdinalIgnoreCase))
+        {
+            var sourceMaterial = workOrder.Materials.SingleOrDefault(material => material.FqcInspectionLotId.HasValue)
+                ?? throw new InvalidOperationException("返修工單未連結來源 FQC 批次");
+            if (workOrder.Materials.Count(material => material.FqcInspectionLotId.HasValue) != 1)
+                throw new InvalidOperationException("返修工單只能連結一個來源 FQC 批次");
+            reworkSourceLot = await _db.FqcInspectionLots
+                .FirstOrDefaultAsync(lot => lot.Id == sourceMaterial.FqcInspectionLotId, cancellationToken)
+                ?? throw new InvalidOperationException("返修來源 FQC 批次不存在");
+            if (reworkSourceLot.ReworkWorkOrderId != workOrder.Id
+                || reworkSourceLot.QuarantinedQty != 0
+                || sourceMaterial.RequiredQty <= 0
+                || sourceMaterial.IssuedQty < sourceMaterial.RequiredQty)
+                throw new InvalidOperationException("返修隔離品尚未全數領用，不能送交複檢");
+            if (!string.Equals(lotNumber, reworkSourceLot.LotNumber, StringComparison.Ordinal))
+                throw new InvalidOperationException("返修複檢必須沿用來源成品批號");
+            if (producedQty > sourceMaterial.IssuedQty)
+                throw new InvalidOperationException("返修複檢數量不可超過來源隔離品已領用數量");
+            if (await _db.FqcInspectionLots.AnyAsync(
+                    lot => lot.ReworkSourceInspectionLotId == reworkSourceLot.Id,
+                    cancellationToken))
+                throw new InvalidOperationException("此返修工單已建立複檢批次，不可重複送檢");
+            if (!string.Equals(workOrder.Status, "pending_fqc", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("返修工單尚未完成報工，不能送交 FQC 複檢");
+        }
+
         var inspectionLot = new FqcInspectionLot
         {
             InspectionNumber = DocumentNumberGenerator.Generate("FQC"),
@@ -114,6 +270,7 @@ public class FqcWorkflowService : IFqcWorkflowService
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
             InspectorName = request.InspectorName.Trim(),
             InspectedAt = DateTime.UtcNow,
+            ReworkSourceInspectionLotId = reworkSourceLot?.Id,
             WorkOrder = workOrder,
             ProductSku = workOrder.ProductSku!
         };
@@ -129,6 +286,8 @@ public class FqcWorkflowService : IFqcWorkflowService
             });
         }
         _db.FqcInspectionLots.Add(inspectionLot);
+        if (reworkSourceLot is not null)
+            reworkSourceLot.DispositionStatus = "ReinspectionPending";
         await _db.SaveChangesAsync(cancellationToken);
         return MapInspectionLot(inspectionLot, 0);
     }
@@ -161,6 +320,8 @@ public class FqcWorkflowService : IFqcWorkflowService
                 status = "Concession";
             else
                 throw new ArgumentException("FQC 整批判定僅接受 Passed、Failed 或 Concession");
+            if (lot.ReworkSourceInspectionLotId.HasValue && status == "Concession")
+                throw new InvalidOperationException("返修複檢只接受合格或不合格判定，不適用特採");
 
             if (lot.CriticalDefectFound && status != "Failed")
                 throw new InvalidOperationException("發現重大缺點，整批必須判定 Failed，不得放行或特採");
@@ -178,6 +339,7 @@ public class FqcWorkflowService : IFqcWorkflowService
                 : lot.ProducedQty - request.ApprovedQty;
             if (quarantineQty > 0)
             {
+                var expiryDateUtc = NormalizeCalendarDateToUtc(lot.ExpiryDate);
                 var warehouse = await _db.Warehouses
                     .FirstOrDefaultAsync(item => item.Id == request.WarehouseId && item.IsActive, cancellationToken)
                     ?? throw new ArgumentException("請指定有效的隔離倉庫");
@@ -216,14 +378,14 @@ public class FqcWorkflowService : IFqcWorkflowService
                         Qty = quarantineQty,
                         WarehouseId = warehouse.Id,
                         BinLocationId = quarantineBin.Id,
-                        ExpiryDate = lot.ExpiryDate,
+                        ExpiryDate = expiryDateUtc,
                         Status = "quarantine"
                     });
                 }
                 else
                 {
                     inventoryLot.Qty += quarantineQty;
-                    inventoryLot.ExpiryDate = lot.ExpiryDate ?? inventoryLot.ExpiryDate;
+                    inventoryLot.ExpiryDate = expiryDateUtc ?? inventoryLot.ExpiryDate;
                     inventoryLot.Status = "quarantine";
                 }
 
@@ -376,6 +538,13 @@ public class FqcWorkflowService : IFqcWorkflowService
         {
             var lot = await LockInspectionLotAsync(id, cancellationToken)
                 ?? throw new KeyNotFoundException("找不到 FQC 檢驗批次");
+            var sourceWorkOrder = await _db.WorkOrders
+                .Include(order => order.ProductSku)
+                .Include(order => order.Operations)
+                .FirstOrDefaultAsync(order => order.Id == lot.WorkOrderId, cancellationToken)
+                ?? throw new InvalidOperationException("找不到 FQC 批次來源工單");
+            if (string.Equals(sourceWorkOrder.WoType, "rework", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("返修工單只允許一次返修與一次複檢；不合格品請轉報廢處置");
             if (lot.InspectionStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("FQC 批次尚未判定，不能建立返修工單");
             if (lot.QuarantinedQty <= 0)
@@ -384,11 +553,6 @@ public class FqcWorkflowService : IFqcWorkflowService
                 await _db.ScrapRecords.AnyAsync(record => record.FqcInspectionLotId == lot.Id, cancellationToken))
                 throw new InvalidOperationException("此 FQC 批次已建立返修工單或報廢單");
 
-            var sourceWorkOrder = await _db.WorkOrders
-                .Include(order => order.ProductSku)
-                .Include(order => order.Operations)
-                .FirstOrDefaultAsync(order => order.Id == lot.WorkOrderId, cancellationToken)
-                ?? throw new InvalidOperationException("找不到 FQC 批次來源工單");
             var now = DateTime.UtcNow;
             var reworkWorkOrder = new WorkOrder
             {
@@ -472,14 +636,15 @@ public class FqcWorkflowService : IFqcWorkflowService
 
     public async Task<FqcScrapNoteDto> CreateScrapNoteAsync(
         Guid id,
+        string reasonCode,
         string reason,
-        string dispositionBy,
+        Guid requesterUserId,
+        string requesterName,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(reason))
-            throw new ArgumentException("請填寫報廢原因");
-        if (string.IsNullOrWhiteSpace(dispositionBy))
-            throw new ArgumentException("請提供報廢處置人員");
+        ValidateScrapReason(reasonCode, reason);
+        if (requesterUserId == Guid.Empty || string.IsNullOrWhiteSpace(requesterName))
+            throw new ArgumentException("無法識別報廢申請人");
 
         await using var transaction = _db.Database.IsRelational()
             ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
@@ -508,34 +673,38 @@ public class FqcWorkflowService : IFqcWorkflowService
                 FqcInspectionLotId = lot.Id,
                 ScrapNumber = DocumentNumberGenerator.Generate("SCR"),
                 ScrapQty = lot.QuarantinedQty,
+                ScrapReasonCode = reasonCode.Trim(),
                 Reason = reason.Trim(),
                 DispositionCode = "FQC_SCRAP",
                 CostAmount = Math.Round(lot.QuarantinedQty * unitCost, 2),
-                ScrapStatus = "pending_accounting",
-                DispositionBy = dispositionBy.Trim(),
+                ScrapStatus = "pending_quality_review",
+                DispositionBy = requesterName.Trim(),
                 DispositionAt = now,
+                RequestedByUserId = requesterUserId,
+                RequestedByName = requesterName.Trim(),
+                SubmittedAt = now,
                 CreatedAt = now
             };
+            var submissionEvent = new FqcScrapApprovalEvent
+            {
+                Stage = "submission",
+                Decision = "submitted",
+                ActorUserId = requesterUserId,
+                ActorName = requesterName.Trim(),
+                OccurredAt = now,
+                ScrapRecordId = scrapRecord.Id
+            };
+            _db.FqcScrapApprovalEvents.Add(submissionEvent);
+            scrapRecord.ApprovalEvents.Add(submissionEvent);
             _db.ScrapRecords.Add(scrapRecord);
-            lot.DispositionStatus = "ScrapPendingAccounting";
-            lot.DispositionBy = dispositionBy.Trim();
+            lot.DispositionStatus = "ScrapPendingQualityReview";
+            lot.DispositionBy = requesterName.Trim();
             lot.DispositionAt = now;
             await _db.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
                 await transaction.CommitAsync(cancellationToken);
 
-            return new FqcScrapNoteDto
-            {
-                Id = scrapRecord.Id,
-                ScrapNumber = scrapRecord.ScrapNumber!,
-                FqcInspectionLotId = lot.Id,
-                InspectionNumber = lot.InspectionNumber,
-                LotNumber = lot.LotNumber,
-                Quantity = scrapRecord.ScrapQty,
-                Status = scrapRecord.ScrapStatus!,
-                Reason = scrapRecord.Reason,
-                CreatedAt = scrapRecord.CreatedAt
-            };
+            return MapScrapNote(scrapRecord, lot);
         }
         catch
         {
@@ -544,6 +713,294 @@ public class FqcWorkflowService : IFqcWorkflowService
             throw;
         }
     }
+
+    public async Task<FqcScrapNoteDto> ResubmitFqcScrapNoteAsync(
+        Guid scrapRecordId,
+        string reasonCode,
+        string reason,
+        Guid requesterUserId,
+        string requesterName,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateScrapReason(reasonCode, reason);
+        if (requesterUserId == Guid.Empty || string.IsNullOrWhiteSpace(requesterName))
+            throw new ArgumentException("無法識別報廢申請人");
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+        try
+        {
+            var record = await LockScrapRecordAsync(scrapRecordId, cancellationToken)
+                ?? throw new KeyNotFoundException("找不到 FQC 報廢單");
+            var lot = await LockInspectionLotAsync(record.FqcInspectionLotId ?? Guid.Empty, cancellationToken)
+                ?? throw new InvalidOperationException("報廢單未連結 FQC 批次");
+            if (record.ScrapStatus != "returned_to_requester")
+                throw new InvalidOperationException("只有退回申請人的報廢單可以重新送審");
+            if (record.RequestedByUserId != requesterUserId)
+                throw new InvalidOperationException("只有原申請人可以重新送審此報廢單");
+
+            var now = DateTime.UtcNow;
+            record.ScrapReasonCode = reasonCode.Trim();
+            record.Reason = reason.Trim();
+            record.ScrapStatus = "pending_quality_review";
+            record.SubmittedAt = now;
+            record.DispositionBy = requesterName.Trim();
+            record.DispositionAt = now;
+            lot.DispositionStatus = "ScrapPendingQualityReview";
+            lot.DispositionBy = requesterName.Trim();
+            lot.DispositionAt = now;
+            var resubmissionEvent = new FqcScrapApprovalEvent
+            {
+                Stage = "submission",
+                Decision = "resubmitted",
+                ActorUserId = requesterUserId,
+                ActorName = requesterName.Trim(),
+                OccurredAt = now,
+                ScrapRecordId = record.Id
+            };
+            _db.FqcScrapApprovalEvents.Add(resubmissionEvent);
+            record.ApprovalEvents.Add(resubmissionEvent);
+
+            await _db.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+            return MapScrapNote(record, lot);
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public Task<FqcScrapNoteDto> DecideFqcScrapQualityAsync(
+        Guid scrapRecordId,
+        Guid actorUserId,
+        string actorName,
+        bool approve,
+        string? comments,
+        CancellationToken cancellationToken = default) =>
+        DecideFqcScrapAsync(scrapRecordId, actorUserId, actorName, approve, comments, "quality", cancellationToken);
+
+    public Task<FqcScrapNoteDto> DecideFqcScrapFinanceAsync(
+        Guid scrapRecordId,
+        Guid actorUserId,
+        string actorName,
+        bool approve,
+        string? comments,
+        CancellationToken cancellationToken = default) =>
+        DecideFqcScrapAsync(scrapRecordId, actorUserId, actorName, approve, comments, "finance", cancellationToken);
+
+    private async Task<FqcScrapNoteDto> DecideFqcScrapAsync(
+        Guid scrapRecordId,
+        Guid actorUserId,
+        string actorName,
+        bool approve,
+        string? comments,
+        string stage,
+        CancellationToken cancellationToken)
+    {
+        if (actorUserId == Guid.Empty || string.IsNullOrWhiteSpace(actorName))
+            throw new ArgumentException("無法識別簽核人員");
+        if (!approve && string.IsNullOrWhiteSpace(comments))
+            throw new ArgumentException("退回報廢申請時必須填寫原因");
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+        try
+        {
+            var record = await LockScrapRecordAsync(scrapRecordId, cancellationToken)
+                ?? throw new KeyNotFoundException("找不到 FQC 報廢單");
+            var lot = await LockInspectionLotAsync(record.FqcInspectionLotId ?? Guid.Empty, cancellationToken)
+                ?? throw new InvalidOperationException("報廢單未連結 FQC 批次");
+
+            var expectedStatus = stage == "quality" ? "pending_quality_review" : "pending_finance_review";
+            if (!string.Equals(record.ScrapStatus, expectedStatus, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(stage == "quality"
+                    ? "此報廢單目前不在品保簽核階段"
+                    : "報廢單必須先通過品保簽核才能由財務核定");
+
+            var now = DateTime.UtcNow;
+            var decision = approve ? "approved" : "rejected";
+            var approvalEvent = new FqcScrapApprovalEvent
+            {
+                Stage = stage,
+                Decision = decision,
+                ActorUserId = actorUserId,
+                ActorName = actorName.Trim(),
+                Comments = NormalizeOptional(comments),
+                OccurredAt = now,
+                ScrapRecordId = record.Id
+            };
+            _db.FqcScrapApprovalEvents.Add(approvalEvent);
+            record.ApprovalEvents.Add(approvalEvent);
+
+            if (!approve)
+            {
+                record.ScrapStatus = "returned_to_requester";
+                lot.DispositionStatus = "ScrapReturned";
+            }
+            else if (stage == "quality")
+            {
+                record.ScrapStatus = "pending_finance_review";
+                lot.DispositionStatus = "ScrapPendingFinanceReview";
+            }
+            else
+            {
+                record.ScrapStatus = "approved_pending_disposal";
+                lot.DispositionStatus = "ScrapApprovedPendingExecution";
+            }
+            lot.DispositionBy = actorName.Trim();
+            lot.DispositionAt = now;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+            return MapScrapNote(record, lot);
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task CloseReworkWorkOrderAsync(
+        Guid workOrderId,
+        string closedBy,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(closedBy))
+            throw new ArgumentException("無法識別返修工單結案人員");
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+        try
+        {
+            var workOrder = await _db.WorkOrders
+                .Include(order => order.Materials)
+                .FirstOrDefaultAsync(order => order.Id == workOrderId, cancellationToken)
+                ?? throw new KeyNotFoundException("找不到返修工單");
+            if (!string.Equals(workOrder.WoType, "rework", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("只有返修工單可以從 FQC 流程結案");
+            if (workOrder.Status != "pending_fqc")
+                throw new InvalidOperationException("返修工單必須完成報工並等待 FQC 複檢後才能結案");
+
+            var sourceMaterial = workOrder.Materials.SingleOrDefault(material => material.FqcInspectionLotId.HasValue)
+                ?? throw new InvalidOperationException("返修工單未連結來源 FQC 批次");
+            var sourceLot = await LockInspectionLotAsync(
+                    sourceMaterial.FqcInspectionLotId!.Value, cancellationToken)
+                ?? throw new InvalidOperationException("返修來源 FQC 批次不存在");
+            if (sourceLot.ReworkWorkOrderId != workOrder.Id || sourceLot.QuarantinedQty != 0
+                || sourceMaterial.IssuedQty < sourceMaterial.RequiredQty)
+                throw new InvalidOperationException("來源隔離品尚未全數領用，返修工單不可結案");
+
+            var reinspection = await _db.FqcInspectionLots
+                .Include(lot => lot.ScrapRecords)
+                .SingleOrDefaultAsync(lot => lot.ReworkSourceInspectionLotId == sourceLot.Id, cancellationToken)
+                ?? throw new InvalidOperationException("返修工單尚未建立 FQC 複檢批次");
+            if (reinspection.WorkOrderId != workOrder.Id
+                || reinspection.InspectionStatus == "Pending")
+                throw new InvalidOperationException("返修 FQC 複檢尚未完成判定");
+
+            var receivedQty = await _db.ProductionReceiptItems
+                .Where(item => item.FqcInspectionLotId == reinspection.Id)
+                .SumAsync(item => (decimal?)item.Quantity, cancellationToken) ?? 0m;
+            if (receivedQty != reinspection.ApprovedQty)
+                throw new InvalidOperationException("返修複檢合格數尚未全數入庫");
+
+            var approvedScrapQty = reinspection.ScrapRecords
+                .Where(record => record.ScrapStatus == "approved_pending_disposal")
+                .Sum(record => record.ScrapQty);
+            if (approvedScrapQty != reinspection.QuarantinedQty
+                || receivedQty + approvedScrapQty != reinspection.ProducedQty)
+                throw new InvalidOperationException("返修複檢數量尚未全數入庫或完成報廢核定");
+
+            var now = DateTime.UtcNow;
+            workOrder.Status = "completed";
+            workOrder.ActualEndDate ??= now;
+            workOrder.UpdatedAt = now;
+            sourceLot.DispositionStatus = "ReworkCompleted";
+            sourceLot.DispositionBy = closedBy.Trim();
+            sourceLot.DispositionAt = now;
+            await _db.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task<ScrapRecord?> LockScrapRecordAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational() && _db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+        {
+            var record = await _db.ScrapRecords
+                .FromSqlInterpolated($"SELECT * FROM \"ScrapRecords\" WHERE \"Id\" = {id} FOR UPDATE")
+                .SingleOrDefaultAsync(cancellationToken);
+            if (record is not null)
+            {
+                await _db.Entry(record).ReloadAsync(cancellationToken);
+                await _db.Entry(record).Collection(item => item.ApprovalEvents).LoadAsync(cancellationToken);
+            }
+            return record;
+        }
+
+        var existing = await _db.ScrapRecords.FirstOrDefaultAsync(record => record.Id == id, cancellationToken);
+        if (existing is not null)
+            await _db.Entry(existing).Collection(record => record.ApprovalEvents).LoadAsync(cancellationToken);
+        return existing;
+    }
+
+    private static void ValidateScrapReason(string reasonCode, string reason)
+    {
+        if (!new[] { "01", "02", "03", "04", "05" }.Contains(reasonCode?.Trim()))
+            throw new ArgumentException("請選擇有效的報廢原因分類");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("請填寫報廢原因");
+    }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static FqcScrapNoteDto MapScrapNote(ScrapRecord record, FqcInspectionLot lot) => new()
+    {
+        Id = record.Id,
+        ScrapNumber = record.ScrapNumber!,
+        FqcInspectionLotId = lot.Id,
+        InspectionNumber = lot.InspectionNumber,
+        LotNumber = lot.LotNumber,
+        Quantity = record.ScrapQty,
+        Status = record.ScrapStatus!,
+        ReasonCode = record.ScrapReasonCode,
+        Reason = record.Reason,
+        RequestedByUserId = record.RequestedByUserId,
+        RequestedByName = record.RequestedByName,
+        SubmittedAt = record.SubmittedAt,
+        CreatedAt = record.CreatedAt,
+        ApprovalEvents = record.ApprovalEvents
+            .OrderBy(item => item.OccurredAt)
+            .Select(item => new FqcScrapApprovalEventDto
+            {
+                Id = item.Id,
+                Stage = item.Stage,
+                Decision = item.Decision,
+                ActorUserId = item.ActorUserId,
+                ActorName = item.ActorName,
+                Comments = item.Comments,
+                OccurredAt = item.OccurredAt
+            })
+            .ToList()
+    };
 
     public async Task<List<ProductionReceiptDto>> GetProductionReceiptsAsync(
         Guid? workOrderId,
@@ -638,6 +1095,7 @@ public class FqcWorkflowService : IFqcWorkflowService
         DateTime? expiryDate,
         CancellationToken cancellationToken)
     {
+        expiryDate = NormalizeCalendarDateToUtc(expiryDate);
         var inventoryLot = await _db.InventoryLots.FirstOrDefaultAsync(
             item => item.SkuId == skuId && item.LotNumber == lotNumber &&
                     item.WarehouseId == warehouseId && item.BinLocationId == binLocationId,
@@ -661,6 +1119,11 @@ public class FqcWorkflowService : IFqcWorkflowService
         inventoryLot.ExpiryDate = expiryDate ?? inventoryLot.ExpiryDate;
         inventoryLot.Status = "active";
     }
+
+    private static DateTime? NormalizeCalendarDateToUtc(DateTime? value) =>
+        value.HasValue
+            ? DateTime.SpecifyKind(value.Value.Date, DateTimeKind.Utc)
+            : null;
 
     private async Task UpdateSalesOrderProductionStatusAsync(
         Guid workOrderId,
@@ -765,9 +1228,16 @@ public class FqcWorkflowService : IFqcWorkflowService
         DecidedAt = lot.DecidedAt,
         QuarantinedQty = lot.QuarantinedQty,
         ReworkWorkOrderId = lot.ReworkWorkOrderId,
+        ReworkSourceInspectionLotId = lot.ReworkSourceInspectionLotId,
+        WorkOrderType = lot.WorkOrder?.WoType,
+        WorkOrderStatus = lot.WorkOrder?.Status,
         DispositionBy = lot.DispositionBy,
         DispositionAt = lot.DispositionAt,
-        Notes = lot.Notes
+        Notes = lot.Notes,
+        ScrapNote = lot.ScrapRecords
+            .OrderByDescending(record => record.SubmittedAt ?? record.CreatedAt)
+            .Select(record => MapScrapNote(record, lot))
+            .FirstOrDefault()
     };
 
     private static ProductionReceiptDto MapReceipt(

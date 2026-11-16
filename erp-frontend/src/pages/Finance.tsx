@@ -2,17 +2,22 @@ import { Landmark, CreditCard, Shield, Eye, Loader2, FileCheck, CheckCircle, Plu
 import { useLoans, useBankAccounts, useInvestments } from '../hooks/useApi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { accountsPayableApi, financeApi, ApiResponse } from '../api/api';
+import { createPortal } from 'react-dom';
 import {
   AccountBalanceDto,
   AccountingPeriodDto,
   AccountingVoucherDto,
-  FinanceGlAccountDto,
+  CreateGLAccountRequest,
   GeneralLedgerEntryDto,
   JournalEntryDto,
   SaveAccountingVoucherRequest,
+  SupplierApSubmissionSummaryDto,
 } from '../api/finance';
 import { AccountsPayableDto } from '../api/procurement';
 import { useState } from 'react';
+import { useRole } from '../contexts/useRole';
+import { PayrollPolicyManager } from '../components/PayrollPolicyManager';
+import { BankAccountMaintenance } from '../components/BankAccountMaintenance';
 import './Finance.css';
 
 const loanStatusConfig: Record<string, { label: string; cls: string }> = {
@@ -20,6 +25,14 @@ const loanStatusConfig: Record<string, { label: string; cls: string }> = {
   overdue: { label: '逾期', cls: 'danger' },
   closed: { label: '結清', cls: 'neutral' },
   pending: { label: '待審', cls: 'warning' },
+};
+
+const accountTypeLabels: Record<string, string> = {
+  Asset: '資產',
+  Liability: '負債',
+  Equity: '權益',
+  Revenue: '收入',
+  Expense: '費用',
 };
 
 type DialogType = 'loan' | 'bankAccount' | 'investment' | 'guarantee' | null;
@@ -40,7 +53,10 @@ const createEmptyVoucherLine = (): VoucherLineForm => ({
 });
 
 export function Finance() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'audit' | 'supplierApReview' | 'payrollPolicies' | 'bankAccounts'>('overview');
+  const { hasPermission } = useRole();
+  const canCreateGLAccounts = hasPermission('finance:accounting', 'create');
+  const [supplierApStatus, setSupplierApStatus] = useState('Submitted');
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
   const [editingVoucherId, setEditingVoucherId] = useState<string | null>(null);
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().slice(0, 10));
@@ -59,21 +75,43 @@ export function Finance() {
   const [periodCode, setPeriodCode] = useState('');
   const [periodStartDate, setPeriodStartDate] = useState('');
   const [periodEndDate, setPeriodEndDate] = useState('');
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [accountForm, setAccountForm] = useState<CreateGLAccountRequest>({
+    accountCode: '',
+    accountName: '',
+    accountType: 'Asset',
+    isCashAccount: false,
+  });
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
-  const { data: loansResp, isLoading: loansLoading } = useLoans();
-  const { data: bankResp } = useBankAccounts();
-  const { data: investResp } = useInvestments();
+  const { data: loansResp, isLoading: loansLoading } = useLoans(undefined, activeTab === 'overview' && hasPermission('finance:treasury', 'view'));
+  const { data: bankResp } = useBankAccounts(activeTab === 'overview' && hasPermission('finance:treasury', 'view'));
+  const { data: investResp } = useInvestments(undefined, activeTab === 'overview' && hasPermission('finance:treasury', 'view'));
   const { data: apsResp, isLoading: apsLoading } = useQuery({ 
     queryKey: ['accounts-payable'], 
     queryFn: () => accountsPayableApi.list().then(res => res.data as ApiResponse<AccountsPayableDto[]>) 
   });
+  const { data: supplierApResp, isLoading: supplierApLoading } = useQuery({
+    queryKey: ['supplier-ap-submissions', supplierApStatus],
+    queryFn: () => financeApi.supplierApSubmissions(supplierApStatus).then(res => res.data),
+    enabled: activeTab === 'supplierApReview' && hasPermission('finance:supplierapsubmissions', 'view'),
+  });
   const { data: vouchersResp, isLoading: vouchersLoading } = useQuery({ 
     queryKey: ['accounting-vouchers'], 
-    queryFn: () => financeApi.getVouchers().then(res => res.data as ApiResponse<AccountingVoucherDto[]>)
+    queryFn: () => financeApi.getVouchers().then(res => res.data as ApiResponse<AccountingVoucherDto[]>),
+    enabled: hasPermission('finance:accounting', 'view'),
   });
-  const { data: chartOfAccountsResp } = useQuery({
+  const { data: chartOfAccountsData } = useQuery({
     queryKey: ['finance-chart-of-accounts'],
-    queryFn: () => financeApi.getChartOfAccounts().then(res => res.data as ApiResponse<FinanceGlAccountDto[]>),
+    enabled: hasPermission('finance:accounting', 'view'),
+    queryFn: async () => {
+      const response = await financeApi.getChartOfAccounts();
+      if (!response.data.success) throw new Error(response.data.message || '載入總帳科目失敗');
+      const accounts = response.data.data;
+      if (accounts !== undefined && !Array.isArray(accounts)) {
+        throw new Error('總帳科目資料格式錯誤，請重新載入。');
+      }
+      return accounts ?? [];
+    },
   });
   const journalParams: Record<string, string> = {
     page: String(journalPage),
@@ -86,7 +124,7 @@ export function Finance() {
   const { data: journalResp, isLoading: journalLoading } = useQuery({
     queryKey: ['accounting-journal', journalParams],
     queryFn: () => financeApi.getJournalBook(journalParams).then(res => res.data),
-    enabled: activeTab === 'audit',
+    enabled: activeTab === 'audit' && hasPermission('finance:accounting', 'view'),
   });
   const reportParams: Record<string, string> = {};
   if (journalFromDate) reportParams.fromDate = journalFromDate;
@@ -94,12 +132,12 @@ export function Finance() {
   const { data: trialBalanceResp, isLoading: trialBalanceLoading } = useQuery({
     queryKey: ['accounting-trial-balance', reportParams],
     queryFn: () => financeApi.getTrialBalance(reportParams).then(res => res.data),
-    enabled: activeTab === 'audit' && Boolean(journalToDate),
+    enabled: activeTab === 'audit' && hasPermission('finance:accounting', 'view') && Boolean(journalToDate),
   });
   const { data: statementsResp, isLoading: statementsLoading } = useQuery({
     queryKey: ['accounting-financial-statements', journalFromDate, journalToDate],
     queryFn: () => financeApi.getFinancialStatements(reportParams).then(res => res.data),
-    enabled: activeTab === 'audit' && Boolean(journalFromDate && journalToDate),
+    enabled: activeTab === 'audit' && hasPermission('finance:accounting', 'view') && Boolean(journalFromDate && journalToDate),
   });
   const ledgerParams: Record<string, string> = {
     accountId: journalAccountId,
@@ -111,17 +149,17 @@ export function Finance() {
   const { data: ledgerResp, isLoading: ledgerLoading } = useQuery({
     queryKey: ['accounting-general-ledger', ledgerParams],
     queryFn: () => financeApi.getGeneralLedger(ledgerParams).then(res => res.data),
-    enabled: activeTab === 'audit' && Boolean(journalAccountId),
+    enabled: activeTab === 'audit' && hasPermission('finance:accounting', 'view') && Boolean(journalAccountId),
   });
   const { data: periodsResp } = useQuery({
     queryKey: ['accounting-periods'],
     queryFn: () => financeApi.getAccountingPeriods().then(res => res.data),
-    enabled: activeTab === 'audit',
+    enabled: activeTab === 'audit' && hasPermission('finance:accounting', 'view'),
   });
   const { data: selectedVoucherResp } = useQuery({
     queryKey: ['accounting-voucher', selectedVoucherId],
     queryFn: () => financeApi.getVoucher(selectedVoucherId!).then(res => res.data),
-    enabled: Boolean(selectedVoucherId),
+    enabled: Boolean(selectedVoucherId) && hasPermission('finance:accounting', 'view'),
   });
 
   const loans = loansResp?.data ?? [];
@@ -137,7 +175,7 @@ export function Finance() {
 
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState<DialogType>(null);
-  const chartOfAccounts = (chartOfAccountsResp?.data ?? []).filter(account => account.isActive);
+  const chartOfAccounts = (chartOfAccountsData ?? []).filter(account => account.isActive);
   const voucherList = vouchersResp?.data ?? [];
   const accountingPeriods = periodsResp?.data ?? [];
   const selectedVoucher = selectedVoucherResp?.data;
@@ -260,6 +298,38 @@ export function Finance() {
     }
   };
 
+  const resetGLAccountForm = () => {
+    setAccountForm({
+      accountCode: '',
+      accountName: '',
+      accountType: 'Asset',
+      isCashAccount: false,
+    });
+    setAccountDialogOpen(false);
+  };
+
+  const createGLAccount = async () => {
+    if (!accountForm.accountCode.trim() || !accountForm.accountName.trim()) {
+      alert('請輸入科目代碼及科目名稱。');
+      return;
+    }
+
+    try {
+      await financeApi.createGLAccount({
+        ...accountForm,
+        accountCode: accountForm.accountCode.trim(),
+        accountName: accountForm.accountName.trim(),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['finance-chart-of-accounts'] });
+      resetGLAccountForm();
+      alert('會計科目新增成功。');
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message || String(error);
+      alert(`會計科目新增失敗：${message}`);
+    }
+  };
+
   const closeAccountingPeriod = async (period: AccountingPeriodDto) => {
     if (!window.confirm(`確定關閉 ${period.periodCode}？關帳前必須完成期間內所有傳票，且已過帳傳票借貸平衡。`))
       return;
@@ -270,6 +340,35 @@ export function Finance() {
       const message = (error as { response?: { data?: { message?: string } } })
         ?.response?.data?.message || String(error);
       alert(`會計期間關帳失敗：${message}`);
+    }
+  };
+
+  const reviewSupplierApSubmission = async (
+    submission: SupplierApSubmissionSummaryDto,
+    action: 'return' | 'reject' | 'approve',
+  ) => {
+    const reasonPrompt = action === 'approve' ? '核准原因（可留空）' : '退回／拒絕原因';
+    const reason = window.prompt(reasonPrompt, '') ?? '';
+    if (action !== 'approve' && !reason.trim()) {
+      alert('退回或拒絕時必須填寫原因。');
+      return;
+    }
+
+    try {
+      const detail = await financeApi.getSupplierApSubmission(submission.id);
+      if (action === 'approve')
+        await financeApi.approveSupplierApSubmission(submission.id, detail.data.version, reason.trim());
+      else if (action === 'reject')
+        await financeApi.rejectSupplierApSubmission(submission.id, detail.data.version, reason.trim());
+      else
+        await financeApi.returnSupplierApSubmission(submission.id, detail.data.version, reason.trim());
+
+      await queryClient.invalidateQueries({ queryKey: ['supplier-ap-submissions'] });
+      alert(action === 'approve' ? '案件已核准。' : action === 'reject' ? '案件已拒絕。' : '案件已退回供應商。');
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message || String(error);
+      alert(`請款審核失敗：${message}`);
     }
   };
 
@@ -287,12 +386,38 @@ export function Finance() {
         >
           財務概覽與資產負債
         </button>
-        <button 
-          onClick={() => setActiveTab('audit')}
-          className={`finance-tab ${activeTab === 'audit' ? 'is-active' : ''}`}
-        >
-          財務帳簿與月結
-        </button>
+        {hasPermission('finance:accounting', 'view') && (
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`finance-tab ${activeTab === 'audit' ? 'is-active' : ''}`}
+          >
+            財務帳簿與月結
+          </button>
+        )}
+        {hasPermission('finance:treasury', 'view') && (
+          <button
+            onClick={() => setActiveTab('bankAccounts')}
+            className={`finance-tab ${activeTab === 'bankAccounts' ? 'is-active' : ''}`}
+          >
+            銀行帳戶維護
+          </button>
+        )}
+        {hasPermission('finance:supplierapsubmissions', 'view') && (
+          <button
+            onClick={() => setActiveTab('supplierApReview')}
+            className={`finance-tab ${activeTab === 'supplierApReview' ? 'is-active' : ''}`}
+          >
+            供應商請款審核
+          </button>
+        )}
+        {hasPermission('hr:payroll', 'approve') && (
+          <button
+            onClick={() => setActiveTab('payrollPolicies')}
+            className={`finance-tab ${activeTab === 'payrollPolicies' ? 'is-active' : ''}`}
+          >
+            薪資政策覆核
+          </button>
+        )}
       </div>
 
       {activeTab === 'overview' && (
@@ -307,14 +432,25 @@ export function Finance() {
                  try {
                    const res = await financeApi.seedAccounts();
                    alert(res.data.message || '初始化成功！');
-                   queryClient.invalidateQueries({ queryKey: ['accounting-vouchers'] });
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['finance-chart-of-accounts'] }),
+                      queryClient.invalidateQueries({ queryKey: ['accounting-vouchers'] }),
+                    ]);
                  } catch (err: unknown) {
                    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || String(err);
                    alert('初始化失敗：' + msg);
                  }
-               }}>
+               }} disabled={!canCreateGLAccounts} title={canCreateGLAccounts ? undefined : '需要「會計與財報－新增」權限'}>
                  <Shield size={16} /> 初始化基礎會計科目
                </button>
+                <button
+                  className="btn btn-secondary"
+                  disabled={!canCreateGLAccounts}
+                  title={canCreateGLAccounts ? undefined : '需要「會計與財報－新增」權限'}
+                  onClick={() => setAccountDialogOpen(true)}
+                >
+                  <Plus size={16} /> 新增科目
+                </button>
             </div>
           </div>
 
@@ -409,9 +545,11 @@ export function Finance() {
                   <h3 className="finance-section-title">借款管理</h3>
                   <span className="finance-section-count">{loans.length} 筆</span>
                 </div>
-                <button className="btn btn-primary" onClick={() => setOpenDialog('loan')}>
-                   新增借款
-                </button>
+                {hasPermission('finance:treasury', 'create') && (
+                  <button className="btn btn-primary" onClick={() => setOpenDialog('loan')}>
+                     新增借款
+                  </button>
+                )}
               </div>
               {loansLoading ? (
                 <LoadingRow />
@@ -448,7 +586,7 @@ export function Finance() {
         </>
       )}
 
-      {activeTab === 'audit' && (
+      {activeTab === 'audit' && hasPermission('finance:accounting', 'view') && (
         <>
           <section className="finance-audit-intro">
             <div className="finance-audit-intro__icon"><Landmark size={22} /></div>
@@ -460,6 +598,45 @@ export function Finance() {
             <div className="finance-audit-intro__note"><Shield size={15} /> 僅統計已過帳分錄</div>
           </section>
 
+          <div className="finance-section finance-audit-section">
+            <div className="glass-card">
+              <div className="finance-section-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Landmark size={17} style={{ color: 'var(--cobalt-400)' }} />
+                  <h3 className="finance-section-title">會計科目表</h3>
+                  <span className="finance-section-count">{(chartOfAccountsData ?? []).length} 筆</span>
+                </div>
+                {hasPermission('finance:accounting', 'create') && (
+                  <button className="btn btn-primary" onClick={() => setAccountDialogOpen(true)}>
+                    <Plus size={15} /> 新增科目
+                  </button>
+                )}
+              </div>
+              <div className="data-table-container">
+                <table className="data-table">
+                  <thead><tr><th>科目代碼</th><th>科目名稱</th><th>類型</th><th>上層科目</th><th>現金／銀行</th><th>狀態</th></tr></thead>
+                  <tbody>
+                    {(chartOfAccountsData ?? []).length === 0 ? (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--slate-500)' }}>尚無會計科目。</td></tr>
+                    ) : (chartOfAccountsData ?? []).map(account => {
+                      const parent = (chartOfAccountsData ?? []).find(item => item.id === account.parentAccountId);
+                      return (
+                        <tr key={account.id}>
+                          <td className="mono">{account.accountCode}</td>
+                          <td>{account.accountName}</td>
+                          <td>{accountTypeLabels[account.accountType] ?? account.accountType}</td>
+                          <td>{parent ? `${parent.accountCode} ${parent.accountName}` : '—'}</td>
+                          <td>{account.isCashAccount ? '是' : '否'}</td>
+                          <td><span className={`status-badge status-${account.isActive ? 'active' : 'neutral'}`}>{account.isActive ? '啟用' : '停用'}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <div className="finance-section finance-audit-section finance-vouchers">
             <div className="glass-card">
               <div className="finance-section-header">
@@ -468,9 +645,11 @@ export function Finance() {
                   <h3 className="finance-section-title">會計傳票</h3>
                   <span className="finance-section-count">{voucherList.length} 筆（最近 100 筆）</span>
                 </div>
-                <button className="btn btn-primary" onClick={startNewVoucher}>
-                  <Plus size={15} /> 新增人工傳票
-                </button>
+                {hasPermission('finance:accounting', 'create') && (
+                  <button className="btn btn-primary" onClick={startNewVoucher}>
+                    <Plus size={15} /> 新增人工傳票
+                  </button>
+                )}
               </div>
               <div className="data-table-container">
                 <table className="data-table">
@@ -497,13 +676,15 @@ export function Finance() {
                           </span>
                         </td>
                         <td style={{ display: 'flex', gap: 6 }}>
-                          {voucher.status === 'Draft' && (
+                          {voucher.status === 'Draft' && hasPermission('finance:accounting', 'edit') && (
                             <>
                               <button className="icon-action-btn" title="編輯草稿" onClick={() => editVoucher(voucher)}><Pencil size={14} /></button>
-                              <button className="icon-action-btn" title="送交覆核" onClick={() => void submitManualVoucher(voucher)}><Send size={14} /></button>
                             </>
                           )}
-                          {voucher.status === 'PendingApproval' && (
+                          {voucher.status === 'Draft' && hasPermission('finance:accounting', 'execute') && (
+                            <button className="icon-action-btn" title="送交覆核" onClick={() => void submitManualVoucher(voucher)}><Send size={14} /></button>
+                          )}
+                          {voucher.status === 'PendingApproval' && hasPermission('finance:accounting', 'approve') && (
                             <button className="icon-action-btn" title="核准並過帳" onClick={() => void approveManualVoucher(voucher)}><CheckCircle size={14} /></button>
                           )}
                         </td>
@@ -742,7 +923,9 @@ export function Finance() {
                 <input aria-label="會計期間代碼" placeholder="期間代碼" value={periodCode} onChange={event => setPeriodCode(event.target.value)} />
                 <input aria-label="會計期間起日" type="date" value={periodStartDate} onChange={event => setPeriodStartDate(event.target.value)} />
                 <input aria-label="會計期間迄日" type="date" value={periodEndDate} onChange={event => setPeriodEndDate(event.target.value)} />
-                <button className="btn btn-primary" onClick={() => void createAccountingPeriod()}>新增期間</button>
+                {hasPermission('finance:accounting', 'create') && (
+                  <button className="btn btn-primary" onClick={() => void createAccountingPeriod()}>新增期間</button>
+                )}
               </div>
               <div className="data-table-container">
                 <table className="data-table">
@@ -754,7 +937,7 @@ export function Finance() {
                       <tr key={period.id}>
                         <td>{period.periodCode}</td><td>{period.startDate}</td><td>{period.endDate}</td>
                         <td>{period.isClosed ? '已關帳（不結轉損益）' : '開放中'}</td><td>{period.closedAt?.slice(0, 19).replace('T', ' ') || '—'}</td>
-                        <td>{!period.isClosed && <button className="btn btn-secondary" onClick={() => void closeAccountingPeriod(period)}>檢核並關帳</button>}</td>
+                        <td>{!period.isClosed && hasPermission('finance:accounting', 'execute') && <button className="btn btn-secondary" onClick={() => void closeAccountingPeriod(period)}>檢核並關帳</button>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -766,15 +949,95 @@ export function Finance() {
         </>
       )}
 
-      {selectedVoucherId && (
-        <div className="dialog-overlay" role="presentation">
-          <div className="dialog-content" role="dialog" aria-modal="true" aria-labelledby="posted-voucher-title" style={{ maxWidth: 900 }}>
+      {activeTab === 'supplierApReview' && (
+        <div className="finance-section">
+          <div className="module-page-header">
+            <div>
+              <h2 className="module-page-title">供應商請款審核</h2>
+              <p className="module-page-desc">供應商送審案件 · 三方核對 · 核准／退回／拒絕</p>
+            </div>
+          </div>
+          <div className="glass-card finance-control-row" style={{ padding: 16, marginBottom: 16 }}>
+            <label>
+              案件狀態
+              <select value={supplierApStatus} onChange={event => setSupplierApStatus(event.target.value)}>
+                <option value="Submitted">待審核</option>
+                <option value="Returned">已退回</option>
+                <option value="Rejected">已拒絕</option>
+                <option value="Approved">已核准</option>
+              </select>
+            </label>
+          </div>
+          <div className="glass-card">
+            {supplierApLoading ? (
+              <LoadingRow />
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>請款案件</th>
+                    <th>供應商發票</th>
+                    <th>發票日期</th>
+                    <th>幣別</th>
+                    <th>金額</th>
+                    <th>三方匹配</th>
+                    <th>版本</th>
+                    <th>送審時間</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!supplierApResp?.items.length ? (
+                    <tr><td colSpan={9} style={{ textAlign: 'center', padding: 32 }}>目前沒有符合條件的供應商請款案件。</td></tr>
+                  ) : supplierApResp.items.map((submission: SupplierApSubmissionSummaryDto) => (
+                    <tr key={submission.id}>
+                      <td className="mono">{submission.submissionNumber}</td>
+                      <td className="mono">{submission.supplierInvoiceNumber}</td>
+                      <td className="mono">{submission.supplierInvoiceDate}</td>
+                      <td>{submission.currency}</td>
+                      <td className="mono">{submission.totalAmount.toLocaleString()}</td>
+                      <td>{submission.matchResult}</td>
+                      <td>{submission.version}</td>
+                      <td className="mono">{submission.submittedAt?.slice(0, 19).replace('T', ' ') || '—'}</td>
+                      <td>
+                        {supplierApStatus === 'Submitted' && hasPermission('finance:supplierapsubmissions', 'approve') ? (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-primary" onClick={() => void reviewSupplierApSubmission(submission, 'approve')}>
+                              核准
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => void reviewSupplierApSubmission(submission, 'return')}>
+                              退回
+                            </button>
+                            <button className="btn btn-danger" onClick={() => void reviewSupplierApSubmission(submission, 'reject')}>
+                              拒絕
+                            </button>
+                          </div>
+                        ) : <span className="status-badge">{submission.status}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'payrollPolicies' && <PayrollPolicyManager mode="finance" />}
+      {activeTab === 'bankAccounts' && <BankAccountMaintenance />}
+
+      {selectedVoucherId && createPortal(
+        <div className="dialog-overlay finance-dialog-overlay" role="presentation">
+          <div className="dialog-content finance-dialog finance-dialog--detail" role="dialog" aria-modal="true" aria-labelledby="posted-voucher-title">
             <div className="dialog-header">
-              <div id="posted-voucher-title" className="dialog-title">原始會計傳票</div>
-              <button onClick={() => setSelectedVoucherId(null)} aria-label="關閉" style={{ background: 'none', border: 'none', color: 'var(--slate-500)', cursor: 'pointer' }}><X size={18} /></button>
+              <div>
+                <p className="finance-dialog-eyebrow">已過帳憑證</p>
+                <div id="posted-voucher-title" className="dialog-title">原始會計傳票</div>
+              </div>
+              <button className="finance-dialog-close" onClick={() => setSelectedVoucherId(null)} aria-label="關閉"><X size={18} /></button>
             </div>
             {selectedVoucher ? (
-              <div className="dialog-body">
+              <div className="dialog-body finance-dialog-body">
                 <p>{selectedVoucher.voucherNumber} · {selectedVoucher.voucherDate.slice(0, 10)} · {selectedVoucher.description || selectedVoucher.voucherType}</p>
                 <div className="data-table-container">
                   <table className="data-table">
@@ -791,18 +1054,82 @@ export function Finance() {
               </div>
             ) : <LoadingRow />}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {voucherDialogOpen && (
-        <div className="dialog-overlay" role="presentation">
-          <div className="dialog-content" role="dialog" aria-modal="true" aria-labelledby="voucher-dialog-title" style={{ maxWidth: 1050 }}>
+      {accountDialogOpen && createPortal(
+        <div className="dialog-overlay finance-dialog-overlay" role="presentation">
+          <div className="dialog-content finance-dialog finance-dialog--account" role="dialog" aria-modal="true" aria-labelledby="gl-account-dialog-title">
             <div className="dialog-header">
-              <div id="voucher-dialog-title" className="dialog-title">{editingVoucherId ? '編輯傳票草稿' : '新增人工傳票'}</div>
-              <button onClick={resetVoucherForm} aria-label="關閉" style={{ background: 'none', border: 'none', color: 'var(--slate-500)', cursor: 'pointer' }}><X size={18} /></button>
+              <div>
+                <p className="finance-dialog-eyebrow">科目設定</p>
+                <div id="gl-account-dialog-title" className="dialog-title">新增會計科目</div>
+                <p className="finance-dialog-description">建立供總帳與傳票使用的會計科目。</p>
+              </div>
+              <button className="finance-dialog-close" onClick={resetGLAccountForm} aria-label="關閉"><X size={18} /></button>
             </div>
-            <div className="dialog-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+            <div className="dialog-body finance-dialog-body" style={{ display: 'grid', gap: 12 }}>
+              <label>
+                科目代碼
+                <input aria-label="科目代碼" required maxLength={20} value={accountForm.accountCode} onChange={event => setAccountForm(form => ({ ...form, accountCode: event.target.value }))} style={{ display: 'block', width: '100%' }} />
+              </label>
+              <label>
+                科目名稱
+                <input aria-label="科目名稱" required maxLength={100} value={accountForm.accountName} onChange={event => setAccountForm(form => ({ ...form, accountName: event.target.value }))} style={{ display: 'block', width: '100%' }} />
+              </label>
+              <label>
+                科目類型
+                <select aria-label="科目類型" value={accountForm.accountType} onChange={event => setAccountForm(form => ({ ...form, accountType: event.target.value, isCashAccount: false }))} style={{ display: 'block', width: '100%' }}>
+                  <option value="Asset">資產</option>
+                  <option value="Liability">負債</option>
+                  <option value="Equity">權益</option>
+                  <option value="Revenue">收入</option>
+                  <option value="Expense">費用</option>
+                </select>
+              </label>
+              <label>
+                上層科目（選填）
+                <select aria-label="上層科目" value={accountForm.parentAccountId ?? ''} onChange={event => setAccountForm(form => ({ ...form, parentAccountId: event.target.value || undefined }))} style={{ display: 'block', width: '100%' }}>
+                  <option value="">無（頂層科目）</option>
+                  {(chartOfAccountsData ?? []).filter(account => account.isActive && account.accountType === accountForm.accountType).map(account => (
+                    <option key={account.id} value={account.id}>{account.accountCode} {account.accountName}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  aria-label="現金或銀行科目"
+                  type="checkbox"
+                  checked={accountForm.isCashAccount}
+                  disabled={accountForm.accountType !== 'Asset'}
+                  onChange={event => setAccountForm(form => ({ ...form, isCashAccount: event.target.checked }))}
+                />
+                現金／銀行科目（限資產類）
+              </label>
+            </div>
+            <div className="dialog-footer finance-dialog-footer">
+              <button className="btn btn-secondary" onClick={resetGLAccountForm}>取消</button>
+              <button className="btn btn-primary" onClick={() => void createGLAccount()}>建立科目</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {voucherDialogOpen && createPortal(
+        <div className="dialog-overlay finance-dialog-overlay" role="presentation">
+          <div className="dialog-content finance-dialog finance-dialog--voucher" role="dialog" aria-modal="true" aria-labelledby="voucher-dialog-title">
+            <div className="dialog-header">
+              <div>
+                <p className="finance-dialog-eyebrow">總帳作業</p>
+                <div id="voucher-dialog-title" className="dialog-title">{editingVoucherId ? '編輯傳票草稿' : '新增人工傳票'}</div>
+                <p className="finance-dialog-description">輸入借貸分錄並儲存為草稿，送審前可再行確認。</p>
+              </div>
+              <button className="finance-dialog-close" onClick={resetVoucherForm} aria-label="關閉"><X size={18} /></button>
+            </div>
+            <div className="dialog-body finance-dialog-body">
+              <div className="finance-voucher-meta">
                 <label>傳票日期<input aria-label="傳票日期" type="date" value={voucherDate} onChange={event => setVoucherDate(event.target.value)} style={{ display: 'block', width: '100%' }} /></label>
                 <label>傳票類型
                   <select aria-label="傳票類型" value={voucherType} onChange={event => setVoucherType(event.target.value)} style={{ display: 'block', width: '100%' }}>
@@ -814,7 +1141,7 @@ export function Finance() {
                 <label>摘要<input aria-label="傳票摘要" maxLength={200} value={voucherDescription} onChange={event => setVoucherDescription(event.target.value)} style={{ display: 'block', width: '100%' }} /></label>
               </div>
               <div className="data-table-container">
-                <table className="data-table">
+                <table className="data-table finance-voucher-lines">
                   <thead><tr><th>項次</th><th>會計科目</th><th>借方</th><th>貸方</th><th>分錄摘要</th><th>操作</th></tr></thead>
                   <tbody>
                     {voucherLines.map((line, index) => (
@@ -838,18 +1165,19 @@ export function Finance() {
               <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setVoucherLines(lines => [...lines, createEmptyVoucherLine()])}>
                 <Plus size={14} /> 新增分錄
               </button>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, marginTop: 16, fontWeight: 600 }}>
+              <div className="finance-voucher-totals">
                 <span>借方：{voucherLines.reduce((sum, line) => sum + (Number(line.debitAmount) || 0), 0).toLocaleString()}</span>
                 <span>貸方：{voucherLines.reduce((sum, line) => sum + (Number(line.creditAmount) || 0), 0).toLocaleString()}</span>
               </div>
-              <p style={{ color: 'var(--slate-500)', fontSize: 12, marginTop: 8 }}>草稿可先儲存未平衡分錄；送審時須借貸平衡且會計期間未關帳。核准者不可為傳票建立者。</p>
+              <p className="finance-dialog-note">草稿可先儲存未平衡分錄；送審時須借貸平衡且會計期間未關帳。核准者不可為傳票建立者。</p>
             </div>
-            <div className="dialog-footer" style={{ gap: 8 }}>
+            <div className="dialog-footer finance-dialog-footer">
               <button className="btn btn-secondary" onClick={resetVoucherForm}>取消</button>
               <button className="btn btn-primary" onClick={() => void saveManualVoucher()}>儲存草稿</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style>{`

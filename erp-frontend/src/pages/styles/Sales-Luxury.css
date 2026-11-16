@@ -194,6 +194,18 @@
   padding: 1.5rem;
 }
 
+.lux-sales-detail-row > .lux-sales-detail-cell {
+  padding: 1.5rem 3rem;
+  background: linear-gradient(115deg, rgba(17, 30, 50, 0.96), rgba(10, 18, 31, 0.98));
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.16);
+}
+
+.lux-sales-detail-content {
+  padding-left: 2rem;
+  border-left: 3px solid var(--lux-gold);
+}
+
 .lux-btn-primary {
   background: linear-gradient(135deg, #d4af37, #b8860b);
   color: #000;

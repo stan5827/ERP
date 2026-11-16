@@ -132,6 +132,8 @@ public class WipReportService : IWipReportService
             || string.Equals(workOrder.Status, "closed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(workOrder.Status, "settled", StringComparison.OrdinalIgnoreCase))
             return (null, "work_order_closed");
+        if (string.Equals(workOrder.Status, "pending_fqc", StringComparison.OrdinalIgnoreCase))
+            return (null, "fqc_pending");
         if (request.CompletedQty < 0 || request.DefectQty < 0 || request.ScrapQty < 0
             || request.CompletedQty + request.DefectQty + request.ScrapQty <= 0)
             return (null, "invalid_quantities");
@@ -413,8 +415,10 @@ public class WipReportService : IWipReportService
                 workOrder.ScrapQty = operation.ScrapQty;
                 if (operation.CompletedQty >= workOrder.PlannedQty)
                 {
-                    workOrder.Status = "completed";
-                    workOrder.ActualEndDate = report.EndTime ?? now;
+                    var isRework = string.Equals(workOrder.WoType, "rework", StringComparison.OrdinalIgnoreCase);
+                    workOrder.Status = isRework ? "pending_fqc" : "completed";
+                    if (!isRework)
+                        workOrder.ActualEndDate = report.EndTime ?? now;
                 }
             }
             workOrder.UpdatedAt = now;

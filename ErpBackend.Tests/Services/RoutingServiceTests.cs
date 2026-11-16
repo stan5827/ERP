@@ -43,6 +43,37 @@ public class RoutingServiceTests
     }
 
     [Fact]
+    public async Task GetRoutingsAsync_FiltersByOperationIdAndActiveRouting()
+    {
+        using var db = CreateInMemoryDbContext();
+        var sku1 = new Sku { SkuNumber = "P-001", SkuName = "Product P" };
+        var sku2 = new Sku { SkuNumber = "P-002", SkuName = "Product Q" };
+        var workCenter = new WorkCenter { WorkCenterCode = "WC1", WorkCenterName = "Center 1" };
+        var matchingOperation = new Operation { OperationCode = "OP1", OperationName = "Injection" };
+        var otherOperation = new Operation { OperationCode = "OP2", OperationName = "Packing" };
+        db.Skus.AddRange(sku1, sku2);
+        db.WorkCenters.Add(workCenter);
+        db.Operations.AddRange(matchingOperation, otherOperation);
+        var matchingRouting = new Routing { RoutingCode = "R001", RoutingName = "Active route", ProductSkuId = sku1.Id, IsActive = true };
+        var inactiveRouting = new Routing { RoutingCode = "R002", RoutingName = "Inactive route", ProductSkuId = sku2.Id, IsActive = false };
+        var otherRouting = new Routing { RoutingCode = "R003", RoutingName = "Other route", ProductSkuId = sku2.Id, IsActive = true };
+        db.Routings.AddRange(matchingRouting, inactiveRouting, otherRouting);
+        await db.SaveChangesAsync();
+        db.RoutingOperations.AddRange(
+            new RoutingOperation { RoutingId = matchingRouting.Id, OperationSeq = 10, OperationId = matchingOperation.Id, WorkCenterId = workCenter.Id },
+            new RoutingOperation { RoutingId = inactiveRouting.Id, OperationSeq = 10, OperationId = matchingOperation.Id, WorkCenterId = workCenter.Id },
+            new RoutingOperation { RoutingId = otherRouting.Id, OperationSeq = 10, OperationId = otherOperation.Id, WorkCenterId = workCenter.Id });
+        await db.SaveChangesAsync();
+
+        var service = new RoutingService(db);
+        var result = await service.GetRoutingsAsync(operationId: matchingOperation.Id);
+
+        var routing = Assert.Single(result);
+        Assert.Equal("R001", routing.RoutingCode);
+        Assert.Equal(sku1.Id, routing.ProductSkuId);
+    }
+
+    [Fact]
     public async Task GetRoutingsAsync_MapsOperationsWithIncludes()
     {
         using var db = CreateInMemoryDbContext();

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using ErpBackend.DTOs;
+using ErpBackend.Filters;
 using ErpBackend.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,6 +14,8 @@ public class ProductionReceiptsController : BaseController
     public ProductionReceiptsController(IFqcWorkflowService service) => _service = service;
 
     [HttpGet]
+    [Authorize]
+    [PermissionAuthorize("quality", "view", "manufacturing:view")]
     public async Task<ActionResult<ApiResponse<List<ProductionReceiptDto>>>> GetProductionReceipts(
         [FromQuery] Guid? workOrderId,
         CancellationToken cancellationToken)
@@ -20,6 +23,7 @@ public class ProductionReceiptsController : BaseController
 
     [HttpPost]
     [Authorize]
+    [PermissionAuthorize("inventory", "execute", "manufacturing:create", "manufacturing:execute")]
     public async Task<ActionResult<ApiResponse<ProductionReceiptDto>>> CreateProductionReceipt(
         [FromBody] CreateProductionReceiptRequestDto request,
         CancellationToken cancellationToken)

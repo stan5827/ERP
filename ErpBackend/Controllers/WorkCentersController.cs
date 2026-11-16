@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ErpBackend.DTOs;
+using ErpBackend.Filters;
 using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
@@ -11,6 +12,7 @@ public class WorkCentersController : BaseController
 
     public WorkCentersController(IWorkCenterService workCenterService) => _workCenterService = workCenterService;
 
+    [PermissionAuthorize("processengineering", "view", "tpm:view")]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<WorkCenterDto>>>> GetWorkCenters()
         => Ok(await _workCenterService.GetWorkCentersAsync());

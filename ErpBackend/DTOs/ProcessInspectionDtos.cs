@@ -8,13 +8,18 @@ public class InspectionTemplateDto
     public Guid OperationId { get; set; }
     public string? OperationCode { get; set; }
     public string? OperationName { get; set; }
-    public Guid? ProductSkuId { get; set; }
-    public string? ProductSkuNumber { get; set; }
-    public string? ProductSkuName { get; set; }
+    public List<InspectionTemplateProductDto> ProductSkus { get; set; } = new();
     public int Version { get; set; }
     public bool IsActive { get; set; }
     public string? Notes { get; set; }
     public List<InspectionTemplateItemDto> Items { get; set; } = new();
+}
+
+public class InspectionTemplateProductDto
+{
+    public Guid Id { get; set; }
+    public string? SkuNumber { get; set; }
+    public string? SkuName { get; set; }
 }
 
 public class InspectionTemplateItemDto
@@ -41,7 +46,7 @@ public class SaveInspectionTemplateRequestDto
     public string TemplateCode { get; set; } = null!;
     public string TemplateName { get; set; } = null!;
     public Guid OperationId { get; set; }
-    public Guid? ProductSkuId { get; set; }
+    public List<Guid> ProductSkuIds { get; set; } = new();
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
     public List<SaveInspectionTemplateItemRequestDto> Items { get; set; } = new();

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Download, Eye, Clock, Loader2 } from 'lucide-react';
+import { Search, Plus, Download, Eye, Clock, Loader2, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { useIqcReports, useSupplierComplaints, useSuppliers } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
@@ -87,6 +87,19 @@ export function Quality() {
         </div>
       </div>
 
+      <button
+        type="button"
+        className="quality-workbench-entry"
+        onClick={() => setActiveTab('process')}
+      >
+        <span className="quality-workbench-icon"><ClipboardCheck size={23} /></span>
+        <span className="quality-workbench-copy">
+          <strong>工藝檢驗工作台</strong>
+          <small>進入製程檢驗紀錄、FQC 成品檢驗及品質處置；可用操作依您的角色權限顯示。</small>
+        </span>
+        <span className="quality-workbench-action">開啟工作台 <ArrowRight size={16} /></span>
+      </button>
+
       <div className="module-stat-grid">
         {stats.map(s => (
           <div key={s.label} className="glass-card module-stat-card">
@@ -127,12 +140,6 @@ export function Quality() {
           >
             Lot 追溯查詢
           </button>
-          <button
-            className="tab-item"
-            onClick={() => setActiveTab('process')}
-          >
-            工藝檢驗
-          </button>
         </div>
       </div>
 
@@ -161,7 +168,7 @@ export function Quality() {
                 const rc = iqcResultConfig[r.result] ?? { label: r.result, cls: 'neutral' };
                 return (
                   <tr key={r.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{r.reportNumber}</td>
+                    <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '12px' }}>{r.reportNumber}</td>
                     <td>
                       <div>{r.goodsReceiptNumber ?? '—'}</div>
                       <div style={{ color: 'var(--slate-400)', fontSize: 11 }}>{r.skuName ?? '—'}</div>
@@ -206,7 +213,7 @@ export function Quality() {
                 const pc = priorityConfig[c.priority] ?? { label: c.priority, cls: 'neutral' };
                 return (
                   <tr key={c.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{c.complaintNumber}</td>
+                    <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '12px' }}>{c.complaintNumber}</td>
                     <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{c.supplierName ?? '—'}</td>
                     <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.skuName ?? '—'}</td>
                     <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{c.defectType ?? '—'}</td>
@@ -310,6 +317,16 @@ export function Quality() {
       )}
 
       <style>{`
+        .quality-workbench-entry { display: flex; align-items: center; gap: 16px; width: 100%; padding: 18px 20px; color: var(--slate-100); text-align: left; background: linear-gradient(110deg, rgba(37, 99, 235, .18), rgba(15, 23, 42, .72)); border: 1px solid rgba(59, 130, 246, .42); border-radius: var(--radius-lg, 12px); cursor: pointer; transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); }
+        .quality-workbench-entry:hover { border-color: var(--cobalt-400); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(15, 23, 42, .2); }
+        .quality-workbench-icon { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; color: var(--cobalt-300); background: rgba(37, 99, 235, .18); border-radius: 12px; }
+        .quality-workbench-copy { display: grid; gap: 5px; flex: 1; }
+        .quality-workbench-copy strong { font-size: 15px; font-weight: 700; }
+        .quality-workbench-copy small { color: var(--slate-400); font-size: 12px; line-height: 1.5; }
+        .quality-workbench-action { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: linear-gradient(135deg, #3b82f6, #7c3aed); border: 1px solid rgba(255,255,255,.2); border-radius: 9px; box-shadow: 0 4px 12px rgba(37,99,235,.28); font-size: 14px; font-weight: 700; white-space: nowrap; transition: background .2s ease, box-shadow .2s ease, transform .2s ease; }
+        .quality-workbench-entry:hover .quality-workbench-action { background: linear-gradient(135deg, #2563eb, #6d28d9); box-shadow: 0 6px 16px rgba(37,99,235,.36); transform: translateX(2px); }
+        .quality-workbench-entry:focus-visible { outline: 3px solid rgba(96,165,250,.75); outline-offset: 3px; }
+        @media (max-width: 640px) { .quality-workbench-entry { align-items: flex-start; padding: 14px; } .quality-workbench-action { display: none; } }
         .module-page { display: flex; flex-direction: column; gap: 16px; }
         .module-page-header { display: flex; align-items: flex-start; justify-content: space-between; }
         .module-page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--slate-100); }

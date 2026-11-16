@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using ErpBackend.Models.MES;
 
 namespace ErpBackend.Models.Finance;
 
@@ -134,6 +135,8 @@ public class AccountingEntry
     public Guid GLAccountId { get; set; }
     
     public Guid? CostCenterId { get; set; }
+
+    public Guid? WorkOrderId { get; set; }
     
     [Column(TypeName = "decimal(18,2)")] 
     public decimal DebitAmount { get; set; } // 借方金額
@@ -153,4 +156,7 @@ public class AccountingEntry
     
     [ForeignKey(nameof(CostCenterId))]
     public CostCenter? CostCenter { get; set; }
+
+    [ForeignKey(nameof(WorkOrderId))]
+    public WorkOrder? WorkOrder { get; set; }
 }

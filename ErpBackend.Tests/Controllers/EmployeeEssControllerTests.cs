@@ -143,6 +143,43 @@ public sealed class EmployeeEssControllerTests
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, ((ObjectResult)result.Result!).StatusCode);
     }
 
+    [Fact]
+    public async Task CreateLeaveRequest_AlwaysUsesTokenEmployeeId()
+    {
+        var tokenEmployeeId = Guid.NewGuid();
+        var leaveService = new Mock<ILeaveRequestService>();
+        leaveService
+            .Setup(service => service.CreateAsync(
+                It.Is<CreateLeaveRequestRequest>(request =>
+                    request.EmployeeId == tokenEmployeeId.ToString()),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((new LeaveRequestDto
+            {
+                Id = Guid.NewGuid(),
+                EmployeeId = tokenEmployeeId,
+                Status = "pending"
+            }, "ok"));
+        var controller = CreateController(
+            new Mock<IAttendanceRecordService>(),
+            tokenEmployeeId,
+            leaveService);
+
+        var result = await controller.CreateLeaveRequest(new EmployeeEssCreateLeaveRequestDto
+        {
+            LeaveType = "annual",
+            StartDate = new DateTime(2026, 7, 1),
+            EndDate = new DateTime(2026, 7, 1)
+        }, CancellationToken.None);
+
+        Assert.IsType<CreatedAtActionResult>(result.Result);
+        leaveService.Verify(
+            service => service.CreateAsync(
+                It.Is<CreateLeaveRequestRequest>(request =>
+                    request.EmployeeId == tokenEmployeeId.ToString()),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private static EmployeeEssController CreateController(
         Mock<IAttendanceRecordService> attendanceService,
         Guid? employeeId = null,

@@ -464,6 +464,103 @@ public class BomServiceTests
     }
 
     [Fact]
+    public async Task ApplyStandardCostRollupAsync_UpdatesSkuAndAuditsApproval()
+    {
+        using var db = CreateInMemoryDbContext();
+        var product = new Sku
+        {
+            SkuNumber = "P-001",
+            SkuName = "Product P",
+            StandardCost = 12m,
+            LatestPurchaseCost = 25m
+        };
+        var child = new Sku
+        {
+            SkuNumber = "C-001",
+            SkuName = "Child C",
+            SourceType = "self_made",
+            StandardCost = 100m
+        };
+        SetProductionUom(db, child, "ea");
+        db.Skus.AddRange(product, child);
+        var bom = new Bom
+        {
+            BomCode = "B001",
+            ProductSkuId = product.Id,
+            Status = "active",
+            EffectiveDate = DateTime.UtcNow.AddDays(-1)
+        };
+        db.Boms.Add(bom);
+        await db.SaveChangesAsync();
+        db.BomItems.Add(new BomItem
+        {
+            BomId = bom.Id,
+            ChildSkuId = child.Id,
+            Quantity = 2m,
+            Unit = "ea"
+        });
+        await db.SaveChangesAsync();
+
+        var approverId = Guid.NewGuid();
+        var (result, status) = await new BomService(db).ApplyStandardCostRollupAsync(
+            bom.Id,
+            260m,
+            approverId,
+            CancellationToken.None);
+
+        Assert.Equal("ok", status);
+        Assert.NotNull(result);
+        Assert.Equal(12m, result!.PreviousStandardCost);
+        Assert.Equal(260m, result.AppliedStandardCost);
+        Assert.Equal(260m, product.StandardCost);
+        Assert.Equal(25m, product.LatestPurchaseCost);
+        var audit = await db.AuditLogs.SingleAsync();
+        Assert.Equal("approve_bom_standard_cost", audit.Action);
+        Assert.Equal(bom.Id, audit.EntityId);
+        Assert.Equal(approverId, audit.UserId);
+    }
+
+    [Fact]
+    public async Task ApplyStandardCostRollupAsync_RejectsStalePreview()
+    {
+        using var db = CreateInMemoryDbContext();
+        var product = new Sku { SkuNumber = "P-001", SkuName = "Product P", StandardCost = 12m };
+        var child = new Sku { SkuNumber = "C-001", SkuName = "Child C", StandardCost = 100m };
+        SetProductionUom(db, child, "ea");
+        db.Skus.AddRange(product, child);
+        var bom = new Bom
+        {
+            BomCode = "B001",
+            ProductSkuId = product.Id,
+            Status = "active",
+            EffectiveDate = DateTime.UtcNow.AddDays(-1)
+        };
+        db.Boms.Add(bom);
+        await db.SaveChangesAsync();
+        db.BomItems.Add(new BomItem
+        {
+            BomId = bom.Id,
+            ChildSkuId = child.Id,
+            Quantity = 2m,
+            Unit = "ea"
+        });
+        await db.SaveChangesAsync();
+        child.StandardCost = 110m;
+        await db.SaveChangesAsync();
+
+        var (result, status) = await new BomService(db).ApplyStandardCostRollupAsync(
+            bom.Id,
+            200m,
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Equal("stale_cost", status);
+        Assert.Equal(12m, product.StandardCost);
+        Assert.Empty(await db.AuditLogs.ToListAsync());
+    }
+
+    [Fact]
     public async Task GetCostRollupAsync_ConvertsProductionQuantityToBaseUnit()
     {
         using var db = CreateInMemoryDbContext();
@@ -494,6 +591,34 @@ public class BomServiceTests
 
         Assert.NotNull(result);
         Assert.Equal(100m, result!.MaterialCost);
+    }
+
+    [Fact]
+    public async Task GetCostRollupAsync_UsesLatestPurchaseCostForPurchasedComponent()
+    {
+        using var db = CreateInMemoryDbContext();
+        var product = new Sku { SkuNumber = "P-001", SkuName = "Product" };
+        var component = new Sku
+        {
+            SkuNumber = "C-001",
+            SkuName = "Purchased component",
+            SourceType = "buy",
+            LatestPurchaseCost = 150m,
+            StandardCost = 100m
+        };
+        SetProductionUom(db, component, "ea");
+        db.Skus.AddRange(product, component);
+        var bom = new Bom { BomCode = "B001", ProductSkuId = product.Id };
+        db.Boms.Add(bom);
+        await db.SaveChangesAsync();
+        db.BomItems.Add(new BomItem { BomId = bom.Id, ChildSkuId = component.Id, Quantity = 2m, Unit = "ea" });
+        await db.SaveChangesAsync();
+
+        var result = await new BomService(db).GetCostRollupAsync(bom.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(300m, result!.MaterialCost);
+        Assert.Equal(300m, result.TotalCost);
     }
 
     [Fact]

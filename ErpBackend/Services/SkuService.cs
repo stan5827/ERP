@@ -123,7 +123,6 @@ public class SkuService : ISkuService
             MaxStock = dto.MaxStock,
             LeadTimeDays = dto.LeadTimeDays,
             PurchasePrice = dto.PurchasePrice,
-            StandardCost = dto.StandardCost,
             DefaultWarehouseId = dto.DefaultWarehouseId,
             DefaultBinLocationId = dto.DefaultBinLocationId,
             PriceA = dto.PriceA,
@@ -161,7 +160,6 @@ public class SkuService : ISkuService
             DefaultRoutingId = dto.DefaultRoutingId,
             CostUnit = dto.CostUnit,
             CostUomId = dto.CostUomId,
-            LatestPurchaseCost = dto.LatestPurchaseCost,
             TaxCode = dto.TaxCode,
             TaxRate = dto.TaxRate,
             IsSubstitute = dto.IsSubstitute,
@@ -256,7 +254,6 @@ public class SkuService : ISkuService
         entity.MaxStock = dto.MaxStock;
         entity.LeadTimeDays = dto.LeadTimeDays;
         entity.PurchasePrice = dto.PurchasePrice;
-        entity.StandardCost = dto.StandardCost;
         entity.DefaultWarehouseId = dto.DefaultWarehouseId;
         entity.DefaultBinLocationId = dto.DefaultBinLocationId;
         entity.PriceA = dto.PriceA;
@@ -294,7 +291,6 @@ public class SkuService : ISkuService
         entity.DefaultRoutingId = dto.DefaultRoutingId;
         entity.CostUnit = dto.CostUnit;
         entity.CostUomId = dto.CostUomId;
-        entity.LatestPurchaseCost = dto.LatestPurchaseCost;
         entity.TaxCode = dto.TaxCode;
         entity.TaxRate = dto.TaxRate;
         entity.IsSubstitute = dto.IsSubstitute;

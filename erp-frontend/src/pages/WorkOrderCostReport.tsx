@@ -311,8 +311,8 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
                   <td style={{ padding: '1rem' }}>${item.totalStandardCost?.toLocaleString()}</td>
                   <td style={{ padding: '1rem' }}>${(item.actualMaterialCost + item.actualLaborCost + item.actualOverheadCost).toLocaleString()}</td>
                   <td style={{ padding: '1rem' }}>
-                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '11px', background: item.status?.toLowerCase() === 'completed' ? 'rgba(52, 211, 153, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: item.status?.toLowerCase() === 'completed' ? '#34d399' : '#f59e0b' }}>
-                      {item.status}
+                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '11px', background: ['completed', 'settled'].includes(item.status?.toLowerCase() ?? '') ? 'rgba(52, 211, 153, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: ['completed', 'settled'].includes(item.status?.toLowerCase() ?? '') ? '#34d399' : '#f59e0b' }}>
+                      {item.status?.toLowerCase() === 'settled' ? '已結轉' : item.status}
                     </span>
                   </td>
                   <td style={{ padding: '1rem' }}>

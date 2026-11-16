@@ -198,9 +198,6 @@ public class CashReceiptService : ICashReceiptService
             requiresUnapplied: true);
         if (mappingStatus is not null)
             return (null, mappingStatus);
-        if (!await _db.GLAccounts.AnyAsync(account =>
-                account.AccountCode == "1131" && account.IsActive))
-            return (null, "ar_account_missing");
 
         await using var transactionScope = _db.Database.IsRelational()
             ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable)

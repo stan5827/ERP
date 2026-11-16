@@ -129,12 +129,31 @@ export interface EcnImpactWorkOrderDto {
 export interface OperationDto { id: string; operationCode: string; operationName: string; setupTime: number; runTime: number; costPerHour: number; isOutsourced: boolean; isActive: boolean; }
 export interface RoutingDto { id: string; routingCode: string; routingName: string; productSkuId: string; productSkuName: string; productSkuNumber: string; version: string; isActive: boolean; operations: Array<{ operationSeq: number; operationId: string; operationName: string; operationCode: string; workCenterId: string; workCenterName: string; workCenterCode: string; transferTime: number; waitTime: number; }>; }
 export interface InspectionTemplateItemDto { id: string; itemCode: string; itemName: string; inputType: string; specification?: string; unit?: string; lowerLimit?: number; upperLimit?: number; options: string[]; inspectionMethod?: string; instrument?: string; samplingPlan?: string; isRequired: boolean; isCritical: boolean; sortOrder: number; }
-export interface InspectionTemplateDto { id: string; templateCode: string; templateName: string; operationId: string; operationCode?: string; operationName?: string; productSkuId?: string; productSkuNumber?: string; productSkuName?: string; version: number; isActive: boolean; notes?: string; items: InspectionTemplateItemDto[]; }
+export interface InspectionTemplateProductDto { id: string; skuNumber?: string; skuName?: string; }
+export interface InspectionTemplateDto { id: string; templateCode: string; templateName: string; operationId: string; operationCode?: string; operationName?: string; productSkus: InspectionTemplateProductDto[]; version: number; isActive: boolean; notes?: string; items: InspectionTemplateItemDto[]; }
 export interface WorkOrderInspectionOperationDto { operationSeq: number; operationId: string; operationCode: string; operationName: string; workCenterId: string; workCenterName?: string; templates: InspectionTemplateDto[]; }
 export interface ProcessInspectionReportItemDto { itemName: string; inputType: string; specification?: string; unit?: string; lowerLimit?: number; upperLimit?: number; inspectionMethod?: string; instrument?: string; samplingPlan?: string; isCritical: boolean; value?: string; result: string; notes?: string; }
 export interface ProcessInspectionReportDto { id: string; reportNumber: string; workOrderId: string; workOrderNumber?: string; operationSeq: number; operationCode?: string; operationName?: string; workCenterName?: string; templateId: string; templateName?: string; templateVersion: number; productSkuId: string; productSkuNumber?: string; productSkuName?: string; lotNumber?: string; inspectorName: string; inspectedAt: string; sampleQuantity: number; result: string; notes?: string; items: ProcessInspectionReportItemDto[]; }
-export interface FqcInspectionLotDto { id: string; inspectionNumber: string; workOrderId: string; workOrderNumber?: string; productSkuId: string; productSkuNumber?: string; lotNumber: string; expiryDate?: string; producedQty: number; sampledQty: number; defectiveQty: number; approvedQty: number; receivedQty: number; availableReceiptQty: number; criticalDefectFound: boolean; inspectionStatus: string; dispositionStatus: string; defectCode?: string; inspectorName: string; inspectedAt: string; decisionBy?: string; decidedAt?: string; quarantinedQty: number; reworkWorkOrderId?: string; dispositionBy?: string; dispositionAt?: string; notes?: string; }
+export interface FqcInspectionLotDto { id: string; inspectionNumber: string; workOrderId: string; workOrderNumber?: string; productSkuId: string; productSkuNumber?: string; lotNumber: string; expiryDate?: string; producedQty: number; sampledQty: number; defectiveQty: number; approvedQty: number; receivedQty: number; availableReceiptQty: number; criticalDefectFound: boolean; inspectionStatus: string; dispositionStatus: string; defectCode?: string; inspectorName: string; inspectedAt: string; decisionBy?: string; decidedAt?: string; quarantinedQty: number; reworkWorkOrderId?: string; reworkSourceInspectionLotId?: string; workOrderType?: string; workOrderStatus?: string; dispositionBy?: string; dispositionAt?: string; notes?: string; scrapNote?: FqcScrapNoteDto; }
+export interface FqcScrapApprovalEventDto { id: string; stage: string; decision: string; actorUserId: string; actorName: string; comments?: string; occurredAt: string; }
+export interface FqcScrapNoteDto { id: string; scrapNumber: string; fqcInspectionLotId: string; inspectionNumber?: string; lotNumber?: string; quantity: number; status: string; reasonCode?: string; reason?: string; requestedByUserId?: string; requestedByName?: string; submittedAt?: string; createdAt: string; approvalEvents: FqcScrapApprovalEventDto[]; }
+export interface FqcWorkOrderOptionDto { id: string; woNumber: string; productSkuId: string; productSkuNumber?: string; productSkuName?: string; status: string; }
+export interface FqcFinishedLotOptionDto { lotNumber: string; producedQty: number; }
+export interface FqcWarehouseOptionDto { id: string; warehouseCode: string; warehouseName: string; }
+export interface FqcBinLocationOptionDto { id: string; locationCode: string; }
 export interface ProductionReceiptDto { id: string; receiptNumber: string; workOrderId: string; workOrderNumber?: string; fqcInspectionLotId: string; fqcInspectionNumber?: string; lotNumber?: string; skuId: string; quantity: number; unitCost: number; totalCost: number; warehouseId: string; binLocationId: string; receivedAt: string; }
+export interface BomStandardCostRollupApprovalDto {
+  bomId: string;
+  bomCode: string;
+  productSkuId: string;
+  productSkuNumber: string;
+  previousStandardCost: number;
+  appliedStandardCost: number;
+  materialCost: number;
+  laborCost: number;
+  overheadCost: number;
+  approvedAt: string;
+}
 
 export const bomsApi = {
   list: (params?: Record<string, string>) => api.get<ApiResponse<BomDto[]>>('/boms', { params }),
@@ -145,6 +164,8 @@ export const bomsApi = {
   activate: (id: string) => api.patch<ApiResponse>(`/boms/${id}/activate`),
   deprecate: (id: string) => api.patch<ApiResponse>(`/boms/${id}/deprecate`),
   costRollup: (id: string) => api.get<ApiResponse<{ materialCost: number; laborCost: number; overheadCost: number; totalCost: number }>>(`/boms/${id}/cost-rollup`),
+  approveCostRollup: (id: string, data: { expectedTotalCost: number }) =>
+    api.post<ApiResponse<BomStandardCostRollupApprovalDto>>(`/boms/${id}/cost-rollup/approve`, data),
 };
 
 export const ecnApi = {
@@ -154,10 +175,38 @@ export const ecnApi = {
   getImpact: (id: string) => api.get<ApiResponse<EcnImpactDto>>(`/ecns/${id}/impact`),
 };
 
+export interface WorkOrderTransferCandidateDto {
+  salesOrderId: string;
+  orderNumber: string;
+  customerName?: string;
+  orderDate: string;
+  expectedDeliveryDate?: string;
+  orderRemarks?: string;
+  items: WorkOrderTransferCandidateItemDto[];
+}
+export interface WorkOrderTransferCandidateItemDto {
+  lineNumber: number;
+  skuNumber?: string;
+  skuName?: string;
+  specification?: string;
+  customerItemCode?: string;
+  quantity: number;
+  unit?: string;
+  needManufacturing: boolean;
+  needOutsourcing: boolean;
+  isOutsourced: boolean;
+  isAlreadyTransferred: boolean;
+  willCreateWorkOrder: boolean;
+  plannedStartDate?: string;
+  plannedFinishDate?: string;
+  lineRemarks?: string;
+}
+
 export const workOrdersApi = {
   list: (params?: Record<string, string>) => api.get<ApiResponse<WorkOrderDto[]>>('/work-orders', { params }),
   get: (id: string) => api.get<ApiResponse<WorkOrderDto>>(`/work-orders/${id}`),
   create: (data: Record<string, unknown>) => api.post<ApiResponse>('/work-orders', toPascalCase(data)),
+  salesOrderTransferCandidates: () => api.get<ApiResponse<WorkOrderTransferCandidateDto[]>>('/work-orders/sales-order-transfer-candidates'),
   createFromSalesOrder: (salesOrderId: string) => api.post<ApiResponse<WorkOrderDto[]>>(`/work-orders/from-sales-order/${salesOrderId}`),
   update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse>(`/work-orders/${id}`, toPascalCase(data)),
   recalculateMaterials: (workOrderIds: string[], plannedQty: number) =>
@@ -190,11 +239,32 @@ export const wipReportsApi = {
 };
 
 export const fqcWorkflowApi = {
+  workOrders: (search?: string) =>
+    api.get<ApiResponse<FqcWorkOrderOptionDto[]>>('/quality/fqc-inspections/work-orders', {
+      params: search?.trim() ? { search: search.trim() } : undefined,
+    }),
+  defaultFinishedLot: (workOrderId: string) =>
+    api.get<ApiResponse<FqcFinishedLotOptionDto | null>>(
+      `/quality/fqc-inspections/work-orders/${workOrderId}/default-finished-lot`,
+    ),
+  warehouses: () =>
+    api.get<ApiResponse<FqcWarehouseOptionDto[]>>('/quality/fqc-inspections/warehouses'),
+  binLocations: (warehouseId: string) =>
+    api.get<ApiResponse<FqcBinLocationOptionDto[]>>(
+      `/quality/fqc-inspections/warehouses/${warehouseId}/bin-locations`,
+    ),
   list: (params?: { workOrderId?: string }) => api.get<ApiResponse<FqcInspectionLotDto[]>>('/quality/fqc-inspections', { params }),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<FqcInspectionLotDto>>('/quality/fqc-inspections', data),
   decide: (id: string, data: Record<string, unknown>) => api.post<ApiResponse<FqcInspectionLotDto>>(`/quality/fqc-inspections/${id}/decision`, data),
   createReworkWorkOrder: (id: string) => api.post<ApiResponse<FqcInspectionLotDto>>(`/quality/fqc-inspections/${id}/rework-work-order`),
-  createScrapNote: (id: string, reason: string) => api.post<ApiResponse<{ id: string; scrapNumber: string; quantity: number; status: string }>>(`/quality/fqc-inspections/${id}/scrap-note`, { reason }),
+  createScrapNote: (id: string, reasonCode: string, reason: string) =>
+    api.post<ApiResponse<FqcScrapNoteDto>>(`/quality/fqc-inspections/${id}/scrap-note`, { reasonCode, reason }),
+  resubmitScrapNote: (id: string, reasonCode: string, reason: string) =>
+    api.post<ApiResponse<FqcScrapNoteDto>>(`/quality/fqc-inspections/scrap-notes/${id}/resubmit`, { reasonCode, reason }),
+  reviewScrapNote: (id: string, stage: 'quality-review' | 'finance-approval', approve: boolean, comments?: string) =>
+    api.post<ApiResponse<FqcScrapNoteDto>>(`/quality/fqc-inspections/scrap-notes/${id}/${stage}`, { approve, comments }),
+  closeReworkWorkOrder: (id: string) =>
+    api.post<ApiResponse>(`/quality/fqc-inspections/rework-work-orders/${id}/close`),
   listReceipts: (params?: { workOrderId?: string }) => api.get<ApiResponse<ProductionReceiptDto[]>>('/manufacturing/production-receipts', { params }),
   createReceipt: (data: Record<string, unknown>) => api.post<ApiResponse<ProductionReceiptDto>>('/manufacturing/production-receipts', data),
 };
@@ -208,7 +278,7 @@ export const operationsApi = {
 };
 
 export const routingsApi = {
-  list: (params?: { page?: number; pageSize?: number }) => api.get<ApiResponse<RoutingDto[]>>('/routings', { params }),
+  list: (params?: { productSkuId?: string; operationId?: string }) => api.get<ApiResponse<RoutingDto[]>>('/routings', { params }),
   get: (id: string) => api.get<ApiResponse<RoutingDto>>(`/routings/${id}`),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<RoutingDto>>('/routings', data),
   update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<RoutingDto>>(`/routings/${id}`, data),

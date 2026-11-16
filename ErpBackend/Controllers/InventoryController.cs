@@ -89,9 +89,15 @@ public class InventoryController : BaseController
     public async Task<ActionResult<ApiResponse<InventoryStocktakeResultDto>>> PostStocktake(
         [FromBody] InventoryStocktakeRequestDto request)
     {
+        var actorUserId = GetUserId();
+        if (actorUserId == Guid.Empty)
+            return Unauthorized(ApiResponse.Fail("無法識別過帳操作人員"));
+
         try
         {
-            return Ok(await _inventoryService.PostStocktakeAsync(request), "盤點差異已過帳");
+            return Ok(
+                await _inventoryService.PostStocktakeAsync(request, actorUserId),
+                "盤點差異已過帳");
         }
         catch (KeyNotFoundException exception)
         {

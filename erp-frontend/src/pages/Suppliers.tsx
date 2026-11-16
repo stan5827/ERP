@@ -203,7 +203,7 @@ export const Suppliers: React.FC = () => {
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>尚無供應商資料</td></tr>
             ) : filtered.map(s => (
               <tr key={s.id}>
-                <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{s.supplierCode}</td>
+                <td className="mono" style={{ color: 'var(--theme-text)' }}>{s.supplierCode}</td>
                 <td>
                   <div style={{ fontWeight: 600, color: 'var(--slate-100)' }}>{s.supplierName}</div>
                   <div style={{ fontSize: 11, color: 'var(--slate-500)' }}>統編: {s.taxId || '—'}</div>
@@ -227,8 +227,8 @@ export const Suppliers: React.FC = () => {
                       fontWeight: 800, 
                       color: s.rating === 'A' ? 'var(--emerald-400)' : s.rating === 'B' ? 'var(--cobalt-400)' : 'var(--amber-400)' 
                     }}>{s.rating || '—'}</span>
-                    <span className={`status-badge ${s.status === 'active' ? 'status-active' : 'status-neutral'}`}>
-                      {s.status === 'active' ? '合作中' : '未啟用'}
+                    <span className={`status-badge ${s.status.toUpperCase() === 'ACTIVE' ? 'status-active' : 'status-neutral'}`}>
+                      {s.status.toUpperCase() === 'ACTIVE' ? '合作中' : '未啟用'}
                     </span>
                   </div>
                 </td>

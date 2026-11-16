@@ -331,15 +331,34 @@ public class ScrapRecord
     public Guid? FqcInspectionLotId { get; set; }
     [MaxLength(30)] public string? ScrapNumber { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ScrapQty { get; set; }
+    [MaxLength(2)] public string? ScrapReasonCode { get; set; }
     [MaxLength(500)] public string? Reason { get; set; }
     [MaxLength(30)] public string? DispositionCode { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal CostAmount { get; set; }
     [MaxLength(30)] public string? ScrapStatus { get; set; }
     [MaxLength(100)] public string? DispositionBy { get; set; }
     public DateTime? DispositionAt { get; set; }
+    public Guid? RequestedByUserId { get; set; }
+    [MaxLength(100)] public string? RequestedByName { get; set; }
+    public DateTime? SubmittedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(FqcInspectionLotId))] public FqcInspectionLot? FqcInspectionLot { get; set; }
+    public ICollection<FqcScrapApprovalEvent> ApprovalEvents { get; set; } = new List<FqcScrapApprovalEvent>();
+}
+
+public class FqcScrapApprovalEvent
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ScrapRecordId { get; set; }
+    [Required, MaxLength(20)] public string Stage { get; set; } = null!;
+    [Required, MaxLength(20)] public string Decision { get; set; } = null!;
+    public Guid ActorUserId { get; set; }
+    [Required, MaxLength(100)] public string ActorName { get; set; } = null!;
+    [MaxLength(1000)] public string? Comments { get; set; }
+    public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(ScrapRecordId))] public ScrapRecord ScrapRecord { get; set; } = null!;
 }
 
 /// <summary>

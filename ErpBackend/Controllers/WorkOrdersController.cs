@@ -53,6 +53,7 @@ public class WorkOrdersController : BaseController
 
     [HttpPatch("{id:guid}/start")]
     [HttpPatch("~/api/erp/WorkOrders/{id:guid}/start")]
+    [PermissionAuthorize("manufacturing", "execute")]
     public async Task<ActionResult<ApiResponse>> StartWorkOrder(Guid id)
     {
         var (found, status) = await _workOrderService.StartAsync(id);
@@ -102,7 +103,16 @@ public class WorkOrdersController : BaseController
         return Ok(dto!, "工單已建立");
     }
 
+    [HttpGet("sales-order-transfer-candidates")]
+    [PermissionAuthorize("sales", "view")]
+    public async Task<ActionResult<ApiResponse<List<WorkOrderTransferCandidateDto>>>> GetSalesOrderWorkOrderTransferCandidates()
+    {
+        var candidates = await _workOrderService.GetSalesOrderWorkOrderTransferCandidatesAsync();
+        return Ok(candidates);
+    }
+
     [HttpPost("from-sales-order/{salesOrderId:guid}")]
+    [PermissionAuthorize("sales", "execute")]
     public async Task<ActionResult<ApiResponse<List<WorkOrderDto>>>> CreateWorkOrdersFromSalesOrder(Guid salesOrderId)
     {
         var (workOrders, status) = await _workOrderService.CreateFromSalesOrderAsync(salesOrderId);

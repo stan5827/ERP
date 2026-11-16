@@ -2,7 +2,14 @@ import { api, ApiResponse } from './client';
 
 export interface GlAccountDto { id: string; accountNo: string; accountName: string; accountType: string; isActive: boolean; }
 export interface JournalEntryDto { id: string; entryDate: string; accountId: string; accountNo?: string; accountName?: string; amountDr: number; amountCr: number; sourceModule: string; sourceDocNo: string; description?: string; }
-export interface FinanceGlAccountDto { id: string; accountCode: string; accountName: string; accountType: string; isActive: boolean; }
+export interface FinanceGlAccountDto { id: string; accountCode: string; accountName: string; accountType: string; isActive: boolean; isCashAccount: boolean; parentAccountId?: string; }
+export interface CreateGLAccountRequest {
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  isCashAccount: boolean;
+  parentAccountId?: string;
+}
 export interface AccountingVoucherLineDto {
   id: string;
   lineNumber: number;
@@ -10,6 +17,7 @@ export interface AccountingVoucherLineDto {
   accountCode: string;
   accountName: string;
   costCenterId?: string;
+  workOrderId?: string;
   debitAmount: number;
   creditAmount: number;
   memo?: string;
@@ -133,13 +141,87 @@ export interface PostingSetupDto { id: string; transactionType: string; itemGrou
 export interface LoanDto { id: string; loanNumber: string; bankName?: string; loanAmount: number; currency: string; annualInterestRate: number; loanDate: string; maturityDate: string; repaymentMethod: string; status: string; }
 export interface BankAccountDto {
   id: string; bankCode?: string; bankName?: string; accountNumber?: string;
+  branchName?: string; accountName?: string;
   glAccountId?: string; glAccountCode?: string; glAccountName?: string;
+  glAccountIsActive?: boolean; glAccountIsCashAccount?: boolean;
   currency: string; currentBalance: number; isActive: boolean;
+}
+export interface SaveBankAccountRequest {
+  bankCode?: string;
+  bankName: string;
+  branchName?: string;
+  accountNumber: string;
+  accountName?: string;
+  glAccountId?: string | null;
+  currency: string;
 }
 export interface InvestmentDto { id: string; investmentName: string; investmentCategory: string; totalCost: number; currentMarketValue: number; unrealizedGainLoss: number; }
 
+export interface SupplierApSubmissionSummaryDto {
+  id: string;
+  submissionNumber: string;
+  status: string;
+  currentRevisionNumber: number;
+  supplierInvoiceNumber: string;
+  supplierInvoiceDate: string;
+  currency: string;
+  totalAmount: number;
+  matchResult: string;
+  version: number;
+  createdAt: string;
+  submittedAt?: string;
+}
+
+export interface SupplierApSubmissionPageDto {
+  items: SupplierApSubmissionSummaryDto[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface SupplierApSubmissionDetailDto extends SupplierApSubmissionSummaryDto {
+  invoiceAmount: number;
+  taxAmount: number;
+  purchaseOrderId: string;
+  purchaseOrderNumber: string;
+  goodsReceiptId: string;
+  goodsReceiptNumber: string;
+  discrepancies: string[];
+  approvedAt?: string;
+  accountsPayableId?: string;
+  accountsPayableNumber?: string;
+  lines: Array<{
+    goodsReceiptItemId: string;
+    skuNumber?: string;
+    skuName?: string;
+    acceptedQuantity: number;
+    invoicedQuantity: number;
+    unitPrice: number;
+    netAmount: number;
+    taxAmount: number;
+    totalAmount: number;
+  }>;
+  attachments: Array<{
+    id: string;
+    originalFileName: string;
+    contentType: string;
+    sizeBytes: number;
+    scanStatus: string;
+    revisionNumber: number;
+  }>;
+  reviews: Array<{
+    id: string;
+    action: string;
+    reason?: string;
+    matchResult: string;
+    createdAt: string;
+  }>;
+}
+
 export const financeApi = {
   getChartOfAccounts: () => api.get<ApiResponse<FinanceGlAccountDto[]>>('/finance/coa'),
+  createGLAccount: (data: CreateGLAccountRequest) =>
+    api.post<ApiResponse<FinanceGlAccountDto>>('/finance/coa', data),
   getJournalEntries: (docNo: string) => api.get<ApiResponse<JournalEntryDto[]>>(`/finance/journals/${docNo}`),
   getJournalBook: (params?: Record<string, string>) =>
     api.get<ApiResponse<JournalQueryResult>>('/finance/journals', { params }),
@@ -170,7 +252,11 @@ export const financeApi = {
   loans: (params?: Record<string, string>) => api.get<ApiResponse<LoanDto[]>>('/finance/loans', { params }),
   createLoan: (data: Record<string, unknown>) => api.post<ApiResponse>('/finance/loans', data),
   bankAccounts: () => api.get<ApiResponse<BankAccountDto[]>>('/finance/bank-accounts'),
-  createBankAccount: (data: Record<string, unknown>) => api.post<ApiResponse>('/finance/bank-accounts', data),
+  createBankAccount: (data: SaveBankAccountRequest) => api.post<ApiResponse>('/finance/bank-accounts', data),
+  updateBankAccount: (id: string, data: SaveBankAccountRequest) =>
+    api.put<ApiResponse>(`/finance/bank-accounts/${id}`, data),
+  setBankAccountStatus: (id: string, isActive: boolean) =>
+    api.patch<ApiResponse>(`/finance/bank-accounts/${id}/status`, { isActive }),
   setBankAccountGlMapping: (id: string, glAccountId: string) =>
     api.patch<ApiResponse>(`/finance/bank-accounts/${id}/gl-account`, { glAccountId }),
   investments: (params?: Record<string, string>) => api.get<ApiResponse<InvestmentDto[]>>('/finance/investments', { params }),
@@ -179,4 +265,22 @@ export const financeApi = {
   createTransfer: (data: Record<string, unknown>) => api.post<ApiResponse>('/finance/treasury-transfers', data),
   guarantees: (params?: Record<string, string>) => api.get<ApiResponse<unknown[]>>('/finance/guarantees', { params }),
   createGuarantee: (data: Record<string, unknown>) => api.post<ApiResponse>('/finance/guarantees', data),
+  supplierApSubmissions: (status = 'Submitted', page = 1) =>
+    api.get<SupplierApSubmissionPageDto>('/supplier-ap-submissions', {
+      params: { status, page, pageSize: 50 },
+    }),
+  getSupplierApSubmission: (id: string) =>
+    api.get<SupplierApSubmissionDetailDto>(`/supplier-ap-submissions/${id}`),
+  returnSupplierApSubmission: (id: string, version: number, reason: string) =>
+    api.post(`/supplier-ap-submissions/${id}/return`, { reason }, {
+      headers: { 'If-Match': `"${version}"` },
+    }),
+  rejectSupplierApSubmission: (id: string, version: number, reason: string) =>
+    api.post(`/supplier-ap-submissions/${id}/reject`, { reason }, {
+      headers: { 'If-Match': `"${version}"` },
+    }),
+  approveSupplierApSubmission: (id: string, version: number, reason: string) =>
+    api.post(`/supplier-ap-submissions/${id}/approve`, { reason }, {
+      headers: { 'If-Match': `"${version}"` },
+    }),
 };

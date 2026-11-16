@@ -2,7 +2,7 @@ import { api, ApiResponse } from './client';
 
 export interface LoginRequest { username: string; password: string; }
 export interface LoginResponse {
-  userId: string; employeeId?: string; username: string; email?: string;
+  userId: string; employeeId?: string; employeeName?: string; username: string; email?: string;
   token: string; expiresAt: string; roles: string[]; permissions: string[];
   mustChangePassword: boolean;
 }

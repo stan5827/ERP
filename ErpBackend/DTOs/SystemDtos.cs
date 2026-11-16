@@ -14,6 +14,7 @@ public class LoginResponse
 {
     public Guid UserId { get; set; }
     public Guid? EmployeeId { get; set; }
+    public string? EmployeeName { get; set; }
     public string Username { get; set; } = null!;
     public string? Email { get; set; }
     public string Token { get; set; } = null!;
@@ -50,6 +51,12 @@ public class CreateUserRequest
     public string? Email { get; set; }
     public Guid? EmployeeId { get; set; }
     public List<Guid> RoleIds { get; set; } = new();
+}
+
+public class UpdateUserRequestDto
+{
+    [EmailAddress, MaxLength(200)]
+    public string? Email { get; set; }
 }
 
 public class CustomerDto

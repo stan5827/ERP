@@ -11,6 +11,7 @@ interface CostCenterRecord extends Record<string, unknown> {
   costCenterCode?: string;
   costCenterName?: string;
   costCenterType?: string;
+  areaSquareMeters?: number;
   children?: CostCenterRecord[];
 }
 
@@ -190,6 +191,7 @@ export const CostCenterManagement: React.FC = () => {
     { name: 'parentCostCenterId', label: '上級成本中心', type: 'select', options: [{ value: '', label: '無' }, ...parentCCs.map(c => ({ value: c.id, label: `${c.costCenterCode} - ${c.costCenterName}` }))] },
     { name: 'departmentId', label: '關聯部門', type: 'select', options: [{ value: '', label: '無' }, ...departments.map(d => ({ value: d.id, label: `${d.deptCode} - ${d.deptName}` }))] },
     { name: 'workCenterId', label: '關聯工作中心', type: 'select', options: [{ value: '', label: '無' }, ...workCenters.map(w => ({ value: w.id, label: `${w.workCenterCode} - ${w.workCenterName}` }))] },
+    { name: 'areaSquareMeters', label: '占用面積（平方公尺）', type: 'number', placeholder: '製造成本中心租金分攤依據' },
     { name: 'budgetLimit', label: '預算上限', type: 'number', placeholder: '0' },
     { name: 'effectiveFrom', label: '生效日期', type: 'date' },
     { name: 'effectiveTo', label: '失效日期', type: 'date' },
@@ -335,6 +337,9 @@ export const CostCenterManagement: React.FC = () => {
             {node.costCenterCode}
           </span>
           <span className="tree-name">{node.costCenterName}</span>
+          {node.areaSquareMeters != null && (
+            <span className="text-xs text-secondary">{node.areaSquareMeters.toLocaleString()} m²</span>
+          )}
           {budget && (
             <div className="tree-budget">
               <span className="tree-budget-text">

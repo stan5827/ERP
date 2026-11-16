@@ -24,6 +24,7 @@ services:
       DB_CONNECTION_STRING: "Host=postgres;Port=5432;Database=ErpUat;Username=erp_uat;Password=${UAT_POSTGRES_PASSWORD:?Set UAT_POSTGRES_PASSWORD in deployment/.env.uat.local}"
       JWT_SECRET_KEY: ${UAT_JWT_SECRET:?Set UAT_JWT_SECRET in deployment/.env.uat.local}
       ADMIN_INITIAL_PASSWORD: ${UAT_ADMIN_INITIAL_PASSWORD:?Set UAT_ADMIN_INITIAL_PASSWORD in deployment/.env.uat.local}
+      ADMIN_RESET_SECRET: ${ADMIN_RESET_SECRET:-}
       AttendanceGeofence__TimeZoneId: Asia/Taipei
       Cors__AdditionalOrigins__0: http://localhost:5177
     ports:

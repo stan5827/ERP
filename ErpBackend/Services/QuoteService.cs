@@ -69,6 +69,9 @@ public class QuoteService : IQuoteService
                     ? skus.GetValueOrDefault(i.SkuId.Value)?.SalesUom?.UomCode
                         ?? skus.GetValueOrDefault(i.SkuId.Value)?.Unit
                     : null,
+                UnitName = i.SkuId.HasValue
+                    ? skus.GetValueOrDefault(i.SkuId.Value)?.SalesUom?.UomName
+                    : null,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
                 DiscountRate = i.DiscountRate,
@@ -164,6 +167,9 @@ public class QuoteService : IQuoteService
                 Unit = i.SkuId.HasValue
                     ? skus.GetValueOrDefault(i.SkuId.Value)?.SalesUom?.UomCode
                         ?? skus.GetValueOrDefault(i.SkuId.Value)?.Unit
+                    : null,
+                UnitName = i.SkuId.HasValue
+                    ? skus.GetValueOrDefault(i.SkuId.Value)?.SalesUom?.UomName
                     : null,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,

@@ -15,6 +15,35 @@ public class CreateFqcInspectionLotRequestDto
     [MaxLength(1000)] public string? Notes { get; set; }
 }
 
+public class FqcWorkOrderOptionDto
+{
+    public Guid Id { get; set; }
+    public string WoNumber { get; set; } = null!;
+    public Guid ProductSkuId { get; set; }
+    public string? ProductSkuNumber { get; set; }
+    public string? ProductSkuName { get; set; }
+    public string Status { get; set; } = null!;
+}
+
+public class FqcFinishedLotOptionDto
+{
+    public string LotNumber { get; set; } = null!;
+    public decimal ProducedQty { get; set; }
+}
+
+public class FqcWarehouseOptionDto
+{
+    public Guid Id { get; set; }
+    public string WarehouseCode { get; set; } = null!;
+    public string WarehouseName { get; set; } = null!;
+}
+
+public class FqcBinLocationOptionDto
+{
+    public Guid Id { get; set; }
+    public string LocationCode { get; set; } = null!;
+}
+
 public class DecideFqcInspectionLotRequestDto
 {
     [Required] public string InspectionStatus { get; set; } = null!;
@@ -50,9 +79,13 @@ public class FqcInspectionLotDto
     public DateTime? DecidedAt { get; set; }
     public decimal QuarantinedQty { get; set; }
     public Guid? ReworkWorkOrderId { get; set; }
+    public Guid? ReworkSourceInspectionLotId { get; set; }
+    public string? WorkOrderType { get; set; }
+    public string? WorkOrderStatus { get; set; }
     public string? DispositionBy { get; set; }
     public DateTime? DispositionAt { get; set; }
     public string? Notes { get; set; }
+    public FqcScrapNoteDto? ScrapNote { get; set; }
 }
 
 public class CreateProductionReceiptRequestDto
@@ -67,6 +100,8 @@ public class CreateProductionReceiptRequestDto
 
 public class CreateFqcScrapNoteRequestDto
 {
+    [Required, RegularExpression("^(01|02|03|04|05)$")]
+    public string ReasonCode { get; set; } = null!;
     [Required, MaxLength(500)] public string Reason { get; set; } = null!;
 }
 
@@ -79,8 +114,30 @@ public class FqcScrapNoteDto
     public string? LotNumber { get; set; }
     public decimal Quantity { get; set; }
     public string Status { get; set; } = null!;
+    public string? ReasonCode { get; set; }
     public string? Reason { get; set; }
+    public Guid? RequestedByUserId { get; set; }
+    public string? RequestedByName { get; set; }
+    public DateTime? SubmittedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+    public List<FqcScrapApprovalEventDto> ApprovalEvents { get; set; } = [];
+}
+
+public class FqcScrapApprovalEventDto
+{
+    public Guid Id { get; set; }
+    public string Stage { get; set; } = null!;
+    public string Decision { get; set; } = null!;
+    public Guid ActorUserId { get; set; }
+    public string ActorName { get; set; } = null!;
+    public string? Comments { get; set; }
+    public DateTime OccurredAt { get; set; }
+}
+
+public class DecideFqcScrapReviewRequestDto
+{
+    [Required] public bool Approve { get; set; }
+    [MaxLength(1000)] public string? Comments { get; set; }
 }
 
 public class ProductionReceiptDto

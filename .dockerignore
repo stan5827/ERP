@@ -9,3 +9,5 @@
 **/appsettings.Development.json
 *.pfx
 *.key
+/deployment/backups/
+/scratch-fqc-debug/

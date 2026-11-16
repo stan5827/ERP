@@ -13,4 +13,11 @@ describe('handleApiError', () => {
       response: { status: 401, data: { message: 'Invalid credentials' } }
     })).toThrow('帳號或密碼錯誤，或帳號目前無法登入');
   });
+
+  it('reports forbidden responses with an empty body as permission errors', () => {
+    expect(() => handleApiError({
+      config: { url: '/equipment/equipment', method: 'post' },
+      response: { status: 403, data: '' }
+    })).toThrow('您沒有權限執行此操作');
+  });
 });

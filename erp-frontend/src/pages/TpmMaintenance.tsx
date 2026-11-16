@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { Search, Plus, AlertTriangle, CheckCircle, Clock, Wrench, Package, Activity, Play, Loader2, X } from 'lucide-react';
 import { equipmentApi, workCentersApi, suppliersApi } from '../api/api';
+import { useCurrentUser } from '../hooks/useApi';
 import './TpmMaintenance.css';
 
 interface Equipment {
@@ -122,7 +123,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const equipmentTypeConfig: Record<string, { label: string; color: string }> = {
-  machine: { label: '加工設備', color: 'var(--cobalt-400)' },
+  machine: { label: '加工設備', color: 'var(--theme-text)' },
   inspection: { label: '檢測設備', color: 'var(--emerald-400)' },
   assembly: { label: '組裝設備', color: 'var(--amber-400)' },
   others: { label: '其他設備', color: 'var(--slate-400)' },
@@ -138,6 +139,11 @@ const maintenanceTypeConfig: Record<string, { label: string; cls: string }> = {
 type DialogType = 'equipment' | 'maintenance' | 'downtime' | null;
 
 export const TpmMaintenance: React.FC = () => {
+  const currentUser = useCurrentUser();
+  const canCreateTpmRecords = currentUser?.roles.includes('Admin')
+    || currentUser?.permissions.includes('tpm:create')
+    || currentUser?.permissions.includes('admin.*')
+    || false;
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'equipment' | 'maintenance' | 'downtime'>('equipment');
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -265,6 +271,7 @@ export const TpmMaintenance: React.FC = () => {
   };
 
   const getAddButton = () => {
+    if (!canCreateTpmRecords) return null;
     if (activeTab === 'equipment') {
       return (
         <button className="btn btn-primary btn-sm" onClick={() => setOpenDialog('equipment')}>
@@ -364,7 +371,7 @@ export const TpmMaintenance: React.FC = () => {
                 const tc = equipmentTypeConfig[e.equipmentType] ?? equipmentTypeConfig.others;
                 return (
                   <tr key={e.id}>
-                    <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{e.equipmentCode}</td>
+                    <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '12px' }}>{e.equipmentCode}</td>
                     <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{e.equipmentName}</td>
                     <td><span style={{ color: tc.color, fontSize: 12 }}>{tc.label}</span></td>
                     <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{e.workCenterName ?? '—'}</td>

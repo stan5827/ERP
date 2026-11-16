@@ -14,6 +14,8 @@ import { salesOrdersApi, customersApi, skusApi, quotesApi, deliveryOrdersApi, wo
 import type { BinLocationDto, SkuDto, WarehouseDto } from '../api/inventory';
 import type { CustomerDto, SalesOrderConfirmationDto, SalesOrderDto } from '../api/sales';
 import { CashReceiptsPanel } from './CashReceiptsPanel';
+import { useRole } from '../contexts/useRole';
+import { WorkOrderTransferQueue } from './WorkOrderTransferQueue';
 import './styles/Sales-Luxury.css';
 
 type SalesLineItem = {
@@ -22,6 +24,7 @@ type SalesLineItem = {
   skuNumber?: string;
   productName?: string;
   skuName?: string;
+  unitName?: string;
   quantity: number;
   deliveredQty?: number;
   unit?: string;
@@ -291,6 +294,19 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 };
 
 export const Sales: React.FC = () => {
+  const { hasPermission } = useRole();
+  const hasSalesOrderTransferView = hasPermission('sales:workordertransfer', 'view');
+  const hasSalesOrderTransferExecute = hasPermission('sales:workordertransfer', 'execute');
+  const hasSalesManagementCreate = hasPermission('sales', 'create');
+
+  if (hasSalesOrderTransferView && !hasSalesManagementCreate) {
+    return <WorkOrderTransferQueue canTransfer={hasSalesOrderTransferExecute} />;
+  }
+
+  return <SalesManagement />;
+};
+
+const SalesManagement: React.FC = () => {
   const queryClient = useQueryClient();
   const [view, setView] = useState<'orders' | 'quotes' | 'customers' | 'process' | 'receipts'>('process');
   const [search, setSearch] = useState("");
@@ -907,12 +923,12 @@ export const Sales: React.FC = () => {
                       </td>
                     </tr>
                     {expItems.has(so.id) && (
-                      <tr className="lux-detail-row">
-                        <td colSpan={7} style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem 3rem' }}>
+                      <tr className="lux-detail-row lux-sales-detail-row">
+                        <td colSpan={7} className="lux-sales-detail-cell">
                            <motion.div 
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              style={{ borderLeft: '2px solid var(--lux-gold)', paddingLeft: '2rem' }}
+                              className="lux-sales-detail-content"
                             >
                               <div style={{ fontSize: '0.75rem', color: 'var(--lux-gold)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                  <FileText size={16} /> 銷售訂單詳細清單 / Contract Detail
@@ -922,12 +938,12 @@ export const Sales: React.FC = () => {
                                  gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', 
                                  gap: '1.5rem', 
                                  padding: '0.8rem 1.2rem', 
-                                 background: 'rgba(212, 175, 55, 0.06)', 
+                                 background: 'rgba(212, 175, 55, 0.06)',
                                  borderRadius: '8px',
                                  marginBottom: '0.5rem', 
                                  fontSize: '0.75rem', 
                                  fontWeight: 800, 
-                                 color: 'var(--lux-gold)', 
+                                 color: 'var(--lux-gold)',
                                  textTransform: 'uppercase', 
                                  letterSpacing: '0.15em',
                                  border: '1px solid rgba(212, 175, 55, 0.1)'
@@ -941,14 +957,14 @@ export const Sales: React.FC = () => {
                               {so.items?.map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', gap: '1.5rem', padding: '1.2rem', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', alignItems: 'center' }}>
                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.productName || item.skuNumber}</span>
+                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.skuName || item.productName || item.skuNumber}</span>
                                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
                                          品號: {item.skuNumber || item.skuId || '---'}
                                       </span>
                                    </div>
                                    <div style={{ textAlign: 'right', fontWeight: 600, color: '#fff', fontFamily: 'var(--font-mono)' }}>{item.quantity?.toLocaleString()}</div>
                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                                     {(uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '—'}
+                                     {item.unitName || (uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '—'}
                                    </div>
                                    <div style={{ textAlign: 'right', color: '#94a3b8', fontFamily: 'var(--font-mono)' }}>${item.unitPrice?.toLocaleString()}</div>
                                    <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--lux-gold)', fontFamily: 'var(--font-mono)', fontSize: '1rem' }}>
@@ -978,15 +994,23 @@ export const Sales: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotes.map((q) => (
+                {isLoading ? (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '4rem' }}>正在同步數據中心...</td></tr>
+                ) : filteredQuotes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '4rem', color: 'var(--slate-500)' }}>
+                      {quotes.length === 0 ? '目前沒有報價資料' : '找不到符合搜尋條件的報價單'}
+                    </td>
+                  </tr>
+                ) : filteredQuotes.map((q) => (
                   <React.Fragment key={q.id}>
                     <tr className="lux-row" style={{ cursor: 'pointer' }} onClick={() => toggleExpand(q.id)}>
                       <td style={{ textAlign: 'center' }}>
                          <ChevronRight size={14} style={{ transform: expItems.has(q.id) ? 'rotate(90deg)' : 'none', transition: '0.2s' }} />
                       </td>
-                      <td style={{ fontFamily: 'monospace', color: '#fbbf24', fontWeight: 600 }}>{q.quoteNumber}</td>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--lux-gold)', fontWeight: 600 }}>{q.quoteNumber}</td>
                       <td style={{ fontWeight: 700 }}>{q.customerName}</td>
-                      <td style={{ fontFamily: 'monospace' }}>${q.finalAmount?.toLocaleString()}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>${q.finalAmount?.toLocaleString()}</td>
                       <td>{q.quoteDate?.slice(0, 10)}</td>
                       <td><StatusBadge status={q.status} /></td>
                       <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
@@ -1000,19 +1024,19 @@ export const Sales: React.FC = () => {
                            {q.status === 'approved' && (
                              <button className="lux-tab-btn" title="轉成訂單" onClick={() => handleWorkflow('convert', q)} style={{ color: '#60a5fa' }}><ArrowRightLeft size={16} /></button>
                            )}
-                           <button className="lux-tab-btn" onClick={() => { setSelectedQuote(q); setQuoteItems(q.items || q.quoteItems || []); setShowQuoteForm(true); }}><Edit size={16} /></button>
+                            <button className="lux-tab-btn" title="編輯報價" onClick={() => { setSelectedQuote(q); setQuoteItems(q.items || q.quoteItems || []); setShowQuoteForm(true); }}><Edit size={16} /></button>
                          </div>
                       </td>
                     </tr>
                     {expItems.has(q.id) && (
-                      <tr className="lux-detail-row">
-                        <td colSpan={7} style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem 3rem' }}>
+                      <tr className="lux-detail-row lux-sales-detail-row">
+                         <td colSpan={7} className="lux-sales-detail-cell">
                            <motion.div 
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              style={{ borderLeft: '2px solid #fbbf24', paddingLeft: '2rem' }}
+                               className="lux-sales-detail-content"
                             >
-                              <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                               <div style={{ fontSize: '0.75rem', color: 'var(--lux-gold)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                  <FileText size={16} /> 報價詳細清單 / Estimation Detail
                               </div>
                               <div style={{ 
@@ -1020,15 +1044,15 @@ export const Sales: React.FC = () => {
                                  gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', 
                                  gap: '1.5rem', 
                                  padding: '0.8rem 1.2rem', 
-                                 background: 'rgba(251, 191, 36, 0.06)', 
+                                 background: 'rgba(212, 175, 55, 0.06)',
                                  borderRadius: '8px',
                                  marginBottom: '0.5rem', 
                                  fontSize: '0.75rem', 
                                  fontWeight: 800, 
-                                 color: '#fbbf24', 
+                                 color: 'var(--lux-gold)',
                                  textTransform: 'uppercase', 
                                  letterSpacing: '0.15em',
-                                 border: '1px solid rgba(251, 191, 36, 0.1)'
+                                 border: '1px solid rgba(212, 175, 55, 0.1)'
                               }}>
                                  <div>產品品號與品名</div>
                                  <div style={{ textAlign: 'right' }}>報價數量</div>
@@ -1039,17 +1063,17 @@ export const Sales: React.FC = () => {
                               {(q.items || q.quoteItems || []).map((item, idx) => (
                                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 3fr) 100px 80px 120px 120px', gap: '1.5rem', padding: '1.2rem', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', alignItems: 'center' }}>
                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.productName || item.skuNumber}</span>
+                                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>{item.skuName || item.productName || item.skuNumber}</span>
                                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
                                          品號: {item.skuNumber || item.skuId || '---'}
                                       </span>
                                    </div>
                                    <div style={{ textAlign: 'right', fontWeight: 600, color: '#fff', fontFamily: 'var(--font-mono)' }}>{item.quantity?.toLocaleString()}</div>
                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                                     {(uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit}
+                                     {item.unitName || (uoms?.data || []).find(u => u.uomCode === item.unit)?.uomName || item.unit || '—'}
                                    </div>
                                    <div style={{ textAlign: 'right', color: '#94a3b8', fontFamily: 'var(--font-mono)' }}>${item.unitPrice?.toLocaleString()}</div>
-                                   <div style={{ textAlign: 'right', fontWeight: 700, color: '#fbbf24', fontFamily: 'var(--font-mono)', fontSize: '1rem' }}>
+                                   <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--lux-gold)', fontFamily: 'var(--font-mono)', fontSize: '1rem' }}>
                                       ${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                                    </div>
                                 </div>

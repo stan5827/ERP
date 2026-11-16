@@ -1,0 +1,37 @@
+@baseUrl = http://localhost:5102
+@token = replace-with-a-UAT-token
+
+### Create a draft. The empty sections are intentionally incomplete; do not enter invented policy values.
+POST {{baseUrl}}/api/erp/payroll/policies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "versionCode": "TW-PAYROLL-UAT-DRAFT-01",
+  "effectiveFrom": "2026-01-01",
+  "approvalDocumentReference": "HR-APPROVAL-DOCUMENT-REFERENCE",
+  "policyJson": "{\"overtimeRules\":[],\"insuranceTables\":{},\"pensionRules\":{},\"taxRules\":{},\"leaveRules\":{}}"
+}
+
+### Submit only after all official tables and approved source references are entered.
+POST {{baseUrl}}/api/erp/payroll/policies/{{policyId}}/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "confirmedOfficialSources": false
+}
+
+### Finance reviewers must be a different user from the creator and HR submitter.
+GET {{baseUrl}}/api/erp/payroll/policies/pending-finance-review
+Authorization: Bearer {{token}}
+
+### Approval is a recordkeeping action only; calculation remains disabled.
+POST {{baseUrl}}/api/erp/payroll/policies/{{policyId}}/approve
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Review note",
+  "confirmedOfficialSources": false
+}

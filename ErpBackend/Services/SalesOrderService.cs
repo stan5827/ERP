@@ -279,6 +279,7 @@ public class SalesOrderService : ISalesOrderService
             SkuNumber = i.Sku?.SkuNumber,
             SkuName = i.Sku?.SkuName,
             Unit = i.Sku?.SalesUom?.UomCode ?? i.Sku?.Unit,
+            UnitName = i.Sku?.SalesUom?.UomName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitPrice,
             DiscountRate = i.DiscountRate,

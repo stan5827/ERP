@@ -54,6 +54,7 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_API_KEY: ${OPENAI_API_KEY:-}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      ADMIN_RESET_SECRET: ${ADMIN_RESET_SECRET:-}
       AttendanceGeofence__Latitude: ${AttendanceGeofence__Latitude:-}
       AttendanceGeofence__Longitude: ${AttendanceGeofence__Longitude:-}
       AttendanceGeofence__RadiusMeters: ${AttendanceGeofence__RadiusMeters:-}

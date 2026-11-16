@@ -2853,6 +2853,9 @@ namespace ErpBackend.Migrations
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("WorkOrderId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CostCenterId");
@@ -2860,6 +2863,8 @@ namespace ErpBackend.Migrations
                     b.HasIndex("GLAccountId");
 
                     b.HasIndex("VoucherId");
+
+                    b.HasIndex("WorkOrderId");
 
                     b.ToTable("AccountingEntries");
                 });
@@ -3200,6 +3205,9 @@ namespace ErpBackend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("AreaSquareMeters")
+                        .HasColumnType("decimal(14,2)");
+
                     b.Property<decimal>("BudgetLimit")
                         .HasColumnType("decimal(14,2)");
 
@@ -3283,7 +3291,10 @@ namespace ErpBackend.Migrations
 
                     b.HasIndex("WorkCenterId");
 
-                    b.ToTable("CostCenters");
+                    b.ToTable("CostCenters", t =>
+                        {
+                            t.HasCheckConstraint("CK_CostCenters_AreaSquareMeters_NonNegative", "\"AreaSquareMeters\" IS NULL OR \"AreaSquareMeters\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.CostCenterPosting", b =>
@@ -6052,6 +6063,129 @@ namespace ErpBackend.Migrations
                     b.ToTable("PayrollDetails");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.HR.PayrollPolicyAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PayrollPolicyVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayrollPolicyVersionId", "OccurredAt");
+
+                    b.ToTable("PayrollPolicyAuditEvents");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.HR.PayrollPolicyVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApprovalDocumentReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("FinanceReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FinanceReviewerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PolicyJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReviewComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VersionCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VersionCode")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "EffectiveFrom");
+
+                    b.ToTable("PayrollPolicyVersions");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.HR.PerformanceReview", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6713,7 +6847,7 @@ namespace ErpBackend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SkuId", "LotNumber")
+                    b.HasIndex("SkuId", "LotNumber", "WarehouseId", "BinLocationId")
                         .IsUnique();
 
                     b.ToTable("InventoryLots");
@@ -9861,6 +9995,67 @@ namespace ErpBackend.Migrations
                     b.ToTable("ForecastConsumptionDetails");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.MES.FqcScrapApprovalEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ScrapRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScrapRecordId", "OccurredAt");
+
+                    b.ToTable("FqcScrapApprovalEvents");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.MES.KpiDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11220,12 +11415,23 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("RequestedByName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ScrapNumber")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("ScrapQty")
                         .HasColumnType("decimal(14,2)");
+
+                    b.Property<string>("ScrapReasonCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
 
                     b.Property<string>("ScrapStatus")
                         .HasMaxLength(30)
@@ -11239,6 +11445,9 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Active");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("WorkOrderId")
                         .HasColumnType("uuid");
@@ -14542,6 +14751,9 @@ namespace ErpBackend.Migrations
                     b.Property<decimal>("QuarantinedQty")
                         .HasColumnType("decimal(14,2)");
 
+                    b.Property<Guid?>("ReworkSourceInspectionLotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ReworkWorkOrderId")
                         .HasColumnType("uuid");
 
@@ -14567,6 +14779,9 @@ namespace ErpBackend.Migrations
                     b.HasIndex("QuarantineBinLocationId");
 
                     b.HasIndex("QuarantineWarehouseId");
+
+                    b.HasIndex("ReworkSourceInspectionLotId")
+                        .IsUnique();
 
                     b.HasIndex("WorkOrderId", "LotNumber")
                         .IsUnique();
@@ -14602,9 +14817,6 @@ namespace ErpBackend.Migrations
                     b.Property<Guid>("OperationId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ProductSkuId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
@@ -14630,8 +14842,6 @@ namespace ErpBackend.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OperationId");
-
-                    b.HasIndex("ProductSkuId");
 
                     b.HasIndex("TemplateCode", "Version")
                         .IsUnique();
@@ -14729,6 +14939,41 @@ namespace ErpBackend.Migrations
                     b.HasIndex("TemplateId");
 
                     b.ToTable("InspectionTemplateItems");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplateSku", b =>
+                {
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("TemplateId", "ProductSkuId");
+
+                    b.HasIndex("ProductSkuId");
+
+                    b.ToTable("InspectionTemplateSkus");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.IpqcReport", b =>
@@ -18618,11 +18863,18 @@ namespace ErpBackend.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CostCenter");
 
                     b.Navigation("GLAccount");
 
                     b.Navigation("Voucher");
+
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.AccountingVoucher", b =>
@@ -19169,6 +19421,17 @@ namespace ErpBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Payroll");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.HR.PayrollPolicyAuditEvent", b =>
+                {
+                    b.HasOne("ErpBackend.Models.HR.PayrollPolicyVersion", "PolicyVersion")
+                        .WithMany("AuditEvents")
+                        .HasForeignKey("PayrollPolicyVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PolicyVersion");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.HR.PerformanceReview", b =>
@@ -19782,6 +20045,17 @@ namespace ErpBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("MpsLine");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.FqcScrapApprovalEvent", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.ScrapRecord", "ScrapRecord")
+                        .WithMany("ApprovalEvents")
+                        .HasForeignKey("ScrapRecordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ScrapRecord");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.MES.KpiValue", b =>
@@ -20674,6 +20948,11 @@ namespace ErpBackend.Migrations
                         .WithMany()
                         .HasForeignKey("QuarantineWarehouseId");
 
+                    b.HasOne("ErpBackend.Models.QA.FqcInspectionLot", "ReworkSourceInspectionLot")
+                        .WithOne("ReworkInspectionLot")
+                        .HasForeignKey("ErpBackend.Models.QA.FqcInspectionLot", "ReworkSourceInspectionLotId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
                         .WithMany()
                         .HasForeignKey("WorkOrderId")
@@ -20686,6 +20965,8 @@ namespace ErpBackend.Migrations
 
                     b.Navigation("QuarantineWarehouse");
 
+                    b.Navigation("ReworkSourceInspectionLot");
+
                     b.Navigation("WorkOrder");
                 });
 
@@ -20697,14 +20978,7 @@ namespace ErpBackend.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ErpBackend.Models.Inventory.Sku", "ProductSku")
-                        .WithMany()
-                        .HasForeignKey("ProductSkuId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Operation");
-
-                    b.Navigation("ProductSku");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplateItem", b =>
@@ -20714,6 +20988,25 @@ namespace ErpBackend.Migrations
                         .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplateSku", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "ProductSku")
+                        .WithMany()
+                        .HasForeignKey("ProductSkuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.InspectionTemplate", "Template")
+                        .WithMany("ProductSkus")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductSku");
 
                     b.Navigation("Template");
                 });
@@ -21455,6 +21748,11 @@ namespace ErpBackend.Migrations
                     b.Navigation("Details");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.HR.PayrollPolicyVersion", b =>
+                {
+                    b.Navigation("AuditEvents");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Inventory.CompletionOrder", b =>
                 {
                     b.Navigation("Items");
@@ -21585,6 +21883,11 @@ namespace ErpBackend.Migrations
                     b.Navigation("Operations");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.MES.ScrapRecord", b =>
+                {
+                    b.Navigation("ApprovalEvents");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.MES.WipReport", b =>
                 {
                     b.Navigation("AuditEvents");
@@ -21684,12 +21987,16 @@ namespace ErpBackend.Migrations
 
                     b.Navigation("ReceiptItems");
 
+                    b.Navigation("ReworkInspectionLot");
+
                     b.Navigation("ScrapRecords");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplate", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("ProductSkus");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.IpqcReport", b =>

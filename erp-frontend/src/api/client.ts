@@ -31,7 +31,7 @@ interface ApiErrorPayload {
 
 interface ApiErrorResponse {
   status: number;
-  data?: ApiErrorPayload;
+  data?: unknown;
 }
 
 interface ApiErrorLike {
@@ -51,7 +51,7 @@ const isApiErrorLike = (error: unknown): error is ApiErrorLike => {
     return false;
   }
 
-  const { config, response } = error;
+  const { config } = error;
   if (config !== undefined
       && (!isRecord(config)
         || (config.url !== undefined && typeof config.url !== 'string')
@@ -59,10 +59,7 @@ const isApiErrorLike = (error: unknown): error is ApiErrorLike => {
     return false;
   }
 
-  return response.data === undefined
-    || (isRecord(response.data)
-      && (response.data.message === undefined
-        || typeof response.data.message === 'string'));
+  return true;
 };
 
 // Error handling utility
@@ -72,27 +69,28 @@ export const handleApiError = (error: unknown) => {
     throw new Error('網路連線錯誤，請檢查您的網路連接');
   }
   const { response } = apiError;
+  const responseData = isRecord(response.data) ? response.data as ApiErrorPayload : undefined;
   if (response.status === 401) {
     if (String(apiError.config?.url ?? '').endsWith('/auth/login')) {
       throw new Error('帳號或密碼錯誤，或帳號目前無法登入');
     }
-    throw new Error(response.data?.message || '登入工作階段無效或已過期，請重新登入');
+    throw new Error(responseData?.message || '登入工作階段無效或已過期，請重新登入');
   }
   if (response.status === 400) {
-    const message = response.data?.message || '輸入資料驗證失敗';
+    const message = responseData?.message || '輸入資料驗證失敗';
     const err = Object.assign(new Error(message), {
       response,
     });
     throw err;
   }
   if (response.status === 403) {
-    throw new Error('您沒有權限執行此操作');
+    throw new Error(responseData?.message || '您沒有權限執行此操作');
   }
   if (response.status === 404) {
     throw new Error('請求的資源不存在');
   }
   if (response.status >= 500) {
-    const serverMsg = response.data?.message;
+    const serverMsg = responseData?.message;
     console.error('[API] Server Error 500:', {
       url: apiError.config?.url,
       method: apiError.config?.method,
@@ -100,7 +98,7 @@ export const handleApiError = (error: unknown) => {
     });
     throw new Error(serverMsg || '伺服器內部錯誤，請稍後再試');
   }
-  throw new Error(response.data?.message || '發生未知錯誤');
+  throw new Error(responseData?.message || '發生未知錯誤');
 };
 
 export const api = axios.create({

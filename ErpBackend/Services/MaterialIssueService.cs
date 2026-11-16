@@ -301,9 +301,9 @@ public class MaterialIssueService : IMaterialIssueService
                     return (null, $"location_stock_insufficient:{sku.SkuNumber}");
 
                 var sourceFqcLot = fqcLotsByMaterialId.GetValueOrDefault(item.Id);
-                var unitCost = sourceFqcLot == null
-                    ? sku.LatestPurchaseCost > 0 ? sku.LatestPurchaseCost : sku.StandardCost
-                    : await GetFqcLotActualUnitCostAsync(sourceFqcLot);
+                var unitCost = sourceFqcLot != null
+                    ? await GetFqcLotActualUnitCostAsync(sourceFqcLot)
+                    : await GetMaterialIssueUnitCostAsync(sku, requestedAllocation.LotNumber);
                 InventoryLot? inventoryLot = null;
                 if (sourceFqcLot != null)
                 {
@@ -687,6 +687,40 @@ public class MaterialIssueService : IMaterialIssueService
         if (lotNumber != null)
             query = query.Where(transaction => transaction.LotNumber == lotNumber);
         return await query.SumAsync(transaction => (decimal?)transaction.QtyChange) ?? 0m;
+    }
+
+    private async Task<decimal> GetMaterialIssueUnitCostAsync(Sku sku, string? lotNumber)
+    {
+        if (!string.IsNullOrWhiteSpace(lotNumber))
+        {
+            var normalizedLotNumber = lotNumber.Trim();
+            var receiptTransactions = await _db.InventoryTransactions
+                .Where(transaction =>
+                    transaction.SkuId == sku.Id &&
+                    transaction.Type == "purchase_receipt" &&
+                    transaction.QtyChange > 0 &&
+                    transaction.LotNumber == normalizedLotNumber &&
+                    transaction.UnitCost.HasValue &&
+                    !_db.InventoryTransactions.Any(reversal =>
+                        reversal.ReversalOfTransactionId == transaction.Id))
+                .Select(transaction => new
+                {
+                    transaction.QtyChange,
+                    transaction.UnitCost,
+                    transaction.TotalCost
+                })
+                .ToListAsync();
+
+            var receivedQuantity = receiptTransactions.Sum(transaction => transaction.QtyChange);
+            if (receivedQuantity > 0)
+            {
+                var totalCost = receiptTransactions.Sum(transaction =>
+                    transaction.TotalCost ?? transaction.QtyChange * transaction.UnitCost!.Value);
+                return Math.Round(totalCost / receivedQuantity, 4, MidpointRounding.AwayFromZero);
+            }
+        }
+
+        return sku.LatestPurchaseCost > 0 ? sku.LatestPurchaseCost : sku.StandardCost;
     }
 
     private async Task<Sku?> LockSkuAsync(Guid skuId)

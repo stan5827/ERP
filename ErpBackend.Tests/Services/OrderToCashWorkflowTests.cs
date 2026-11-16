@@ -170,12 +170,12 @@ public class OrderToCashWorkflowTests
             new GLAccountMapping
             {
                 MappingKey = "accounts_receivable",
-                GLAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "1131")
+                GLAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "1136")
             },
             new GLAccountMapping
             {
                 MappingKey = "sales_revenue",
-                GLAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "4101")
+                GLAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "4111")
             },
             new GLAccountMapping
             {
@@ -185,7 +185,7 @@ public class OrderToCashWorkflowTests
             new GLAccountMapping
             {
                 MappingKey = "customer_advances",
-                GLAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "2101")
+                GLAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "2200")
             });
         await db.SaveChangesAsync();
         var (found, approvalStatus) = await invoiceService.ApproveInvoiceAsync(
@@ -202,7 +202,7 @@ public class OrderToCashWorkflowTests
         Assert.Equal(invoice.TotalAmount, invoiceVoucher.Entries.Sum(entry => entry.DebitAmount));
         Assert.Equal(invoice.TotalAmount, invoiceVoucher.Entries.Sum(entry => entry.CreditAmount));
 
-        var cashAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "1103");
+        var cashAccount = await db.GLAccounts.SingleAsync(account => account.AccountCode == "1111");
         var bankAccount = new BankAccount
         {
             BankName = "Settlement account",

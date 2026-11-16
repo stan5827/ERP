@@ -29,6 +29,24 @@ public class SkuServiceTests
     }
 
     [Fact]
+    public async Task CreateSkuAsync_DoesNotAcceptManualLatestPurchaseCost()
+    {
+        await using var db = CreateInMemoryDbContext();
+
+        var created = await new SkuService(db).CreateSkuAsync(new SkuDto
+        {
+            SkuNumber = "SKU-COST-001",
+            SkuName = "Cost test SKU",
+            LatestPurchaseCost = 999m,
+            StandardCost = 888m
+        });
+
+        var savedSku = await db.Skus.SingleAsync(sku => sku.Id == created.Id);
+        Assert.Equal(0m, savedSku.LatestPurchaseCost);
+        Assert.Equal(0m, savedSku.StandardCost);
+    }
+
+    [Fact]
     public async Task UpdateSkuAsync_NormalizesUnspecifiedEffectiveDatesToUtc()
     {
         await using var db = CreateInMemoryDbContext();
@@ -47,6 +65,32 @@ public class SkuServiceTests
 
         Assert.Equal(DateTimeKind.Utc, sku.EffectiveFrom?.Kind);
         Assert.Equal(DateTimeKind.Utc, sku.EffectiveTo?.Kind);
+    }
+
+    [Fact]
+    public async Task UpdateSkuAsync_PreservesLatestPurchaseCostFromReceipts()
+    {
+        await using var db = CreateInMemoryDbContext();
+        var sku = new Sku
+        {
+            SkuNumber = "SKU-COST-001",
+            SkuName = "Cost test SKU",
+            LatestPurchaseCost = 150m,
+            StandardCost = 80m
+        };
+        db.Skus.Add(sku);
+        await db.SaveChangesAsync();
+
+        await new SkuService(db).UpdateSkuAsync(sku.Id, new SkuDto
+        {
+            SkuNumber = sku.SkuNumber,
+            SkuName = sku.SkuName,
+            LatestPurchaseCost = 999m,
+            StandardCost = 999m
+        });
+
+        Assert.Equal(150m, sku.LatestPurchaseCost);
+        Assert.Equal(80m, sku.StandardCost);
     }
 
     [Fact]

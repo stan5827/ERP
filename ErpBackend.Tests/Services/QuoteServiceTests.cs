@@ -145,6 +145,7 @@ public class QuoteServiceTests
         Assert.Equal("FG-001", item.SkuNumber);
         Assert.Equal("A型眼鏡", item.SkuName);
         Assert.Equal("BRANCH", item.Unit);
+        Assert.Equal("支", item.UnitName);
         Assert.Equal(1000, item.Quantity);
         Assert.Equal(280, item.UnitPrice);
         Assert.Equal(280000, item.Subtotal);

@@ -6,13 +6,21 @@ using ErpBackend.Models.Sales;
 
 namespace ErpBackend.Models.QA;
 
+public class InspectionTemplateSku
+{
+    public Guid TemplateId { get; set; }
+    public Guid ProductSkuId { get; set; }
+
+    [ForeignKey(nameof(TemplateId))] public InspectionTemplate Template { get; set; } = null!;
+    [ForeignKey(nameof(ProductSkuId))] public Sku ProductSku { get; set; } = null!;
+}
+
 public class InspectionTemplate
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     [Required, MaxLength(30)] public string TemplateCode { get; set; } = null!;
     [Required, MaxLength(150)] public string TemplateName { get; set; } = null!;
     public Guid OperationId { get; set; }
-    public Guid? ProductSkuId { get; set; }
     public int Version { get; set; } = 1;
     public bool IsActive { get; set; } = true;
     [MaxLength(1000)] public string? Notes { get; set; }
@@ -20,7 +28,7 @@ public class InspectionTemplate
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(OperationId))] public Operation? Operation { get; set; }
-    [ForeignKey(nameof(ProductSkuId))] public Sku? ProductSku { get; set; }
+    public ICollection<InspectionTemplateSku> ProductSkus { get; set; } = new List<InspectionTemplateSku>();
     public ICollection<InspectionTemplateItem> Items { get; set; } = new List<InspectionTemplateItem>();
 }
 
@@ -118,6 +126,7 @@ public class FqcInspectionLot
     [Column(TypeName = "decimal(14,2)")] public decimal QuarantinedQty { get; set; }
     public DateTime? QuarantinedAt { get; set; }
     public Guid? ReworkWorkOrderId { get; set; }
+    public Guid? ReworkSourceInspectionLotId { get; set; }
     [MaxLength(100)] public string? DispositionBy { get; set; }
     public DateTime? DispositionAt { get; set; }
 
@@ -125,6 +134,8 @@ public class FqcInspectionLot
     [ForeignKey(nameof(ProductSkuId))] public Sku ProductSku { get; set; } = null!;
     [ForeignKey(nameof(QuarantineWarehouseId))] public Warehouse? QuarantineWarehouse { get; set; }
     [ForeignKey(nameof(QuarantineBinLocationId))] public BinLocation? QuarantineBinLocation { get; set; }
+    [ForeignKey(nameof(ReworkSourceInspectionLotId))] public FqcInspectionLot? ReworkSourceInspectionLot { get; set; }
+    public FqcInspectionLot? ReworkInspectionLot { get; set; }
     public ICollection<ProductionReceiptItem> ReceiptItems { get; set; } = new List<ProductionReceiptItem>();
     public ICollection<FqcInspectionFinding> Findings { get; set; } = new List<FqcInspectionFinding>();
     public ICollection<ScrapRecord> ScrapRecords { get; set; } = new List<ScrapRecord>();

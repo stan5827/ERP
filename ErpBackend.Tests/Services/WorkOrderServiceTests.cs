@@ -114,6 +114,79 @@ public class WorkOrderServiceTests
         Assert.Equal(200m, await db.WorkOrderMaterials.SumAsync(material => material.RequiredQty));
     }
 
+    [Fact]
+    public async Task GetSalesOrderWorkOrderTransferCandidatesAsync_OnlyReturnsConfirmedUnsentManufacturingOrders()
+    {
+        using var db = CreateInMemoryDbContext();
+        var customer = new Customer { CustomerCode = "CUST-TRANSFER", CustomerName = "轉發測試客戶" };
+        var manufacturableSku = new Sku
+        {
+            SkuNumber = "FG-TRANSFER",
+            SkuName = "內製品",
+            IsManufacturable = true
+        };
+        var nonManufacturableSku = new Sku
+        {
+            SkuNumber = "FG-NON-MFG",
+            SkuName = "非內製品",
+            IsManufacturable = false
+        };
+        db.AddRange(customer, manufacturableSku, nonManufacturableSku);
+
+        SalesOrder CreateOrder(string orderNumber, string status, string manufacturingStatus, Sku sku, bool needManufacturing)
+        {
+            var order = new SalesOrder
+            {
+                OrderNumber = orderNumber,
+                CustomerId = customer.Id,
+                Customer = customer,
+                Status = status,
+                ManufacturingStatus = manufacturingStatus
+            };
+            order.Items.Add(new SalesOrderItem
+            {
+                SalesOrderId = order.Id,
+                LineNumber = 1,
+                ProductId = sku.Id,
+                SkuId = sku.Id,
+                Sku = sku,
+                Quantity = 12m,
+                NeedManufacturing = needManufacturing
+            });
+            return order;
+        }
+
+        var candidate = CreateOrder("SO-TRANSFER-001", "confirmed", "pending", manufacturableSku, false);
+        candidate.Items.Add(new SalesOrderItem
+        {
+            SalesOrderId = candidate.Id,
+            LineNumber = 2,
+            ProductId = nonManufacturableSku.Id,
+            SkuId = nonManufacturableSku.Id,
+            Sku = nonManufacturableSku,
+            Quantity = 4m
+        });
+        var unconfirmed = CreateOrder("SO-TRANSFER-002", "pending", "pending", manufacturableSku, true);
+        var alreadySent = CreateOrder("SO-TRANSFER-003", "confirmed", "sent", manufacturableSku, true);
+        var noManufacturing = CreateOrder("SO-TRANSFER-004", "confirmed", "pending", nonManufacturableSku, false);
+        db.AddRange(candidate, unconfirmed, alreadySent, noManufacturing);
+        await db.SaveChangesAsync();
+
+        var result = await new WorkOrderService(db).GetSalesOrderWorkOrderTransferCandidatesAsync();
+
+        var transferCandidate = Assert.Single(result);
+        Assert.Equal(candidate.Id, transferCandidate.SalesOrderId);
+        Assert.Equal(candidate.OrderNumber, transferCandidate.OrderNumber);
+        Assert.Equal(customer.CustomerName, transferCandidate.CustomerName);
+        Assert.Equal(2, transferCandidate.Items.Count);
+        Assert.Equal("FG-TRANSFER", transferCandidate.Items[0].SkuNumber);
+        Assert.Equal(12m, transferCandidate.Items[0].Quantity);
+        Assert.True(transferCandidate.Items[0].WillCreateWorkOrder);
+        Assert.False(transferCandidate.Items[0].IsAlreadyTransferred);
+        Assert.Equal("FG-NON-MFG", transferCandidate.Items[1].SkuNumber);
+        Assert.False(transferCandidate.Items[1].WillCreateWorkOrder);
+    }
+
     private async Task<ErpGeneralDbContext> SeedAsync(ErpGeneralDbContext db)
     {
         var sku = new Sku { SkuNumber = "SKU001", SkuName = "TestSku" };

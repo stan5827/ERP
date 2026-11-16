@@ -15,6 +15,7 @@ public interface IWorkOrderService
     Task<List<WorkOrderDto>> GetAllAsync(string? status = null, int page = 1, int pageSize = 20, int? totalCount = null);
     Task<WorkOrderDto?> GetByIdAsync(Guid id);
     Task<(WorkOrderDto? dto, string status)> CreateAsync(CreateWorkOrderRequest req);
+    Task<List<WorkOrderTransferCandidateDto>> GetSalesOrderWorkOrderTransferCandidatesAsync();
     Task<(List<WorkOrderDto> workOrders, string status)> CreateFromSalesOrderAsync(Guid salesOrderId);
     Task<(bool found, string status, CreateSupplyOrdersResultDto? result)> CreateSupplyOrdersAsync(Guid id);
     Task<(bool found, string status, int operationCount)> ExplodeRoutingAsync(Guid id);
@@ -657,6 +658,81 @@ public class WorkOrderService : IWorkOrderService
         public Dictionary<Guid, decimal> RemainingAvailableBySku { get; } = new();
         public int PrCount { get; set; }
         public int SubWoCount { get; set; }
+    }
+
+    public async Task<List<WorkOrderTransferCandidateDto>> GetSalesOrderWorkOrderTransferCandidatesAsync()
+    {
+        var now = DateTime.UtcNow;
+        return await _db.SalesOrders
+            .AsNoTracking()
+            .Where(order =>
+                (order.Status == "confirmed" || order.Status == "partial")
+                && order.ManufacturingStatus != "sent"
+                && order.Items.Any(item =>
+                    !item.NeedOutsourcing
+                    && (item.Sku == null || !item.Sku.IsOutsourced)
+                    && (item.NeedManufacturing
+                        || (item.Sku != null && item.Sku.IsManufacturable)
+                        || item.BomId.HasValue
+                        || item.RoutingId.HasValue
+                        || _db.Boms.Any(bom =>
+                            bom.ProductSkuId == (item.SkuId ?? item.ProductId)
+                            && bom.Status == "active"
+                            && bom.EffectiveDate <= now
+                            && (bom.ExpiryDate == null || bom.ExpiryDate >= now)))
+                    && !_db.SalesOrderProductionLinks.Any(link =>
+                        link.SalesOrderItemId == item.Id
+                        && link.ProductionDocType == "work_order")))
+            .OrderBy(order => order.OrderDate)
+            .ThenBy(order => order.OrderNumber)
+            .Select(order => new WorkOrderTransferCandidateDto
+            {
+                SalesOrderId = order.Id,
+                OrderNumber = order.OrderNumber,
+                CustomerName = order.Customer.CustomerName,
+                OrderDate = order.OrderDate,
+                ExpectedDeliveryDate = order.ExpectedDeliveryDate,
+                OrderRemarks = order.OrderRemarks,
+                Items = order.Items
+                    .OrderBy(item => item.LineNumber)
+                    .Select(item => new WorkOrderTransferCandidateItemDto
+                    {
+                        LineNumber = item.LineNumber,
+                        SkuNumber = item.Sku != null ? item.Sku.SkuNumber : item.Product != null ? item.Product.SkuNumber : null,
+                        SkuName = item.Sku != null ? item.Sku.SkuName : item.Product != null ? item.Product.SkuName : null,
+                        Specification = item.Sku != null ? item.Sku.Specification : item.Product != null ? item.Product.Specification : null,
+                        CustomerItemCode = item.CustomerItemCode,
+                        Quantity = item.Quantity,
+                        Unit = item.Sku != null
+                            ? item.Sku.SalesUomCode ?? item.Sku.Unit
+                            : item.Product != null ? item.Product.SalesUomCode ?? item.Product.Unit : null,
+                        NeedManufacturing = item.NeedManufacturing,
+                        NeedOutsourcing = item.NeedOutsourcing,
+                        IsOutsourced = item.Sku != null && item.Sku.IsOutsourced,
+                        IsAlreadyTransferred = _db.SalesOrderProductionLinks.Any(link =>
+                            link.SalesOrderItemId == item.Id
+                            && link.ProductionDocType == "work_order"),
+                        WillCreateWorkOrder = !item.NeedOutsourcing
+                            && (item.Sku == null || !item.Sku.IsOutsourced)
+                            && (item.NeedManufacturing
+                                || (item.Sku != null && item.Sku.IsManufacturable)
+                                || item.BomId.HasValue
+                                || item.RoutingId.HasValue
+                                || _db.Boms.Any(bom =>
+                                    bom.ProductSkuId == (item.SkuId ?? item.ProductId)
+                                    && bom.Status == "active"
+                                    && bom.EffectiveDate <= now
+                                    && (bom.ExpiryDate == null || bom.ExpiryDate >= now)))
+                            && !_db.SalesOrderProductionLinks.Any(link =>
+                                link.SalesOrderItemId == item.Id
+                                && link.ProductionDocType == "work_order"),
+                        PlannedStartDate = item.PlannedStartDate,
+                        PlannedFinishDate = item.PlannedFinishDate,
+                        LineRemarks = item.LineRemarks
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
     }
 
     public async Task<(List<WorkOrderDto> workOrders, string status)> CreateFromSalesOrderAsync(Guid salesOrderId)

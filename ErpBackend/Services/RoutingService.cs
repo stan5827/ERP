@@ -7,7 +7,7 @@ namespace ErpBackend.Services;
 
 public interface IRoutingService
 {
-    Task<List<RoutingDto>> GetRoutingsAsync(Guid? productSkuId = null);
+    Task<List<RoutingDto>> GetRoutingsAsync(Guid? productSkuId = null, Guid? operationId = null);
     Task<RoutingDto?> GetRoutingAsync(Guid id);
     Task<(RoutingDto? dto, string status)> CreateRoutingAsync(CreateRoutingRequest request);
     Task<(RoutingDto? dto, string status)> UpdateRoutingAsync(Guid id, UpdateRoutingRequest request);
@@ -19,7 +19,7 @@ public class RoutingService : IRoutingService
 
     public RoutingService(ErpGeneralDbContext db) => _db = db;
 
-    public async Task<List<RoutingDto>> GetRoutingsAsync(Guid? productSkuId = null)
+    public async Task<List<RoutingDto>> GetRoutingsAsync(Guid? productSkuId = null, Guid? operationId = null)
     {
         var q = _db.Routings
             .Include(r => r.ProductSku)
@@ -31,6 +31,8 @@ public class RoutingService : IRoutingService
 
         if (productSkuId.HasValue)
             q = q.Where(r => r.ProductSkuId == productSkuId.Value);
+        if (operationId.HasValue)
+            q = q.Where(r => r.IsActive && r.Operations.Any(operation => operation.OperationId == operationId.Value));
 
         return await q.OrderBy(r => r.RoutingCode).Select(r => MapToDto(r)).ToListAsync();
     }

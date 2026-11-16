@@ -186,20 +186,19 @@ export const BarcodeSystem: React.FC = () => {
       <div className="glass-card" style={{ padding: 0 }}>
         {activeTab === 'scan' && (
           <div style={{ padding: 24 }}>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-              <div style={{ flex: 1, position: 'relative' }}>
+            <div className="barcode-scan-controls">
+              <div className="barcode-scan-field">
                 <input
                   ref={inputRef}
-                  className="input"
+                  className="barcode-scan-input"
                   placeholder="請掃描或輸入條碼..."
                   value={scanInput}
                   onChange={e => setScanInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  style={{ paddingLeft: 40 }}
                 />
-                <QrCode size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-500)' }} />
+                <QrCode className="barcode-scan-icon" size={16} aria-hidden="true" />
               </div>
-              <button className="btn btn-primary" onClick={handleScan} disabled={isScanning}>
+              <button className="btn btn-primary barcode-scan-button" onClick={handleScan} disabled={isScanning}>
                 {isScanning ? <RotateCcw size={14} className="spin" /> : <Camera size={14} />}
                 {isScanning ? '掃描中...' : '掃描'}
               </button>
@@ -284,9 +283,9 @@ export const BarcodeSystem: React.FC = () => {
                     <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>尚無條碼記錄</td></tr>
                   ) : records.slice(0, 5).map(r => (
                     <tr key={r.id} onClick={() => { setScanInput(r.barcode); handleScan(); }} style={{ cursor: 'pointer' }}>
-                      <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: '12px' }}>{r.barcode}</td>
+                      <td className="mono" style={{ color: 'var(--theme-text)', fontSize: '13px', fontWeight: 600 }}>{r.barcode}</td>
                       <td>
-                        <span style={{ color: barcodeTypeConfig[r.barcodeType].color, fontSize: 12 }}>
+                        <span style={{ color: r.barcodeType === 'sku' ? 'var(--theme-text)' : barcodeTypeConfig[r.barcodeType].color, fontSize: 13, fontWeight: 600 }}>
                           {barcodeTypeConfig[r.barcodeType].label}
                         </span>
                       </td>

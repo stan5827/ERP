@@ -13,6 +13,7 @@ using ErpBackend.Configs;
 using ErpBackend.Data;
 using ErpBackend.DTOs;
 using ErpBackend.Infrastructure.CapaAttachments;
+using ErpBackend.Infrastructure;
 using ErpBackend.Services;
 using ErpBackend.Middleware;
 using ErpBackend.Filters;
@@ -24,6 +25,12 @@ using Npgsql;
 Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (args.Length > 0 && args[0] == "recover-admin")
+{
+    Environment.ExitCode = await AdminRecoveryCommand.RunAsync(args[1..], builder.Configuration);
+    return;
+}
 
 // Configure background service exception behavior to not stop host
 builder.Services.Configure<HostOptions>(options =>
@@ -106,6 +113,8 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IUomConversionService, UomConversionService>();
 builder.Services.AddScoped<ApprovalWorkflowService>();
 builder.Services.AddScoped<ICostingService, CostingService>();
+builder.Services.AddScoped<ICostCenterService, CostCenterService>();
+builder.Services.AddScoped<IManufacturingCostAllocationService, ManufacturingCostAllocationService>();
 builder.Services.AddSingleton<AgentMetricsService>();
 builder.Services.AddHostedService<CalendarReminderService>();
 builder.Services.AddScoped<ISubstituteService, SubstituteService>();
@@ -174,6 +183,7 @@ builder.Services.AddScoped<ILotManagementService, LotManagementService>();
 builder.Services.AddScoped<ISupplierRatingService, SupplierRatingService>();
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 builder.Services.AddScoped<IPayrollService, PayrollService>();
+builder.Services.AddScoped<IPayrollPolicyService, PayrollPolicyService>();
 builder.Services.AddScoped<ISalesReportService, SalesReportService>();
 builder.Services.AddScoped<IApsIntegrationService, ApsIntegrationService>();
 builder.Services.AddScoped<IRccpResourceService, RccpResourceService>();
@@ -547,6 +557,7 @@ using (var scope = app.Services.CreateScope())
         // No runtime schema changes needed - use migrations instead
 Console.WriteLine("Database ErpGeneral ready via PostgreSQL.");
         await PermissionCatalog.SeedAsync(db);
+await RolePermissionCatalog.SeedAsync(db);
         
         // Seed default warehouse if empty (done via migrations)
         // Seed Calendar Categories
@@ -588,6 +599,30 @@ Console.WriteLine("Database ErpGeneral ready via PostgreSQL.");
             db.MeetingRooms.AddRange(rooms);
             db.SaveChanges();
         }
+
+        var financeManagerTitle = db.JobTitles.FirstOrDefault(title =>
+            title.TitleCode == "J13" || title.TitleName == "財務主管");
+        if (financeManagerTitle == null)
+        {
+            db.JobTitles.Add(new ErpBackend.Models.HR.JobTitle
+            {
+                TitleCode = "J13",
+                TitleName = "財務主管",
+                ApplicableDeptType = "admin",
+                IsSupervisor = true,
+                IsActive = true,
+                Description = "負責財務部門主管職務"
+            });
+        }
+        else
+        {
+            financeManagerTitle.TitleCode = "J13";
+            financeManagerTitle.TitleName = "財務主管";
+            financeManagerTitle.ApplicableDeptType = "admin";
+            financeManagerTitle.IsSupervisor = true;
+            financeManagerTitle.IsActive = true;
+        }
+        db.SaveChanges();
 
         // Seed default admin user - 使用環境變數控制初始化密碼
         if (!db.Users.Any())

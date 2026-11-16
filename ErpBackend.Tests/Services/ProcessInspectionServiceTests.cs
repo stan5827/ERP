@@ -4,12 +4,79 @@ using ErpBackend.Data;
 using ErpBackend.DTOs;
 using ErpBackend.Models.Inventory;
 using ErpBackend.Models.MES;
+using ErpBackend.Models.QA;
 using ErpBackend.Services;
 
 namespace ErpBackend.Tests.Services;
 
 public class ProcessInspectionServiceTests
 {
+    [Fact]
+    public async Task TemplatesAsync_SupportMultipleProductsAndKeepGlobalFallback()
+    {
+        var options = new DbContextOptionsBuilder<ErpGeneralDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new ErpGeneralDbContext(options);
+        var operation = new Operation { OperationCode = "ASM", OperationName = "組裝" };
+        var workCenter = new WorkCenter { WorkCenterCode = "WC3", WorkCenterName = "組裝線" };
+        var firstSku = new Sku { SkuNumber = "SKU-101", SkuName = "產品一" };
+        var secondSku = new Sku { SkuNumber = "SKU-102", SkuName = "產品二" };
+        var otherSku = new Sku { SkuNumber = "SKU-103", SkuName = "產品三" };
+        var selectedWorkOrder = CreateWorkOrder("WO-101", secondSku.Id, operation.Id, workCenter.Id);
+        var globalWorkOrder = CreateWorkOrder("WO-102", otherSku.Id, operation.Id, workCenter.Id);
+        db.AddRange(operation, workCenter, firstSku, secondSku, otherSku, selectedWorkOrder, globalWorkOrder);
+        await db.SaveChangesAsync();
+
+        var service = new ProcessInspectionService(db);
+        var (globalTemplate, globalStatus) = await service.CreateTemplateAsync(new SaveInspectionTemplateRequestDto
+        {
+            TemplateCode = "ASM-GLOBAL",
+            TemplateName = "通用組裝檢驗",
+            OperationId = operation.Id,
+            Items = { new SaveInspectionTemplateItemRequestDto { ItemCode = "VISUAL", ItemName = "外觀" } }
+        });
+        var (multiProductTemplate, multiProductStatus) = await service.CreateTemplateAsync(new SaveInspectionTemplateRequestDto
+        {
+            TemplateCode = "ASM-MULTI",
+            TemplateName = "指定產品組裝檢驗",
+            OperationId = operation.Id,
+            ProductSkuIds = { firstSku.Id, secondSku.Id },
+            Items = { new SaveInspectionTemplateItemRequestDto { ItemCode = "FIT", ItemName = "組裝配合" } }
+        });
+
+        Assert.Equal("ok", globalStatus);
+        Assert.Equal("ok", multiProductStatus);
+        Assert.Equal(
+            new[] { firstSku.Id, secondSku.Id }.OrderBy(id => id),
+            multiProductTemplate!.ProductSkus.Select(product => product.Id).OrderBy(id => id));
+
+        var templatesForSelectedSku = await service.GetTemplatesAsync(operation.Id, secondSku.Id);
+        Assert.Equal(2, templatesForSelectedSku.Count);
+        Assert.Single(await service.GetTemplatesAsync(operation.Id, otherSku.Id));
+
+        var selectedOperations = await service.GetWorkOrderOperationsAsync(selectedWorkOrder.Id);
+        Assert.Equal(multiProductTemplate.TemplateCode, Assert.Single(selectedOperations![0].Templates).TemplateCode);
+        var globalOperations = await service.GetWorkOrderOperationsAsync(globalWorkOrder.Id);
+        Assert.Equal(globalTemplate!.TemplateCode, Assert.Single(globalOperations![0].Templates).TemplateCode);
+
+        var (updatedTemplate, updateStatus) = await service.UpdateTemplateAsync(
+            multiProductTemplate.Id,
+            new SaveInspectionTemplateRequestDto
+            {
+                TemplateCode = "ASM-MULTI",
+                TemplateName = "指定產品組裝檢驗",
+                OperationId = operation.Id,
+                ProductSkuIds = { firstSku.Id, otherSku.Id },
+                Items = { new SaveInspectionTemplateItemRequestDto { ItemCode = "FIT", ItemName = "組裝配合" } }
+            });
+
+        Assert.Equal("ok", updateStatus);
+        Assert.Equal(
+            new[] { firstSku.Id, otherSku.Id }.OrderBy(id => id),
+            updatedTemplate!.ProductSkus.Select(product => product.Id).OrderBy(id => id));
+    }
+
     [Fact]
     public async Task CreateReportAsync_CalculatesNumericResult_AndKeepsTemplateSnapshot()
     {
@@ -181,4 +248,19 @@ public class ProcessInspectionServiceTests
         Assert.Null(report);
         Assert.Equal("template_mismatch", status);
     }
+
+    private static WorkOrder CreateWorkOrder(string number, Guid skuId, Guid operationId, Guid workCenterId) => new()
+    {
+        WoNumber = number,
+        ProductSkuId = skuId,
+        Operations = new List<WorkOrderOperation>
+        {
+            new()
+            {
+                OperationSeq = 10,
+                OperationId = operationId,
+                WorkCenterId = workCenterId
+            }
+        }
+    };
 }

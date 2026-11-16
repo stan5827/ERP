@@ -740,6 +740,19 @@ public class ProcurementService : IProcurementService
             }
         }
 
+        foreach (var group in selectedItems.GroupBy(item => item.PurchaseOrderItem.SkuId))
+        {
+            var receivedQuantity = group.Sum(item => item.Request.Quantity);
+            var localCurrencyAmount = group.Sum(item =>
+                item.Request.Quantity * item.PurchaseOrderItem.UnitPrice * po.ExchangeRate);
+            var sku = lockedSkus[group.Key];
+            sku.LatestPurchaseCost = Math.Round(
+                localCurrencyAmount / receivedQuantity,
+                4,
+                MidpointRounding.AwayFromZero);
+            sku.UpdatedAt = DateTime.UtcNow;
+        }
+
         gr.IqcStatus = hasIqcRequiredItems ? "pending" : "not_required";
         _db.GoodsReceipts.Add(gr);
         if (linkedAsn is not null)

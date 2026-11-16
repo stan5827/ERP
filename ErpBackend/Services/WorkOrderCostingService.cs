@@ -153,7 +153,10 @@ public class WorkOrderCostingService : IWorkOrderCostingService
             var actualManufacturingOverhead = await _db.WorkOrderMachineActuals
                 .Where(actual => actual.WorkOrderId == id)
                 .SumAsync(actual => actual.OverheadAmount);
-            actualOverheadCost = actualMachineCost + actualManufacturingOverhead;
+            var allocatedManufacturingOverhead = await GetAllocatedWipOverheadAsync(id);
+            actualOverheadCost = actualMachineCost
+                + actualManufacturingOverhead
+                + allocatedManufacturingOverhead;
 
             (standardMaterialCost, standardLaborCost, standardOverheadCost) =
                 await CalculateStandardCostsAsync(workOrder);
@@ -349,6 +352,26 @@ public class WorkOrderCostingService : IWorkOrderCostingService
         }
 
         return await _db.WorkOrders.FirstOrDefaultAsync(order => order.Id == workOrderId);
+    }
+
+    private async Task<decimal> GetAllocatedWipOverheadAsync(Guid workOrderId)
+    {
+        var wipAccountId = await _db.GLAccountMappings
+            .Where(mapping => mapping.MappingKey == "work_in_progress")
+            .Select(mapping => (Guid?)mapping.GLAccountId)
+            .FirstOrDefaultAsync();
+        if (!wipAccountId.HasValue)
+            return 0m;
+
+        return await (
+            from entry in _db.AccountingEntries
+            join voucher in _db.AccountingVouchers on entry.VoucherId equals voucher.Id
+            where entry.WorkOrderId == workOrderId
+                && entry.GLAccountId == wipAccountId.Value
+                && voucher.ReferenceType == "ManufacturingCostAllocation"
+                && voucher.Status == "Posted"
+            select entry.DebitAmount - entry.CreditAmount)
+            .SumAsync();
     }
 
     private async Task<(decimal materialCost, decimal laborCost, decimal overheadCost)> CalculateStandardCostsAsync(

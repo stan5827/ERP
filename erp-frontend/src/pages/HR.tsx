@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Download, Search, Edit2, Eye, Check, X, Calendar, Clock, DollarSign } from 'lucide-react';
+import { Plus, Download, Search, Edit2, Eye, Check, X, Calendar, Clock, DollarSign, FileCheck } from 'lucide-react';
 import { useEmployees } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormTab, FormField } from '../components/FormModal';
 import { employeesApi, attendanceApi, leaveRequestsApi, payrollApi, departmentsApi, jobTitlesApi, jobGradesApi } from '../api/api';
 import type { AttendanceRecordDto, EmployeeDto, LeaveRequestDto, PayrollDto } from '../api/api';
 import { getApplicableJobTitles } from '../utils/hrOrganization';
+import { PayrollPolicyManager } from '../components/PayrollPolicyManager';
 
-type TabType = 'employees' | 'attendance' | 'leave' | 'payroll';
+type TabType = 'employees' | 'attendance' | 'leave' | 'payroll' | 'payrollPolicy';
 
 /* ── 統計卡片（動態計算）── */
 function getHRStats(employees: EmployeeDto[], attendanceRecords: AttendanceRecordDto[], leaveRequests: LeaveRequestDto[]) {
@@ -307,6 +308,7 @@ function buildEmployeeWizardFields(
 export const HR: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('employees');
   const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeDto | null>(null);
@@ -340,10 +342,25 @@ export const HR: React.FC = () => {
 
   const { data: employeesResponse, isLoading } = useEmployees({
     ...(search && { search }),
+    ...(departmentFilter && { departmentId: departmentFilter }),
     ...(statusFilter && { status: statusFilter }),
   }, refreshKey);
 
   const employees = employeesResponse?.data ?? [];
+
+  useEffect(() => {
+    departmentsApi.flat()
+      .then(response => {
+        const departments = response.data?.data as DepartmentOptionSource[] | undefined;
+        if (!departments) return;
+        setDepartmentSources(departments);
+        setDeptOptions(departments.map(department => ({
+          value: department.id,
+          label: `${department.deptCode} - ${department.deptName}`,
+        })));
+      })
+      .catch(error => console.error('Failed to load departments:', error));
+  }, []);
 
   const handleEditEmployee = async (employee: { id: string }) => {
     setLoadingEmployeeId(employee.id);
@@ -479,6 +496,7 @@ export const HR: React.FC = () => {
     { key: 'attendance' as TabType, label: '出勤管理', icon: <Clock size={14} /> },
     { key: 'leave' as TabType, label: '請假審批', icon: <Calendar size={14} /> },
     { key: 'payroll' as TabType, label: '薪資核算', icon: <DollarSign size={14} /> },
+    { key: 'payrollPolicy' as TabType, label: '薪資政策', icon: <FileCheck size={14} /> },
   ];
 
   const handleApproveLeave = async (id: string) => {
@@ -530,6 +548,14 @@ export const HR: React.FC = () => {
                   onChange={e => setSearch(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px 8px 32px', background: 'var(--slate-800)', border: '1px solid var(--slate-700)', borderRadius: 6, color: 'var(--slate-200)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
               </div>
+              <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)}
+                aria-label="依部門篩選員工"
+                style={{ padding: '8px 12px', background: 'var(--slate-800)', border: '1px solid var(--slate-700)', borderRadius: 6, color: 'var(--slate-300)', fontSize: 13, outline: 'none' }}>
+                <option value="">全部部門</option>
+                {deptOptions.map(department => (
+                  <option key={department.value} value={department.value}>{department.label}</option>
+                ))}
+              </select>
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                 style={{ padding: '8px 12px', background: 'var(--slate-800)', border: '1px solid var(--slate-700)', borderRadius: 6, color: 'var(--slate-300)', fontSize: 13, outline: 'none' }}>
                 <option value="">全部狀態</option>
@@ -562,7 +588,7 @@ export const HR: React.FC = () => {
                       const sc = statusConfig[emp.status] ?? { label: emp.status, cls: 'neutral' };
                       return (
                         <tr key={emp.id}>
-                          <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: 12 }}>{emp.employeeNo}</td>
+                          <td className="mono" style={{ color: 'var(--theme-text)', fontSize: 12 }}>{emp.employeeNo}</td>
                           <td style={{ fontWeight: 600, fontSize: 13 }}>{emp.chineseName}</td>
                           <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{emp.departmentName ?? '—'}</td>
                           <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{emp.jobTitleName ?? emp.positionTitle ?? '—'}</td>
@@ -632,7 +658,7 @@ export const HR: React.FC = () => {
                       return (
                         <tr key={record.id}>
                           <td className="mono" style={{ fontSize: 12 }}>{record.date?.slice(0, 10)}</td>
-                          <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: 12 }}>{record.employeeNo}</td>
+                          <td className="mono" style={{ color: 'var(--theme-text)', fontSize: 12 }}>{record.employeeNo}</td>
                           <td style={{ fontWeight: 600, fontSize: 13 }}>{record.employeeName}</td>
                           <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{record.shiftType ?? '—'}</td>
                           <td className="mono" style={{ fontSize: 11 }}>
@@ -700,7 +726,7 @@ export const HR: React.FC = () => {
                       const lt = leaveTypes.find(l => l.value === record.leaveType);
                       return (
                         <tr key={record.id}>
-                          <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: 12 }}>{record.applicationNo}</td>
+                          <td className="mono" style={{ color: 'var(--theme-text)', fontSize: 12 }}>{record.applicationNo}</td>
                           <td className="mono" style={{ fontSize: 12 }}>{record.employeeNo}</td>
                           <td style={{ fontWeight: 600, fontSize: 13 }}>{record.employeeName}</td>
                           <td style={{ fontSize: 12, color: 'var(--slate-400)' }}>{lt?.label ?? record.leaveType}</td>
@@ -763,7 +789,7 @@ export const HR: React.FC = () => {
                       const sc = payrollStatusConfig[record.status] ?? { label: record.status, cls: 'neutral' };
                       return (
                         <tr key={record.id}>
-                          <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: 12 }}>{record.employeeNo}</td>
+                          <td className="mono" style={{ color: 'var(--theme-text)', fontSize: 12 }}>{record.employeeNo}</td>
                           <td style={{ fontWeight: 600, fontSize: 13 }}>{record.employeeName}</td>
                           <td className="mono" style={{ fontSize: 12 }}>{record.periodStart.slice(0, 7)}</td>
                           <td style={{ fontSize: 12, textAlign: 'right' }}>{record.basicSalary.toLocaleString()}</td>
@@ -788,6 +814,8 @@ export const HR: React.FC = () => {
             </div>
           </>
         );
+      case 'payrollPolicy':
+        return <PayrollPolicyManager mode="hr" />;
     }
   };
 

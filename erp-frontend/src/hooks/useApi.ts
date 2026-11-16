@@ -54,11 +54,12 @@ export const useDashboard = () =>
     retry: 2,
   });
 
-export const useSidebarBadges = () =>
+export const useSidebarBadges = (enabled = true) =>
   useQuery({ 
     queryKey: ['sidebar-badges'], 
     queryFn: () => api.dashboardApi.getBadges().then(r => r.data),
-    refetchInterval: 30000 // Refresh every 30 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds
+    enabled,
   });
 
 // ========== Users & Roles ==========
@@ -362,12 +363,24 @@ export const useCreateSupplyOrders = () => {
 };
 
 // ========== Finance ==========
-export const useLoans = (params?: Record<string, string>) =>
-  useQuery({ queryKey: ['finance', 'loans', params], queryFn: () => api.financeApi.loans(params).then(r => r.data) });
-export const useBankAccounts = () =>
-  useQuery({ queryKey: ['finance', 'bank-accounts'], queryFn: () => api.financeApi.bankAccounts().then(r => r.data) });
-export const useInvestments = (params?: Record<string, string>) =>
-  useQuery({ queryKey: ['finance', 'investments', params], queryFn: () => api.financeApi.investments(params).then(r => r.data) });
+export const useLoans = (params?: Record<string, string>, enabled = true) =>
+  useQuery({
+    queryKey: ['finance', 'loans', params],
+    queryFn: () => api.financeApi.loans(params).then(r => r.data),
+    enabled,
+  });
+export const useBankAccounts = (enabled = true) =>
+  useQuery({
+    queryKey: ['finance', 'bank-accounts'],
+    queryFn: () => api.financeApi.bankAccounts().then(r => r.data),
+    enabled,
+  });
+export const useInvestments = (params?: Record<string, string>, enabled = true) =>
+  useQuery({
+    queryKey: ['finance', 'investments', params],
+    queryFn: () => api.financeApi.investments(params).then(r => r.data),
+    enabled,
+  });
 export const useGuarantees = (params?: Record<string, string>) =>
   useQuery({ queryKey: ['finance', 'guarantees', params], queryFn: () => api.financeApi.guarantees(params).then(r => r.data) });
 

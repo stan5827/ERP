@@ -26,18 +26,26 @@ const getModuleAccessFromLoginSnapshot = (permissions: unknown): ModuleAccess[] 
 
   const modulePermissions = new Map<string, Set<string>>();
   for (const permission of permissions) {
-    const [moduleId, action] = permission.split(':', 2);
+    const [moduleId, resourceId, resourceAction] = permission.split(':');
     if (!moduleId || moduleId === 'admin.*')
       continue;
 
-    const actions = modulePermissions.get(moduleId) ?? new Set<string>();
-    if (!action || action === 'page') {
+    const scopedModuleId = resourceAction ? `${moduleId}:${resourceId}` : moduleId;
+    const action = resourceAction ?? resourceId;
+    const actions = modulePermissions.get(scopedModuleId) ?? new Set<string>();
+    if (resourceAction === 'page') {
+      actions.add('view');
+    } else if (!resourceAction && (!action || action === 'page')) {
       for (const moduleAction of ['view', 'create', 'edit', 'delete', 'approve', 'export', 'execute'])
         actions.add(moduleAction);
     } else {
       actions.add(action);
     }
-    modulePermissions.set(moduleId, actions);
+    modulePermissions.set(scopedModuleId, actions);
+    if (resourceAction && !modulePermissions.has(moduleId))
+      modulePermissions.set(moduleId, new Set(['view']));
+    else if (resourceAction)
+      modulePermissions.get(moduleId)?.add('view');
   }
 
   return Array.from(modulePermissions, ([moduleId, actions]) => ({

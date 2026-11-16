@@ -1,9 +1,11 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ErpBackend.Data;
 using ErpBackend.DTOs;
 using ErpBackend.Models.Inventory;
 using ErpBackend.Models.MES;
+using ErpBackend.Models.System;
 
 namespace ErpBackend.Services;
 
@@ -16,6 +18,11 @@ public interface IBomService
     Task<(bool ok, string status)> DeleteBomAsync(Guid id);
     Task<(bool ok, string status)> SetBomStatusAsync(Guid id, string status);
     Task<BomCostRollupDto?> GetCostRollupAsync(Guid id);
+    Task<(BomStandardCostRollupApprovalDto? dto, string status)> ApplyStandardCostRollupAsync(
+        Guid id,
+        decimal expectedTotalCost,
+        Guid approvedBy,
+        CancellationToken cancellationToken);
     Task<BomTreeNodeDto?> GetBomTreeAsync(Guid productSkuId);
     Task<BomDto?> GetLatestActiveRevisionAsync(Guid productSkuId);
 }
@@ -183,20 +190,109 @@ public class BomService : IBomService
         var bom = await _db.Boms.AsNoTracking().Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == id);
         if (bom == null) return null;
 
+        return await CalculateCostRollupAsync(bom, CancellationToken.None);
+    }
+
+    public async Task<(BomStandardCostRollupApprovalDto? dto, string status)> ApplyStandardCostRollupAsync(
+        Guid id,
+        decimal expectedTotalCost,
+        Guid approvedBy,
+        CancellationToken cancellationToken)
+    {
+        if (expectedTotalCost < 0)
+            return (null, "invalid_bom");
+        if (approvedBy == Guid.Empty)
+            throw new ArgumentException("必須提供有效的核准人員", nameof(approvedBy));
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        var bom = await LockBomAsync(id, cancellationToken);
+        if (bom == null)
+            return (null, "not_found");
+
+        var now = DateTime.UtcNow;
+        if (!string.Equals(bom.Status, "active", StringComparison.OrdinalIgnoreCase) ||
+            bom.EffectiveDate > now ||
+            (bom.ExpiryDate.HasValue && bom.ExpiryDate.Value <= now))
+            return (null, "inactive_bom");
+        var latestBomId = await _db.Boms
+            .Where(candidate =>
+                candidate.ProductSkuId == bom.ProductSkuId &&
+                candidate.Status == "active" &&
+                candidate.EffectiveDate <= now &&
+                (!candidate.ExpiryDate.HasValue || candidate.ExpiryDate.Value > now))
+            .OrderByDescending(candidate => candidate.Version)
+            .ThenByDescending(candidate => candidate.EffectiveDate)
+            .Select(candidate => candidate.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (latestBomId != bom.Id)
+            return (null, "obsolete_bom");
+        if (bom.Items.Count == 0)
+            return (null, "invalid_bom");
+
+        var rollup = await CalculateCostRollupAsync(bom, cancellationToken);
+        if (rollup.TotalCost != expectedTotalCost)
+            return (null, "stale_cost");
+
+        var productSku = await LockSkuAsync(bom.ProductSkuId, cancellationToken);
+        if (productSku == null)
+            return (null, "not_found");
+
+        var previousStandardCost = productSku.StandardCost;
+        productSku.StandardCost = rollup.TotalCost;
+        productSku.UpdatedAt = now;
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Action = "approve_bom_standard_cost",
+            EntityType = nameof(Bom),
+            EntityId = bom.Id,
+            Details = $"BOM {bom.BomCode} v{bom.Version}: standard cost {previousStandardCost} -> {rollup.TotalCost}; approved by {approvedBy}.",
+            UserId = approvedBy,
+            TableName = nameof(Sku),
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        if (transaction != null)
+            await transaction.CommitAsync(cancellationToken);
+
+        return (new BomStandardCostRollupApprovalDto(
+            bom.Id,
+            bom.BomCode,
+            productSku.Id,
+            productSku.SkuNumber,
+            previousStandardCost,
+            rollup.TotalCost,
+            rollup.MaterialCost,
+            rollup.LaborCost,
+            rollup.OverheadCost,
+            new DateTimeOffset(DateTime.SpecifyKind(now, DateTimeKind.Utc))),
+            "ok");
+    }
+
+    private async Task<BomCostRollupDto> CalculateCostRollupAsync(Bom bom, CancellationToken cancellationToken)
+    {
         decimal materialCost = 0;
         decimal laborCost = 0;
         decimal overheadCost = 0;
 
         foreach (var item in bom.Items)
         {
-            var sku = await _db.Skus.AsNoTracking().FirstOrDefaultAsync(s => s.Id == item.ChildSkuId);
-            if (sku == null) continue;
+            var sku = await _db.Skus.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == item.ChildSkuId, cancellationToken);
+            if (sku == null)
+                throw new InvalidOperationException($"BOM {bom.BomCode} 的元件 SKU {item.ChildSkuId} 不存在");
 
             var baseQuantity = await _uomConversionService.ConvertToBaseUomAsync(sku.Id, item.Quantity, item.Unit);
-            var itemMaterialCost = sku.StandardCost * baseQuantity;
+            var unitCost = IsSelfManufacturedSku(sku)
+                ? sku.StandardCost
+                : sku.LatestPurchaseCost > 0 ? sku.LatestPurchaseCost : sku.StandardCost;
+            var itemMaterialCost = unitCost * baseQuantity;
             materialCost += itemMaterialCost;
 
-            if (sku.SourceType == "self_made")
+            if (IsSelfManufacturedSku(sku))
             {
                 laborCost += itemMaterialCost * 0.2m;
                 overheadCost += itemMaterialCost * 0.1m;
@@ -210,6 +306,43 @@ public class BomService : IBomService
             OverheadCost = Math.Round(overheadCost, 2),
             TotalCost = Math.Round(materialCost + laborCost + overheadCost, 2)
         };
+    }
+
+    private static bool IsSelfManufacturedSku(Sku sku) =>
+        string.Equals(sku.SourceType, "self_made", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(sku.MakeOrBuy, "make", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<Bom?> LockBomAsync(Guid bomId, CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational()
+            && _db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+        {
+            var bom = await _db.Boms
+                .FromSqlInterpolated($"SELECT * FROM \"Boms\" WHERE \"Id\" = {bomId} FOR UPDATE")
+                .SingleOrDefaultAsync(cancellationToken);
+            if (bom != null)
+                await _db.Entry(bom).Collection(item => item.Items).LoadAsync(cancellationToken);
+            return bom;
+        }
+
+        return await _db.Boms.Include(bom => bom.Items)
+            .SingleOrDefaultAsync(bom => bom.Id == bomId, cancellationToken);
+    }
+
+    private async Task<Sku?> LockSkuAsync(Guid skuId, CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational()
+            && _db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+        {
+            var sku = await _db.Skus
+                .FromSqlInterpolated($"SELECT * FROM \"Skus\" WHERE \"Id\" = {skuId} FOR UPDATE")
+                .SingleOrDefaultAsync(cancellationToken);
+            if (sku != null)
+                await _db.Entry(sku).ReloadAsync(cancellationToken);
+            return sku;
+        }
+
+        return await _db.Skus.SingleOrDefaultAsync(sku => sku.Id == skuId, cancellationToken);
     }
 
     public async Task<BomTreeNodeDto?> GetBomTreeAsync(Guid productSkuId)
