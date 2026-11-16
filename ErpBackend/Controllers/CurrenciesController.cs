@@ -1,67 +1,39 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
-using ErpBackend.Models.MES;
 using ErpBackend.DTOs;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
 [Route("api/erp/currencies")]
 public class CurrenciesController : BaseController
 {
-    private readonly ErpGeneralDbContext _context;
+    private readonly ICurrencyMasterService _currencyService;
 
-    public CurrenciesController(ErpGeneralDbContext context)
-    {
-        _context = context;
-    }
+    public CurrenciesController(ICurrencyMasterService currencyService) => _currencyService = currencyService;
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<CurrencyMaster>>>> List()
-    {
-        var list = await _context.Currencies
-            .OrderByDescending(c => c.IsBaseCurrency)
-            .ThenBy(c => c.CurrencyCode)
-            .ToListAsync();
-        return Ok(list);
-    }
+    public async Task<ActionResult<ApiResponse<List<CurrencyDto>>>> List()
+        => Ok(await _currencyService.GetCurrenciesAsync());
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<CurrencyMaster>>> Get(Guid id)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<CurrencyDto>>> Get(Guid id)
     {
-        var item = await _context.Currencies.FindAsync(id);
-        if (item == null) return NotFound(ApiResponse.Fail("Currency not found"));
-        return Ok(item);
+        var dto = await _currencyService.GetCurrencyAsync(id);
+        return dto == null ? NotFound(ApiHelper.FailOf<CurrencyDto>("Currency not found")) : Ok(dto);
     }
 
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<CurrencyMaster>>> Create(CurrencyMaster model)
+    public async Task<ActionResult<ApiResponse<CurrencyDto>>> Create([FromBody] CurrencyDto model)
     {
-        if (model.IsBaseCurrency)
-        {
-            // Reset other base currencies
-            var bases = await _context.Currencies.Where(c => c.IsBaseCurrency).ToListAsync();
-            foreach (var b in bases) b.IsBaseCurrency = false;
-        }
-
-        _context.Currencies.Add(model);
-        await _context.SaveChangesAsync();
-        return Ok(model);
+        var (dto, status) = await _currencyService.CreateCurrencyAsync(model);
+        return Ok(dto!);
     }
 
-    [HttpPut("{id}")]
-    public async Task<ActionResult<ApiResponse<CurrencyMaster>>> Update(Guid id, CurrencyMaster model)
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<CurrencyDto>>> Update(Guid id, [FromBody] CurrencyDto model)
     {
-        if (id != model.Id) return BadRequest();
-        
-        if (model.IsBaseCurrency)
-        {
-            var bases = await _context.Currencies.Where(c => c.Id != id && c.IsBaseCurrency).ToListAsync();
-            foreach (var b in bases) b.IsBaseCurrency = false;
-        }
-
-        _context.Entry(model).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
-        return Ok(model);
+        var (dto, status) = await _currencyService.UpdateCurrencyAsync(id, model);
+        if (status == "not_found") return NotFound(ApiHelper.FailOf<CurrencyDto>("Currency not found"));
+        return Ok(dto!);
     }
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Search, Download, Leaf, Zap, Factory, Lightbulb, AlertTriangle, TrendingDown, TrendingUp, Plus, Target, Truck, FileText, Loader2, CheckCircle } from 'lucide-react';
-import { useEmissionRecords, useEmissionSummary, useAiInsights, useEmissionSources, useEmissionFactors, useReductionTargets, useSupplierSustainability, useEnergyConsumption, useEsgReports } from '../hooks/useApi';
+import { useEmissionRecords, useEmissionSummary, useAiInsights, useReductionTargets, useSupplierSustainability, useEnergyConsumption, useEsgReports } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { esgApi } from '../api/api';
@@ -75,18 +75,14 @@ export function ESG() {
   
   const { data: summaryResp, isLoading: summaryLoading } = useEmissionSummary();
   const { data: recordsResp, isLoading: recordsLoading } = useEmissionRecords();
-  const { data: sourcesResp } = useEmissionSources();
-  const { data: factorsResp } = useEmissionFactors();
   const { data: targetsResp } = useReductionTargets();
   const { data: suppliersResp } = useSupplierSustainability();
   const { data: energyResp } = useEnergyConsumption();
   const { data: reportsResp } = useEsgReports();
   const { data: insightsResp, isLoading: insightsLoading } = useAiInsights();
   
-  const summaryData = summaryResp?.data ?? {} as any;
+  const summaryData = summaryResp?.data ?? { scope1: 0, scope2: 0, scope3: 0 };
   const recordsData = recordsResp?.data ?? [];
-  const sourcesData = sourcesResp?.data ?? [];
-  const factorsData = factorsResp?.data ?? [];
   const targetsData = targetsResp?.data ?? [];
   const suppliersData = suppliersResp?.data ?? [];
   const energyData = energyResp?.data ?? [];
@@ -95,7 +91,7 @@ export function ESG() {
   
   const totalEmissions = (summaryData.scope1 ?? 0) + (summaryData.scope2 ?? 0) + (summaryData.scope3 ?? 0);
   
-  const filtered = recordsData.filter((r: any) =>
+  const filtered = recordsData.filter(r =>
     !search || (r.sourceName ?? '').includes(search) || (r.period ?? '').includes(search)
   );
 
@@ -239,7 +235,7 @@ export function ESG() {
             <tbody>
               {energyData.length === 0 ? (
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>無能源消耗資料</td></tr>
-              ) : energyData.map((e: any) => (
+              ) : energyData.map(e => (
                 <tr key={e.id}>
                   <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{e.energyType}</td>
                   <td>
@@ -263,7 +259,7 @@ export function ESG() {
         <div style={{ display: 'grid', gap: 12 }}>
           {targetsData.length === 0 ? (
             <div className="glass-card" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>尚無減排目標設定</div>
-          ) : targetsData.map((t: any) => (
+          ) : targetsData.map(t => (
             <div key={t.id} className="glass-card" style={{ padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
@@ -337,7 +333,7 @@ export function ESG() {
             <tbody>
               {suppliersData.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>無供應商永續資料</td></tr>
-              ) : suppliersData.map((s: any) => {
+              ) : suppliersData.map(s => {
                 const rating = ratingConfig[s.rating] ?? { label: s.rating, color: 'var(--slate-500)' };
                 return (
                   <tr key={s.id}>
@@ -401,7 +397,7 @@ export function ESG() {
             <tbody>
               {reportsData.length === 0 ? (
                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>尚無ESG報告</td></tr>
-              ) : reportsData.map((r: any) => (
+              ) : reportsData.map(r => (
                 <tr key={r.id}>
                   <td className="mono" style={{ color: 'var(--cobalt-300)', fontSize: 12 }}>{r.reportCode}</td>
                   <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{r.reportName}</td>
@@ -443,7 +439,7 @@ export function ESG() {
           <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--slate-500)', fontSize: 12 }}>暫無 AI 洞察</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 12 }}>
-            {insightsData.map((insight: any, i: number) => {
+            {insightsData.map((insight, i: number) => {
               const icon = insightIcons[insight.type] ?? insightIcons.default;
               return (
                 <div key={insight.id ?? i} style={{ display: 'flex', gap: 10, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.04)' }}>

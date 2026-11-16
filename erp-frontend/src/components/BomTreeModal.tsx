@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, ChevronRight, ChevronDown, Package, GitBranch, Loader2 } from 'lucide-react';
+import type { BomDto, SkuDto } from '../api/api';
 
 interface BomTreeItem {
   skuId: string;
@@ -14,61 +15,59 @@ interface BomTreeItem {
 interface BomTreeModalProps {
   open: boolean;
   onClose: () => void;
-  bom: any;
-  boms: any[];
-  skus: any[];
+  bom: BomDto;
+  boms: BomDto[];
+  skus: SkuDto[];
 }
 
 export function BomTreeModal({ open, onClose, bom, boms, skus }: BomTreeModalProps) {
-  const [treeData, setTreeData] = useState<BomTreeItem[]>([]);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [expandedState, setExpandedState] = useState<{
+    rootSkuId: string;
+    nodeIds: Set<string>;
+  } | null>(null);
+  const expandedNodes = bom && expandedState?.rootSkuId === bom.productSkuId
+    ? expandedState.nodeIds
+    : new Set(bom ? [bom.productSkuId] : []);
+  const treeData = useMemo(() => {
+    if (!open) return [];
 
-  useEffect(() => {
-    if (open && bom) {
-      const buildTree = (bomData: any, level: number = 0): BomTreeItem[] => {
-        const items = bomData.items || [];
-        return items.map((item: any) => {
-          const childBom = boms.find((b: any) => b.productSkuId === item.childSkuId);
-          const sku = skus.find((s: any) => s.id === item.childSkuId);
-          const nodeId = `${item.childSkuId}-${level}`;
-          
-          const treeItem: BomTreeItem = {
-            skuId: item.childSkuId,
-            skuNumber: item.childSkuNumber || sku?.skuNumber || 'Unknown',
-            skuName: item.childSkuName || sku?.skuName || 'Unknown',
-            quantity: item.quantity,
-            unit: item.unit || 'PCS',
-            level,
-            children: childBom ? buildTree(childBom, level + 1) : undefined
-          };
-          return treeItem;
-        });
-      };
+    const buildTree = (bomData: BomDto, level = 0): BomTreeItem[] =>
+      bomData.items.map(item => {
+        const childBom = boms.find(candidate => candidate.productSkuId === item.childSkuId);
+        const sku = skus.find(candidate => candidate.id === item.childSkuId);
 
-      const rootTree: BomTreeItem[] = [{
-        skuId: bom.productSkuId,
-        skuNumber: bom.productSkuNumber || 'Unknown',
-        skuName: bom.productSkuName || 'Unknown',
-        quantity: 1,
-        unit: 'PCS',
-        level: -1,
-        children: buildTree(bom, 0)
-      }];
+        return {
+          skuId: item.childSkuId,
+          skuNumber: item.childSkuNumber || sku?.skuNumber || 'Unknown',
+          skuName: item.childSkuName || sku?.skuName || 'Unknown',
+          quantity: item.quantity,
+          unit: item.unit || 'PCS',
+          level,
+          children: childBom ? buildTree(childBom, level + 1) : undefined,
+        };
+      });
 
-      setTreeData(rootTree);
-      setExpandedNodes(new Set([bom.productSkuId]));
-    }
+    return [{
+      skuId: bom.productSkuId,
+      skuNumber: bom.productSkuNumber || 'Unknown',
+      skuName: bom.productSkuName || 'Unknown',
+      quantity: 1,
+      unit: 'PCS',
+      level: -1,
+      children: buildTree(bom),
+    }];
   }, [open, bom, boms, skus]);
 
   const toggleNode = (skuId: string) => {
-    setExpandedNodes(prev => {
-      const next = new Set(prev);
+    setExpandedState(prev => {
+      const rootSkuId = bom.productSkuId;
+      const next = new Set(prev?.rootSkuId === rootSkuId ? prev.nodeIds : [rootSkuId]);
       if (next.has(skuId)) {
         next.delete(skuId);
       } else {
         next.add(skuId);
       }
-      return next;
+      return { rootSkuId, nodeIds: next };
     });
   };
 

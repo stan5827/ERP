@@ -1,18 +1,34 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ecnApi } from '../api/api';
-import { Search, Plus, Download, Eye, FileText, Loader2, Beaker, FolderOpen, GitBranch, GitMerge, FileArchive, CheckCircle, Zap, X, ChevronRight, AlertCircle, Pencil, Trash2, BookOpen, FlaskConical, Truck } from 'lucide-react';
+import { Search, Plus, Download, Eye, FileText, Loader2, Beaker, GitBranch, GitMerge, FileArchive, Zap, X, Pencil } from 'lucide-react';
 import { 
-  useRndProjects, useRndDocuments, useRndLogs, useCreateRndLog, 
-  useBoms, useEcns, useSkus, useCreateBom, useUpdateBom, useDeleteBom, 
-  useTrialProduction, useCreateTrialProduction, useMassProductionTransition, 
+  useRndProjects,
+  useBoms, useEcns, useSkus, useCreateBom, useUpdateBom,
   useCreateRndProject, useCreateEcn, useUoms, useActivateBom, useDeprecateBom 
 } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import { BomTreeModal } from '../components/BomTreeModal';
 import type { FormField } from '../components/FormModal';
+import type { BomDto, EcnDto, EcnImpactDto } from '../api/api';
 
 export interface RndProjectDto { id: string; projectCode: string; projectName: string; description?: string; managerName?: string; startDate?: string; budget: number; progress: number; status: string; }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getErrorMessage(error: unknown, preferResponseMessage = false): string | undefined {
+  if (!isRecord(error)) return undefined;
+  const responseData = isRecord(error.response) ? error.response.data : undefined;
+  const responseMessage = isRecord(responseData) && typeof responseData.message === 'string'
+    ? responseData.message
+    : undefined;
+  const errorMessage = typeof error.message === 'string' ? error.message : undefined;
+  return preferResponseMessage
+    ? responseMessage || errorMessage
+    : errorMessage || responseMessage;
+}
 
 const projectStatusConfig: Record<string, { label: string; cls: string }> = {
   planning: { label: '規劃中', cls: 'neutral' },
@@ -46,19 +62,16 @@ const ecnFields: FormField[] = [
 
 export function RD() {
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
   const [activeTab, setActiveTab] = useState<'projects' | 'documents' | 'boms' | 'ecns' | 'logs' | 'trial' | 'mass'>('boms');
   const [showAdd, setShowAdd] = useState(false);
   const [showAddBom, setShowAddBom] = useState(false);
-  const [editBom, setEditBom] = useState<any>(null);
+  const [editBom, setEditBom] = useState<(Omit<BomDto, 'id'> & { id?: string }) | null>(null);
   const [showDiffModal, setShowDiffModal] = useState(false);
   const [showBomTree, setShowBomTree] = useState(false);
-  const [selectedBomTree, setSelectedBomTree] = useState<any>(null);
+  const [selectedBomTree, setSelectedBomTree] = useState<BomDto | null>(null);
   const [bomItems, setBomItems] = useState<{ childSkuId: string; quantity: number; unit: string; scrapRate: number }[]>([]);
-  const [showAddLog, setShowAddLog] = useState(false);
-  const [showAddTrial, setShowAddTrial] = useState(false);
-  const [selectedEcn, setSelectedEcn] = useState<any>(null);
-  const [ecnImpact, setEcnImpact] = useState<any>(null);
+  const [selectedEcn, setSelectedEcn] = useState<EcnDto | null>(null);
+  const [ecnImpact, setEcnImpact] = useState<EcnImpactDto | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [affectedBoms, setAffectedBoms] = useState<{ bomId: string; actionType: string }[]>([]);
   const [impactSubTab, setImpactSubTab] = useState<'risk' | 'list'>('risk');
@@ -84,11 +97,9 @@ export function RD() {
     }
   }, [showDiffModal, selectedEcn]);
 
-  const { data: projectsResp, isLoading: projectsLoading } = useRndProjects();
-  const { data: docsResp, isLoading: docsLoading } = useRndDocuments();
-  const { data: bomsResp, isLoading: bomsLoading } = useBoms();
-  const { data: ecnsResp, isLoading: ecnsLoading } = useEcns();
-  const { data: trialResp, isLoading: trialLoading } = useTrialProduction();
+  const { data: projectsResp } = useRndProjects();
+  const { data: bomsResp } = useBoms();
+  const { data: ecnsResp } = useEcns();
   const { data: skusResp } = useSkus({ pageSize: '9999' });
   const { data: uomResp } = useUoms();
 
@@ -97,7 +108,7 @@ export function RD() {
   const activateBom = useActivateBom();
   const deprecateBom = useDeprecateBom();
 
-  const handleToggleStatus = async (bom: any) => {
+  const handleToggleStatus = async (bom: BomDto) => {
     try {
       if (bom.status === 'active') {
         if (!confirm(`確定要停用 BOM [${bom.bomCode}] v${bom.version} 嗎？`)) return;
@@ -106,16 +117,16 @@ export function RD() {
         if (!confirm(`啟用 [${bom.bomCode}] v${bom.version} 將會自動停用該產品的其他有效版本，是否繼續？`)) return;
         await activateBom.mutateAsync(bom.id);
       }
-    } catch (err: any) {
-      alert(`操作失敗: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`操作失敗: ${getErrorMessage(err) || String(err)}`);
     }
   };
 
-  const handleCopyAsNewVersion = (bom: any) => {
+  const handleCopyAsNewVersion = (bom: BomDto) => {
     const currentVer = parseFloat(bom.version) || 1.0;
     const nextVer = (currentVer + 0.1).toFixed(1);
     
-    setBomItems(bom.items?.map((it: any) => ({ 
+    setBomItems(bom.items?.map(it => ({
       childSkuId: it.childSkuId, 
       quantity: it.quantity, 
       unit: it.unit || '---', 
@@ -134,16 +145,16 @@ export function RD() {
   const createProject = useCreateRndProject();
   const createEcn = useCreateEcn();
 
-  const handleProjectSubmit = async (data: any) => {
+  const handleProjectSubmit = async (data: Record<string, unknown>) => {
     try {
       await createProject.mutateAsync(data);
       setShowAdd(false);
-    } catch (err: any) {
-      alert('建立專案失敗: ' + (err.message || '發生未知錯誤'));
+    } catch (err: unknown) {
+      alert('建立專案失敗: ' + (getErrorMessage(err) || '發生未知錯誤'));
     }
   };
 
-  const handleEcnSubmit = async (data: any) => {
+  const handleEcnSubmit = async (data: Record<string, unknown>) => {
     try {
       if (affectedBoms.length === 0) {
         alert('請至少選擇一個受影響的 BOM 表');
@@ -158,12 +169,12 @@ export function RD() {
       await createEcn.mutateAsync(payload);
       setShowAdd(false);
       setAffectedBoms([]);
-    } catch (err: any) {
-      alert('建立變更單失敗: ' + (err.message || '發生未知錯誤'));
+    } catch (err: unknown) {
+      alert('建立變更單失敗: ' + (getErrorMessage(err) || '發生未知錯誤'));
     }
   };
 
-  const handleBomSubmit = async (data: any) => {
+  const handleBomSubmit = async (data: Record<string, unknown>) => {
     try {
       const payload = {
         bomCode: data.bomCode,
@@ -189,21 +200,21 @@ export function RD() {
       setShowAddBom(false);
       setEditBom(null);
       setBomItems([]);
-    } catch (err: any) {
-      alert('操作失敗: ' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert('操作失敗: ' + (getErrorMessage(err, true) || '發生未知錯誤'));
     }
   };
 
   const projects = (projectsResp?.data as unknown as RndProjectDto[]) ?? [];
-  const boms = (bomsResp as any)?.data ?? [];
-  const ecns = (ecnsResp as any)?.data ?? [];
-  const allSkus = (skusResp?.data as any[]) ?? [];
+  const boms = bomsResp?.data ?? [];
+  const ecns = ecnsResp?.data ?? [];
+  const allSkus = skusResp?.data ?? [];
   
-  const filteredBoms = boms.filter((b: any) => b.bomCode?.includes(search) || b.productSkuName?.includes(search));
-  const filteredEcns = ecns.filter((e: any) => e.ecnNumber?.includes(search) || e.changeDescription?.includes(search));
+  const filteredBoms = boms.filter(b => b.bomCode?.includes(search) || b.productSkuName?.includes(search));
+  const filteredEcns = ecns.filter(e => e.ecnNumber?.includes(search) || e.changeDescription?.includes(search));
 
-  const bomParentSkuIds = new Set(boms.map((b: any) => b.productSkuId));
-  const bomParentSkus = allSkus.filter((s: any) => {
+  const bomParentSkuIds = new Set(boms.map(b => b.productSkuId));
+  const bomParentSkus = allSkus.filter(s => {
     const isBaseMatch = (s.isBomTop || s.itemType === 'finished' || s.itemType === 'semi_finished') && s.status !== 'inactive';
     if (editBom && s.id === editBom.productSkuId) return true;
     return isBaseMatch && !bomParentSkuIds.has(s.id);
@@ -270,7 +281,7 @@ export function RD() {
           <table className="data-table">
             <thead><tr><th>BOM 編號</th><th>產品</th><th>版本</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody>
-              {filteredBoms.map((b: any) => (
+              {filteredBoms.map(b => (
                 <tr key={b.id}>
                   <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{b.bomCode}</td>
                   <td>{b.productSkuName}</td>
@@ -291,7 +302,7 @@ export function RD() {
                       <button className="icon-action-btn" title="複製並建立新版本" onClick={() => handleCopyAsNewVersion(b)}><FileArchive size={13} /></button>
                       <button className="icon-action-btn" title="編輯" onClick={() => {
                         setEditBom(b);
-                        setBomItems(b.items?.map((it: any) => ({ childSkuId: it.childSkuId, quantity: it.quantity, unit: it.unit || '---', scrapRate: it.scrapRate || 0 })) || []);
+                        setBomItems(b.items?.map(it => ({ childSkuId: it.childSkuId, quantity: it.quantity, unit: it.unit || '---', scrapRate: it.scrapRate || 0 })) || []);
                         setShowAddBom(true);
                       }}><Pencil size={13} /></button>
                     </div>
@@ -304,7 +315,7 @@ export function RD() {
           <table className="data-table">
             <thead><tr><th>ECN 編號</th><th>變更說明</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody>
-              {filteredEcns.map((e: any) => (
+              {filteredEcns.map(e => (
                 <tr key={e.id}>
                   <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{e.ecnNumber}</td>
                   <td>{e.changeDescription}</td>
@@ -331,7 +342,7 @@ export function RD() {
         } : { version: '1.0', effectiveDate: new Date().toISOString().split('T')[0] }}
         fields={[
           { name: 'bomCode', label: 'BOM 編號', type: 'text', required: true },
-          { name: 'productSkuId', label: '母件', type: 'select', options: bomParentSkus.map((s: any) => ({ value: s.id, label: `${s.skuNumber} - ${s.skuName}` })) },
+          { name: 'productSkuId', label: '母件', type: 'select', options: bomParentSkus.map(s => ({ value: s.id, label: `${s.skuNumber} - ${s.skuName}` })) },
           { name: 'version', label: '版本', type: 'text', required: true },
           { name: 'effectiveDate', label: '生效日', type: 'date', required: true },
           { name: 'bomItems', label: 'BOM 明細', type: 'custom' }
@@ -354,13 +365,13 @@ export function RD() {
                     if (sku) {
                       // 尋找單位名稱
                       const targetUomId = sku.productionUomId || sku.baseUomId;
-                      const uom = (uomResp?.data as any[])?.find(u => u.id === targetUomId);
+                      const uom = uomResp?.data?.find(u => u.id === targetUomId);
                       n[idx].unit = sku.productionUomName || uom?.uomName || sku.unit || '---';
                     }
                     setBomItems(n); 
                   }}>
                     <option value="">選擇子件</option>
-                    {allSkus.filter((s: any) => s.status === 'active' && s.itemType !== 'finished').map((s: any) => <option key={s.id} value={s.id}>{s.skuNumber} - {s.skuName}</option>)}
+                    {allSkus.filter(s => s.status === 'active' && s.itemType !== 'finished').map(s => <option key={s.id} value={s.id}>{s.skuNumber} - {s.skuName}</option>)}
                   </select>
                   <div style={{ display: 'flex', flex: 1.5, gap: 4 }}>
                     <input className="form-input" type="number" style={{ flex: 1 }} value={it.quantity} onChange={e => { const n = [...bomItems]; n[idx].quantity = parseFloat(e.target.value) || 0; setBomItems(n); }} placeholder="數量" />
@@ -395,7 +406,7 @@ export function RD() {
                 <div key={idx} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <select className="form-input" style={{ flex: 3 }} value={b.bomId} onChange={e => { const n = [...affectedBoms]; n[idx].bomId = e.target.value; setAffectedBoms(n); }}>
                     <option value="">選擇 BOM</option>
-                    {boms.map((bom: any) => <option key={bom.id} value={bom.id}>{bom.bomCode} - {bom.productSkuName}</option>)}
+                    {boms.map(bom => <option key={bom.id} value={bom.id}>{bom.bomCode} - {bom.productSkuName}</option>)}
                   </select>
                   <select className="form-input" style={{ flex: 1.5 }} value={b.actionType} onChange={e => { const n = [...affectedBoms]; n[idx].actionType = e.target.value; setAffectedBoms(n); }}>
                     <option value="update">更新版本</option>
@@ -519,7 +530,7 @@ export function RD() {
                     ) : (
                       <>
                         {impactSubTab === 'risk' ? (
-                          ecnImpact?.affectedWorkOrders?.map((wo: any, idx: number) => (
+                          ecnImpact?.affectedWorkOrders?.map((wo, idx) => (
                             <tr key={idx}>
                               <td><span className="status-badge status-warning" style={{ fontSize: 11 }}>工單</span></td>
                               <td>{wo.woNumber} - {wo.productSkuLabel}</td>
@@ -528,7 +539,7 @@ export function RD() {
                             </tr>
                           ))
                         ) : (
-                          ecnImpact?.details?.map((it: any, idx: number) => (
+                          ecnImpact?.details?.map((it, idx) => (
                             <tr key={idx}>
                               <td><span className="status-badge status-info" style={{ fontSize: 11 }}>庫存</span></td>
                               <td>{it.skuNumber} - {it.skuName}</td>

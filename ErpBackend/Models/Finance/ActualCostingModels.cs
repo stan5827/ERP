@@ -47,7 +47,7 @@ public class WorkOrderLaborActual
     [Required] public Guid WorkOrderId { get; set; }
     
     public Guid? WipReportId { get; set; }
-    
+
     public Guid? EmployeeId { get; set; }
     
     public int OperationSeq { get; set; }
@@ -76,6 +76,8 @@ public class WorkOrderMachineActual
     [Required] public Guid WorkOrderId { get; set; }
     
     public Guid? WipReportId { get; set; }
+
+    public Guid? EquipmentUsageRecordId { get; set; }
     
     public Guid? WorkCenterId { get; set; }
     
@@ -84,6 +86,10 @@ public class WorkOrderMachineActual
     [Column(TypeName = "decimal(18, 4)")] public decimal ActualHours { get; set; }
     
     [Column(TypeName = "decimal(18, 2)")] public decimal MachineRate { get; set; }
+
+    [Column(TypeName = "decimal(18, 2)")] public decimal OverheadRate { get; set; }
+
+    [Column(TypeName = "decimal(18, 2)")] public decimal OverheadAmount { get; set; }
     
     [Column(TypeName = "decimal(18, 2)")] public decimal TotalAmount { get; set; }
     
@@ -113,13 +119,13 @@ public class WorkOrderCost
     [Column(TypeName = "decimal(18, 2)")] public decimal MachineActualCost { get; set; }
     [Column(TypeName = "decimal(18, 2)")] public decimal OverheadActualCost { get; set; }
     [Column(TypeName = "decimal(18, 2)")] public decimal TotalActualCost { get; set; }
-    [NotMapped] public decimal MaterialCost { get => MaterialActualCost; set => MaterialActualCost = value; }
-    [NotMapped] public decimal LaborCost { get => LaborActualCost; set => LaborActualCost = value; }
-    [NotMapped] public decimal OverheadCost { get => OverheadActualCost; set => OverheadActualCost = value; }
-    [NotMapped] public decimal TotalCost { get => TotalActualCost; set => TotalActualCost = value; }
-    [NotMapped] public DateTime SettlementDate { get => SettledAt ?? DateTime.MinValue; set => SettledAt = value; }
+    [Column(TypeName = "decimal(18, 2)")] public decimal AbnormalCost { get; set; }
+    [Column(TypeName = "decimal(18, 2)")] public decimal CapitalizedActualCost { get; set; }
     
     // 標準成本 (結案時快照)
+    [Column(TypeName = "decimal(18, 2)")] public decimal StandardMaterialCost { get; set; }
+    [Column(TypeName = "decimal(18, 2)")] public decimal StandardLaborCost { get; set; }
+    [Column(TypeName = "decimal(18, 2)")] public decimal StandardOverheadCost { get; set; }
     [Column(TypeName = "decimal(18, 2)")] public decimal StandardUnitCost { get; set; }
     [Column(TypeName = "decimal(18, 2)")] public decimal TotalStandardCost { get; set; }
     
@@ -132,4 +138,38 @@ public class WorkOrderCost
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(WorkOrderId))] public WorkOrder? WorkOrder { get; set; }
+}
+
+[Table("work_order_cost_variance_allocations")]
+public class WorkOrderCostVarianceAllocation
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required] public Guid WorkOrderId { get; set; }
+    [Required, MaxLength(20)] public string SourceType { get; set; } = null!;
+    [Required] public Guid SourceId { get; set; }
+    [Column(TypeName = "decimal(18, 2)")] public decimal Amount { get; set; }
+    [Required, MaxLength(30)] public string ReasonCode { get; set; } = null!;
+    [Required, MaxLength(500)] public string Reason { get; set; } = null!;
+    [Required, MaxLength(30)] public string Status { get; set; } = "PendingApproval";
+    public Guid CreatedBy { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ApprovedAt { get; set; }
+
+    [ForeignKey(nameof(WorkOrderId))] public WorkOrder? WorkOrder { get; set; }
+    public ICollection<WorkOrderCostVarianceAllocationApproval> Approvals { get; set; } =
+        new List<WorkOrderCostVarianceAllocationApproval>();
+}
+
+[Table("work_order_cost_variance_allocation_approvals")]
+public class WorkOrderCostVarianceAllocationApproval
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required] public Guid AllocationId { get; set; }
+    [Required, MaxLength(30)] public string ApprovalRole { get; set; } = null!;
+    [Required] public Guid ApproverId { get; set; }
+    [MaxLength(500)] public string? Comments { get; set; }
+    public DateTime ApprovedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(AllocationId))]
+    public WorkOrderCostVarianceAllocation Allocation { get; set; } = null!;
 }

@@ -1,368 +1,174 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.System;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
+[Route("api/erp/system-settings")]
+[Route("api/erp/systemsettings")]
 public class SystemSettingsController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly ISystemSettingsService _settingsService;
 
-    public SystemSettingsController(ErpGeneralDbContext db)
+    public SystemSettingsController(ISystemSettingsService settingsService)
     {
-        _db = db;
+        _settingsService = settingsService;
     }
 
     [HttpGet("ping")]
     public ActionResult<ApiResponse<string>> Ping() => Ok<string>("pong");
 
     [HttpGet("permissions/tree")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<List<PermissionTreeDto>>>> GetPermissionTree()
     {
-        var permissions = await _db.Permissions
-            .Where(p => p.IsActive)
-            .OrderBy(p => p.SortOrder)
-            .ToListAsync();
-
-        var tree = BuildPermissionTree(permissions, null);
-        return Ok(tree);
+        var data = await _settingsService.GetPermissionTreeAsync();
+        return Ok(data);
     }
 
     [HttpPost("permissions")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<PermissionTreeDto>>> CreatePermission([FromBody] CreatePermissionRequest request)
     {
-        var permission = new Permission
-        {
-            Id = Guid.NewGuid(),
-            PermissionCode = request.PermissionCode,
-            ModuleName = request.ModuleName,
-            ActionType = request.ActionType,
-            PermissionType = request.PermissionType,
-            Description = request.Description,
-            ParentId = request.ParentId,
-            SortOrder = request.SortOrder,
-            IsActive = true
-        };
-
-        _db.Permissions.Add(permission);
-        await _db.SaveChangesAsync();
-
-        return Ok(new PermissionTreeDto
-        {
-            Id = permission.Id,
-            PermissionCode = permission.PermissionCode,
-            ModuleName = permission.ModuleName,
-            ActionType = permission.ActionType,
-            PermissionType = permission.PermissionType,
-            Description = permission.Description,
-            SortOrder = permission.SortOrder,
-            Children = new List<PermissionTreeDto>()
-        });
+        var data = await _settingsService.CreatePermissionAsync(request);
+        if (data == null)
+            return BadRequest(ApiResponse<PermissionTreeDto>.Fail("Failed to create permission"));
+        return Ok(data);
     }
 
     [HttpPut("permissions/{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<PermissionTreeDto>>> UpdatePermission(Guid id, [FromBody] UpdatePermissionRequest request)
     {
-        var permission = await _db.Permissions.FindAsync(id);
-        if (permission == null)
-            return NotFound(ApiHelper.Fail("找不到權限"));
-
-        permission.PermissionCode = request.PermissionCode;
-        permission.ModuleName = request.ModuleName;
-        permission.ActionType = request.ActionType;
-        permission.PermissionType = request.PermissionType;
-        permission.Description = request.Description;
-        permission.ParentId = request.ParentId;
-        permission.SortOrder = request.SortOrder;
-
-        await _db.SaveChangesAsync();
-
-        return Ok(new PermissionTreeDto
-        {
-            Id = permission.Id,
-            PermissionCode = permission.PermissionCode,
-            ModuleName = permission.ModuleName,
-            ActionType = permission.ActionType,
-            PermissionType = permission.PermissionType,
-            Description = permission.Description,
-            SortOrder = permission.SortOrder,
-            Children = new List<PermissionTreeDto>()
-        });
+        var data = await _settingsService.UpdatePermissionAsync(id, request);
+        if (data == null)
+            return NotFound(ApiResponse<PermissionTreeDto>.Fail("Permission not found"));
+        return Ok(data);
     }
 
     [HttpDelete("permissions/{id}")]
-    public async Task<ActionResult<ApiResponse>> DeletePermission(Guid id)
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeletePermission(Guid id)
     {
-        var permission = await _db.Permissions.FindAsync(id);
-        if (permission == null)
-            return NotFound(ApiHelper.Fail("找不到權限"));
-
-        var childPermissions = await _db.Permissions.Where(p => p.ParentId == id).ToListAsync();
-        foreach (var child in childPermissions)
-        {
-            child.ParentId = null;
-        }
-
-        var rolePerms = await _db.RolePermissions.Where(rp => rp.PermissionId == id).ToListAsync();
-        _db.RolePermissions.RemoveRange(rolePerms);
-
-        _db.Permissions.Remove(permission);
-        await _db.SaveChangesAsync();
-
-        return ApiResponse.Ok(new object(), "權限已刪除");
-    }
-
-    private List<PermissionTreeDto> BuildPermissionTree(List<Permission> allPermissions, Guid? parentId)
-    {
-        return allPermissions
-            .Where(p => p.ParentId == parentId)
-            .Select(p => new PermissionTreeDto
-            {
-                Id = p.Id,
-                PermissionCode = p.PermissionCode,
-                ModuleName = p.ModuleName,
-                ActionType = p.ActionType,
-                PermissionType = p.PermissionType,
-                Description = p.Description,
-                SortOrder = p.SortOrder,
-                Children = BuildPermissionTree(allPermissions, p.Id)
-            })
-            .ToList();
+        var success = await _settingsService.DeletePermissionAsync(id);
+        if (!success)
+            return new NotFoundObjectResult(new ApiResponse { Success = false, Message = "Permission not found" });
+        return new OkObjectResult(new ApiResponse { Success = true, Message = "Permission deleted successfully" });
     }
 
     [HttpGet("users")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<List<UserWithRolesDto>>>> GetUsers()
     {
-        var users = await _db.Users
-            .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-            .Where(u => u.IsActive)
-            .OrderBy(u => u.Username)
-            .Select(u => new UserWithRolesDto
-            {
-                Id = u.Id,
-                Username = u.Username,
-                Email = u.Email,
-                IsActive = u.IsActive,
-                CreatedAt = u.CreatedAt,
-                Roles = u.UserRoles.Select(ur => new RoleDto
-                {
-                    Id = ur.Role.Id,
-                    RoleName = ur.Role.RoleName,
-                    Description = ur.Role.Description
-                }).ToList()
-            })
-            .ToListAsync();
-
-        return Ok(users);
+        var data = await _settingsService.GetUsersAsync();
+        return Ok(data);
     }
 
-    [HttpPut("users/{id}/roles")]
-    public async Task<ActionResult<ApiResponse>> UpdateUserRoles(Guid id, [FromBody] UpdateUserRolesRequest request)
+    [HttpGet("users/linked-employee-ids")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<List<Guid>>>> GetLinkedEmployeeIds()
     {
-        var user = await _db.Users
-            .Include(u => u.UserRoles)
-            .FirstOrDefaultAsync(u => u.Id == id);
-
-        if (user == null)
-            return NotFound(ApiHelper.Fail("找不到使用者"));
-
-        var existingRoles = _db.UserRoles.Where(ur => ur.UserId == id);
-        _db.UserRoles.RemoveRange(existingRoles);
-
-        foreach (var roleId in request.RoleIds)
-        {
-            _db.UserRoles.Add(new UserRole
-            {
-                Id = Guid.NewGuid(),
-                UserId = id,
-                RoleId = roleId
-            });
-        }
-
-        await _db.SaveChangesAsync();
-        return ApiResponse.Ok(new object(), "使用者角色已更新");
+        var data = await _settingsService.GetLinkedEmployeeIdsAsync();
+        return Ok(data);
     }
 
     [HttpGet("roles")]
-    public async Task<ActionResult<ApiResponse<List<RoleWithPermissionsDto>>>> GetRoles()
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<List<RoleDto>>>> GetRoles()
     {
-        var roles = await _db.Roles
-            .Include(r => r.RolePermissions)
-                .ThenInclude(rp => rp.Permission)
-            .OrderBy(r => r.RoleName)
-            .Select(r => new RoleWithPermissionsDto
-            {
-                Id = r.Id,
-                RoleName = r.RoleName,
-                Description = r.Description,
-                IsSystem = r.IsSystem,
-                CreatedAt = r.CreatedAt,
-                PermissionIds = r.RolePermissions.Select(rp => rp.PermissionId).ToList()
-            })
-            .ToListAsync();
-
-        return Ok(roles);
-    }
-
-    [HttpPut("roles/{id}/permissions")]
-    public async Task<ActionResult<ApiResponse>> UpdateRolePermissions(Guid id, [FromBody] UpdateRolePermissionsRequest request)
-    {
-        var role = await _db.Roles
-            .Include(r => r.RolePermissions)
-            .FirstOrDefaultAsync(r => r.Id == id);
-
-        if (role == null)
-            return NotFound(ApiHelper.Fail("找不到角色"));
-
-        var existingPerms = _db.RolePermissions.Where(rp => rp.RoleId == id);
-        _db.RolePermissions.RemoveRange(existingPerms);
-
-        foreach (var permId in request.PermissionIds)
-        {
-            _db.RolePermissions.Add(new RolePermission
-            {
-                Id = Guid.NewGuid(),
-                RoleId = id,
-                PermissionId = permId
-            });
-        }
-
-        await _db.SaveChangesAsync();
-        return ApiResponse.Ok(new object(), "角色權限已更新");
+        var data = await _settingsService.GetRolesAsync();
+        return Ok(data);
     }
 
     [HttpPost("roles")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<RoleDto>>> CreateRole([FromBody] CreateRoleRequest request)
     {
-        var role = new Role
-        {
-            Id = Guid.NewGuid(),
-            RoleName = request.RoleName,
-            Description = request.Description,
-            IsSystem = false,
-            CreatedAt = DateTime.UtcNow
-        };
+        var role = await _settingsService.CreateRoleAsync(request);
+        if (role == null)
+            return Conflict(ApiResponse<RoleDto>.Fail("Role name is required, must be unique, and cannot exceed 50 characters"));
 
-        _db.Roles.Add(role);
-        await _db.SaveChangesAsync();
+        if (request.PermissionIds.Count > 0
+            && !await _settingsService.UpdateRolePermissionsAsync(role.Id, request.PermissionIds))
+            return new BadRequestObjectResult(ApiResponse<RoleDto>.Fail("One or more permissions do not exist"));
 
-        return Ok(new RoleDto
-        {
-            Id = role.Id,
-            RoleName = role.RoleName,
-            Description = role.Description
-        });
+        return Ok(role);
+    }
+
+    [HttpPut("roles/{id:guid}/permissions")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateRolePermissions(Guid id, [FromBody] UpdateRolePermissionsRequest request)
+    {
+        var success = await _settingsService.UpdateRolePermissionsAsync(id, request.PermissionIds);
+        if (!success)
+            return BadRequest(new ApiResponse { Success = false, Message = "Role or permission does not exist, or the Admin role cannot be changed" });
+        return new OkObjectResult(new ApiResponse { Success = true, Message = "Role permissions updated successfully" });
     }
 
     [HttpDelete("roles/{id}")]
-    public async Task<ActionResult<ApiResponse>> DeleteRole(Guid id)
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteRole(Guid id)
     {
-        var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == id);
-        if (role == null)
-            return NotFound(ApiHelper.Fail("找不到角色"));
-
-        if (role.IsSystem)
-            return BadRequest(ApiHelper.Fail("系統角色無法刪除"));
-
-        var rolePerms = _db.RolePermissions.Where(rp => rp.RoleId == id);
-        _db.RolePermissions.RemoveRange(rolePerms);
-
-        var userRoles = _db.UserRoles.Where(ur => ur.RoleId == id);
-        _db.UserRoles.RemoveRange(userRoles);
-
-        _db.Roles.Remove(role);
-        await _db.SaveChangesAsync();
-
-        return ApiResponse.Ok(new object(), "角色已刪除");
+        var success = await _settingsService.DeleteRoleAsync(id);
+        if (!success)
+            return new NotFoundObjectResult(new ApiResponse { Success = false, Message = "Role not found or is system role" });
+        return new OkObjectResult(new ApiResponse { Success = true, Message = "Role deleted successfully" });
     }
 
     [HttpGet("themes")]
-    public ActionResult<ApiResponse<List<ThemeDto>>> GetThemes()
+    public async Task<ActionResult<ApiResponse<List<ThemeDto>>>> GetThemes()
     {
-        var themes = new List<ThemeDto>
-        {
-            new() { Name = "modern-dark", DisplayName = "現代深色", Description = "目前使用的深色玻璃風格", IsDefault = true },
-            new() { Name = "light-pro", DisplayName = "淺色專業", Description = "專業的淺色配色", IsDefault = false, 
-                Colors = new ThemeColorsDto { Primary = "#1d5cd4", Accent = "#1d5cd4", Background = "#f5f7fa", Surface = "#ffffff", Text = "#1a202c", Border = "#e2e8f0" }},
-            new() { Name = "high-contrast", DisplayName = "高對比", Description = "高對比度黑白配色", IsDefault = false,
-                Colors = new ThemeColorsDto { Primary = "#0066ff", Accent = "#ffff00", Background = "#000000", Surface = "#1a1a1a", Text = "#ffffff", Border = "#333333" }},
-            new() { Name = "custom", DisplayName = "自訂", Description = "自訂主題顏色", IsDefault = false }
-        };
-
-        return Ok(themes);
+        var data = await _settingsService.GetThemesAsync();
+        return Ok(data);
     }
 
     [HttpGet("users/{id}/theme")]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<UserThemePreferenceDto>>> GetUserTheme(Guid id)
     {
-        try
-        {
-            var user = await _db.Users.FindAsync(id);
-            if (user == null) 
-            {
-                return Ok(new UserThemePreferenceDto());
-            }
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+            return Unauthorized();
+        if (userId != id && !User.IsInRole("Admin"))
+            return Forbid();
 
-            return Ok(new UserThemePreferenceDto
-            {
-                ThemeName = user.ThemeName ?? "modern-dark",
-                CustomPrimaryColor = user.CustomPrimaryColor,
-                CustomAccentColor = user.CustomAccentColor
-            });
-        }
-        catch (Exception)
-        {
-            return Ok(new UserThemePreferenceDto());
-        }
+        var data = await _settingsService.GetUserThemeAsync(id);
+        return Ok(data);
     }
 
     [HttpPut("users/{id}/theme")]
-    public async Task<ActionResult<ApiResponse>> UpdateUserTheme(Guid id, [FromBody] UpdateThemeRequest req)
+    [Authorize]
+    public async Task<IActionResult> UpdateUserTheme(Guid id, [FromBody] UpdateThemeRequest req)
     {
-        try
-        {
-            var user = await _db.Users.FindAsync(id);
-            if (user == null) return NotFound(ApiHelper.Fail("使用者不存在"));
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+            return Unauthorized();
+        if (userId != id && !User.IsInRole("Admin"))
+            return Forbid();
 
-            user.ThemeName = req.ThemeName;
-            user.CustomPrimaryColor = req.CustomPrimaryColor;
-            user.CustomAccentColor = req.CustomAccentColor;
-
-            await _db.SaveChangesAsync();
-            return ApiResponse.Ok(new object(), "主題更新成功");
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, ApiHelper.Fail($"主題更新失敗: {ex.Message}"));
-        }
+        var success = await _settingsService.UpdateUserThemeAsync(id, req);
+        if (!success)
+            return new NotFoundObjectResult(new ApiResponse { Success = false, Message = "User not found" });
+        return new OkObjectResult(new ApiResponse { Success = true, Message = "Theme updated successfully" });
     }
-    
+
     [HttpGet("role-modules/{roleName}")]
-    public ActionResult<ApiResponse<List<ModuleAccessDto>>> GetRoleModules(string roleName)
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<List<ModuleAccessDto>>>> GetRoleModules(string roleName)
     {
-        var access = new List<ModuleAccessDto>
-        {
-            new() { ModuleId = "dashboard", Permissions = new List<string> { "read" } },
-            new() { ModuleId = "sales", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "procurement", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "inventory", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "manufacturing", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "quality", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "hr", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "finance", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "systemsettings", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "engineering", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "mps", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "rccp", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "mrp", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "uom", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "org", Permissions = new List<string> { "read", "write" } },
-            new() { ModuleId = "actual_costing", Permissions = new List<string> { "read", "write" } }
-        };
-        
-        return Ok(access);
+        var data = await _settingsService.GetRoleModulesAsync(roleName);
+        return Ok(data);
+    }
+
+    [HttpGet("permissions/me")]
+    [Authorize(Policy = "AuthenticatedAccount")]
+    public async Task<ActionResult<ApiResponse<List<ModuleAccessDto>>>> GetCurrentUserModules()
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+            return Unauthorized(ApiResponse<List<ModuleAccessDto>>.Fail("Authenticated user identity is required"));
+        var data = await _settingsService.GetCurrentUserModulesAsync(userId);
+        return Ok(data);
     }
 }

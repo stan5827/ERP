@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: erp-main-wip-postgres
+    environment:
+      POSTGRES_DB: ErpGeneral
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: ${MAIN_ERP_WIP_POSTGRES_PASSWORD:?Run prepare-main-erp-wip.ps1 first}
+    ports:
+      - "127.0.0.1:55434:5432"
+    volumes:
+      - main_erp_wip_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d ErpGeneral"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    container_name: erp-main-wip-keycloak
+    command: ["start-dev", "--http-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${MAIN_ERP_WIP_KEYCLOAK_ADMIN_USERNAME:?Run prepare-main-erp-wip.ps1 first}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${MAIN_ERP_WIP_KEYCLOAK_ADMIN_PASSWORD:?Run prepare-main-erp-wip.ps1 first}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8183:8080"
+    volumes:
+      - main_erp_wip_keycloak_data:/opt/keycloak/data
+    restart: unless-stopped
+
+volumes:
+  main_erp_wip_postgres_data:
+  main_erp_wip_keycloak_data:

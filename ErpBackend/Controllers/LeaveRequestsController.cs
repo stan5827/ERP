@@ -1,221 +1,70 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.HR;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
+[Authorize]
+[Route("api/erp/leave-requests")]
 public class LeaveRequestsController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly ILeaveRequestService _leaveRequestService;
 
-    public LeaveRequestsController(ErpGeneralDbContext db)
-    {
-        _db = db;
-    }
+    public LeaveRequestsController(ILeaveRequestService leaveRequestService) => _leaveRequestService = leaveRequestService;
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<LeaveRequestDto>>>> GetLeaveRequests(
-        [FromQuery] string? employeeId,
+    public async Task<ActionResult<ApiResponse<List<LeaveRequestDto>>>> GetAll(
+        [FromQuery] string? search,
+        [FromQuery] Guid? employeeId,
         [FromQuery] string? status,
-        [FromQuery] string? leaveType,
-        [FromQuery] string? startDate,
-        [FromQuery] string? endDate)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var page = GetPage();
-        var pageSize = GetPageSize();
-
-        var query = _db.LeaveRequests
-            .Include(l => l.Employee)
-            .AsQueryable();
-
-        if (!string.IsNullOrEmpty(employeeId) && Guid.TryParse(employeeId, out var empGuid))
-            query = query.Where(l => l.EmployeeId == empGuid);
-
-        if (!string.IsNullOrEmpty(status))
-            query = query.Where(l => l.Status == status);
-
-        if (!string.IsNullOrEmpty(leaveType))
-            query = query.Where(l => l.LeaveType == leaveType);
-
-        if (!string.IsNullOrEmpty(startDate) && DateTime.TryParse(startDate, out var start))
-            query = query.Where(l => l.StartDate >= start);
-
-        if (!string.IsNullOrEmpty(endDate) && DateTime.TryParse(endDate, out var end))
-            query = query.Where(l => l.EndDate <= end);
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(l => l.ApplicationDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var dtos = items.Select(l => new LeaveRequestDto
-        {
-            Id = l.Id,
-            ApplicationNo = l.ApplicationNo,
-            EmployeeId = l.EmployeeId,
-            EmployeeName = l.Employee?.ChineseName,
-            LeaveType = l.LeaveType,
-            ApplicationDate = l.ApplicationDate,
-            StartDate = l.StartDate,
-            EndDate = l.EndDate,
-            StartTime = l.StartTime?.ToString(),
-            EndTime = l.EndTime?.ToString(),
-            TotalHours = l.TotalHours,
-            Reason = l.Reason,
-            Status = l.Status,
-            ApproverId = l.ApproverId,
-            ApprovedAt = l.ApprovedAt,
-            RejectReason = l.RejectReason,
-            Remarks = l.Remarks,
-            CreatedAt = l.CreatedAt
-        }).ToList();
-
-        return Ok(dtos, totalCount: totalCount);
+        var dtos = await _leaveRequestService.GetAllAsync(search, employeeId, status, page, pageSize);
+        return Ok(dtos);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<LeaveRequestDto>>> GetLeaveRequest(Guid id)
+    public async Task<ActionResult<ApiResponse<LeaveRequestDto>>> Get(Guid id)
     {
-        var l = await _db.LeaveRequests
-            .Include(r => r.Employee)
-            .FirstOrDefaultAsync(r => r.Id == id);
-
-        if (l == null) return NotFound(ApiHelper.Fail("Leave request not found"));
-
-        var dto = new LeaveRequestDto
-        {
-            Id = l.Id,
-            ApplicationNo = l.ApplicationNo,
-            EmployeeId = l.EmployeeId,
-            EmployeeName = l.Employee?.ChineseName,
-            LeaveType = l.LeaveType,
-            ApplicationDate = l.ApplicationDate,
-            StartDate = l.StartDate,
-            EndDate = l.EndDate,
-            StartTime = l.StartTime?.ToString(),
-            EndTime = l.EndTime?.ToString(),
-            TotalHours = l.TotalHours,
-            Reason = l.Reason,
-            AttachmentUrl = l.AttachmentUrl,
-            IncludesSpecialPeriod = l.IncludesSpecialPeriod,
-            ShiftConflictFlag = l.ShiftConflictFlag,
-            AutoDeductPayFlag = l.AutoDeductPayFlag,
-            ImpactOtOrBonus = l.ImpactOtOrBonus,
-            ApprovalLevel = l.ApprovalLevel,
-            Status = l.Status,
-            ApproverId = l.ApproverId,
-            ApprovedAt = l.ApprovedAt,
-            RejectReason = l.RejectReason,
-            Remarks = l.Remarks,
-            CreatedAt = l.CreatedAt
-        };
-
-        return Ok(dto);
+        var dto = await _leaveRequestService.GetByIdAsync(id);
+        return dto == null ? NotFound(ApiHelper.Fail("Leave request not found")) : Ok(dto);
     }
 
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<LeaveRequestDto>>> CreateLeaveRequest([FromBody] CreateLeaveRequestRequest req)
+    public async Task<ActionResult<ApiResponse<LeaveRequestDto>>> Create([FromBody] CreateLeaveRequestRequest request)
     {
-        var empId = req.EmployeeId;
-        if (!Guid.TryParse(empId, out var empGuid))
-            return BadRequest(ApiHelper.Fail("Invalid employee ID"));
-
-        var totalHours = (decimal)(req.EndDate - req.StartDate).TotalHours;
-        if (req.EndTime.HasValue && req.StartTime.HasValue)
-            totalHours += (decimal)(req.EndTime.Value - req.StartTime.Value).TotalHours;
-
-        var leave = new LeaveRequest
-        {
-            Id = Guid.NewGuid(),
-            ApplicationNo = $"LR-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}",
-            EmployeeId = empGuid,
-            LeaveType = req.LeaveType,
-            ApplicationDate = DateTime.UtcNow,
-            StartDate = req.StartDate,
-            EndDate = req.EndDate,
-            StartTime = req.StartTime,
-            EndTime = req.EndTime,
-            TotalHours = totalHours,
-            Reason = req.Reason,
-            AttachmentUrl = req.AttachmentUrl,
-            IncludesSpecialPeriod = req.IncludesSpecialPeriod,
-            ImpactOtOrBonus = req.ImpactOtOrBonus,
-            Status = "pending"
-        };
-
-        _db.LeaveRequests.Add(leave);
-        await _db.SaveChangesAsync();
-
-        var dto = new LeaveRequestDto
-        {
-            Id = leave.Id,
-            ApplicationNo = leave.ApplicationNo,
-            EmployeeId = leave.EmployeeId,
-            LeaveType = leave.LeaveType,
-            ApplicationDate = leave.ApplicationDate,
-            StartDate = leave.StartDate,
-            EndDate = leave.EndDate,
-            TotalHours = leave.TotalHours,
-            Reason = leave.Reason,
-            Status = leave.Status,
-            CreatedAt = leave.CreatedAt
-        };
-
-        return Ok(dto);
+        var (dto, status) = await _leaveRequestService.CreateAsync(request);
+        if (status == "invalid") return BadRequest(ApiHelper.FailOf<LeaveRequestDto>("Invalid request"));
+        if (status == "not_found") return BadRequest(ApiHelper.FailOf<LeaveRequestDto>("Employee not found"));
+        if (status == "schedule_not_configured")
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                ApiHelper.FailOf<LeaveRequestDto>(
+                    "Leave requests are unavailable until work schedules and holidays are configured"));
+        return Ok(dto!, "Leave request created");
     }
 
     [HttpPatch("{id}/approve")]
-    public async Task<ActionResult<ApiResponse>> ApproveLeaveRequest(Guid id, [FromBody] ApproveLeaveRequestRequest req)
+    public async Task<ActionResult<ApiResponse>> Approve(Guid id, [FromBody] ApproveLeaveRequestRequest request)
     {
-        var leave = await _db.LeaveRequests.FindAsync(id);
-        if (leave == null) return NotFound(ApiHelper.Fail("Leave request not found"));
-
-        leave.Status = "approved";
-        leave.ApproverId = req.ApproverId;
-        leave.ApprovedAt = DateTime.UtcNow;
-        leave.Remarks = req.Remarks;
-
-        await _db.SaveChangesAsync();
-
-        return ApiResponse.Ok("Leave request approved");
+        var (ok, status) = await _leaveRequestService.ApproveAsync(id, request);
+        if (status == "approval_not_configured")
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                ApiHelper.Fail("Leave approvals are unavailable until leave-hour calculation and balance transactions are configured"));
+        if (status == "not_found") return NotFound(ApiHelper.Fail("Leave request not found"));
+        if (status == "guarded") return BadRequest(ApiHelper.Fail("Only pending requests can be approved"));
+        return Ok("Leave request approved");
     }
 
     [HttpPatch("{id}/reject")]
-    public async Task<ActionResult<ApiResponse>> RejectLeaveRequest(Guid id, [FromBody] RejectLeaveRequestRequest req)
+    public async Task<ActionResult<ApiResponse>> Reject(Guid id, [FromBody] RejectLeaveRequestRequest request)
     {
-        var leave = await _db.LeaveRequests.FindAsync(id);
-        if (leave == null) return NotFound(ApiHelper.Fail("Leave request not found"));
-
-        leave.Status = "rejected";
-        leave.ApproverId = req.ApproverId;
-        leave.ApprovedAt = DateTime.UtcNow;
-        leave.RejectReason = req.RejectReason;
-
-        await _db.SaveChangesAsync();
-
-        return ApiResponse.Ok("Leave request rejected");
-    }
-
-    [HttpGet("leave-types")]
-    public ActionResult<ApiResponse<List<string>>> GetLeaveTypes()
-    {
-        var types = new List<string>
-        {
-            "annual",     // 特休
-            "sick",      // 病假
-            "personal",  // 事假
-            "maternal",  // 產假
-            "paternal",   // 陪產假
-            "bereavement", // 喪假
-            "marriage",   // 婚假
-            "public",     // 公假
-            "unpaid"     // 無薪假
-        };
-        return Ok(types);
+        var (ok, status) = await _leaveRequestService.RejectAsync(id, request);
+        if (status == "not_found") return NotFound(ApiHelper.Fail("Leave request not found"));
+        if (status == "guarded") return BadRequest(ApiHelper.Fail("Only pending requests can be rejected"));
+        return Ok("Leave request rejected");
     }
 }
-

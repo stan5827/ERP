@@ -13,13 +13,11 @@ public interface IProductionAlertService
 public class ProductionAlertService : IProductionAlertService
 {
     private readonly ErpGeneralDbContext _db;
-    private readonly ILlmService _llm;
     private readonly ILogger<ProductionAlertService> _logger;
 
-    public ProductionAlertService(ErpGeneralDbContext db, ILlmService llm, ILogger<ProductionAlertService> logger)
+    public ProductionAlertService(ErpGeneralDbContext db, ILogger<ProductionAlertService> logger)
     {
         _db = db;
-        _llm = llm;
         _logger = logger;
     }
 
@@ -29,7 +27,7 @@ public class ProductionAlertService : IProductionAlertService
         {
             var report = await _db.WipReports
                 .Include(r => r.WorkOrder)
-                .FirstOrDefaultAsync(r => r.Id == wipReportId);
+                .FirstOrDefaultAsync(r => r.Id == wipReportId && r.Status == "approved");
 
             if (report == null || report.WorkOrder == null) return;
 
@@ -98,18 +96,7 @@ public class ProductionAlertService : IProductionAlertService
             alertMessage.AppendLine($"⚠️ {a}");
         }
 
-        // 使用 AI 生成智慧建議
-        var prompt = $"工單 {report.WorkOrder?.WoNumber} 在工序 {report.OperationSeq} 發生以下異常：{string.Join(", ", anomalies)}。請提供 30 字以內的簡短預防性建議。";
-        var aiResponse = await _llm.CompleteAsync(new LlmRequest { Prompt = prompt });
-        
-        if (aiResponse.Success)
-        {
-            report.AiDiagnosis = aiResponse.Content;
-            alertMessage.AppendLine("---------------------------");
-            alertMessage.AppendLine($"🤖 AI 建議：{aiResponse.Content}");
-        }
-
-        // 模擬 LINE Notify 推送
+        // Keep WIP data local until an approved LLM data-egress policy is available.
         await SendLineNotification(alertMessage.ToString());
     }
 

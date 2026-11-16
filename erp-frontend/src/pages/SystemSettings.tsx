@@ -1,16 +1,53 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, Edit2, Eye, ArrowLeftRight, ClipboardCheck, TrendingDown, RefreshCw, ChevronDown, Menu, X, Check, CheckSquare, Square, ChevronRight, Coins, Globe, History, TrendingUp } from 'lucide-react';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { Search, Plus, Trash2, Edit2, Eye, KeyRound, ChevronDown, X, Check, ChevronRight, Globe, TrendingUp } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { systemSettingsApi, currenciesApi, PermissionTreeDto, UserWithRolesDto, RoleWithPermissionsDto, ThemeDto, CurrencyDto, ExchangeRateDto } from '../api/api';
-import { useTheme } from '../theme/ThemeProvider';
+import type { QueryClient } from '@tanstack/react-query';
+import { authApi, systemSettingsApi, currenciesApi, employeesApi, usersApi, PermissionTreeDto, UserWithRolesDto, RoleWithPermissionsDto, ThemeDto, CurrencyDto, ExchangeRateDto, EmployeeDto } from '../api/api';
+import { useTheme } from '../theme/themeContext';
 import { currencySchema, exchangeRateSchema } from '../utils/erpSchemas';
 import { toast } from 'react-hot-toast';
 import { FormModal } from '../components/FormModal';
-import type { FormField } from '../components/FormModal';
-import { themes, ThemeName, Theme } from '../theme/themes';
+import { ThemeName } from '../theme/themes';
+import { getPermissionDisplayName, getPermissionSelectionState, getPermissionTypeLabel, togglePermissionSelection } from '../utils/permissionTree';
+
+const roleDisplayNames: Record<string, string> = {
+  admin: '系統管理員',
+  finance: '財務人員',
+  'hr manager': '人資主管',
+  operator: '現場作業員',
+  'production supervisor': '生產主管',
+};
+
+const systemRoleDescriptions: Record<string, string> = {
+  finance: '應收應付帳款、實際成本及總帳查詢。',
+  'hr manager': '員工資料、出勤、請假審核及薪資管理。',
+  operator: '個人與團隊生產報工及員工自助服務。',
+  'production supervisor': '工單派工、生產報工審核、BOM 狀態核准及產線監控。',
+};
+
+const getRoleDisplayName = (roleName: string) =>
+  roleDisplayNames[roleName.trim().toLocaleLowerCase()] ?? roleName;
+
+const getRoleDisplayDescription = (roleName: string, description?: string) =>
+  systemRoleDescriptions[roleName.trim().toLocaleLowerCase()] ?? description ?? '-';
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null)
+    return error instanceof Error ? error.message : String(error);
+  const response = 'response' in error ? error.response : undefined;
+  const responseData = typeof response === 'object' && response !== null && 'data' in response
+    ? response.data
+    : undefined;
+  const responseMessage = typeof responseData === 'object' && responseData !== null && 'message' in responseData
+    ? responseData.message
+    : undefined;
+  return typeof responseMessage === 'string'
+    ? responseMessage
+    : error instanceof Error ? error.message : String(error);
+}
 
 export const SystemSettings: React.FC = () => {
-  const { themeName, setTheme, setCustomColors, customPrimaryColor, customAccentColor } = useTheme();
+  const { themeName, setTheme, setCustomColors } = useTheme();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'permissions' | 'themes' | 'currencies'>('permissions');
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
@@ -38,10 +75,10 @@ export const SystemSettings: React.FC = () => {
     queryFn: () => systemSettingsApi.getThemes().then(res => res.data)
   });
 
-  const permissionsTree = (permTreeRes as any)?.data || [];
-  const users = (usersRes as any)?.data || [];
-  const roles = (rolesRes as any)?.data || [];
-  const availableThemes = (themesRes as any)?.data || [];
+  const permissionsTree: PermissionTreeDto[] = permTreeRes?.data ?? [];
+  const users: UserWithRolesDto[] = usersRes?.data ?? [];
+  const roles: RoleWithPermissionsDto[] = rolesRes?.data ?? [];
+  const availableThemes: ThemeDto[] = themesRes?.data ?? [];
 
   return (
     <div className="page-container">
@@ -110,8 +147,8 @@ export const SystemSettings: React.FC = () => {
             await systemSettingsApi.createRole({ roleName: data.roleName as string, description: data.description as string });
             queryClient.invalidateQueries({ queryKey: ['roles'] });
             setShowAddRoleModal(false);
-          } catch (err: any) {
-            alert('新增失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('新增失敗: ' + getErrorMessage(err));
           }
         }}
       />
@@ -153,8 +190,8 @@ export const SystemSettings: React.FC = () => {
             });
             queryClient.invalidateQueries({ queryKey: ['permissions-tree'] });
             setShowAddPermissionModal(false);
-          } catch (err: any) {
-            alert('新增失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('新增失敗: ' + getErrorMessage(err));
           }
         }}
       />
@@ -170,26 +207,68 @@ interface PermissionsTabProps {
   isLoading: boolean;
   onAddRole: () => void;
   onAddPermission: () => void;
-  queryClient: any;
+  queryClient: QueryClient;
 }
 
 function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, onAddPermission, queryClient }: PermissionsTabProps) {
   const [activePermTab, setActivePermTab] = useState<'users' | 'roles' | 'tree'>('users');
   const [searchUser, setSearchUser] = useState('');
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserWithRolesDto | null>(null);
   const [editingUserRoles, setEditingUserRoles] = useState<string | null>(null);
   const [editingRolePerms, setEditingRolePerms] = useState<string | null>(null);
   const [selectedRolePerms, setSelectedRolePerms] = useState<string[]>([]);
 
+  const {
+    data: employeesRes,
+    isLoading: employeesLoading,
+    error: employeesError,
+    refetch: refetchEmployees
+  } = useQuery({
+    queryKey: ['employees', 'user-provisioning'],
+    queryFn: async () => {
+      const pageSize = 200;
+      const firstPage = await employeesApi.list({ status: 'active', page: '1', pageSize: String(pageSize) });
+      const firstPageData = firstPage.data.data ?? [];
+      const activeEmployees = [...firstPageData];
+      const totalCount = firstPage.data.totalCount ?? firstPageData.length;
+
+      for (let page = 2; activeEmployees.length < totalCount; page += 1) {
+        const nextPage = await employeesApi.list({ status: 'active', page: String(page), pageSize: String(pageSize) });
+        const nextPageData = nextPage.data.data ?? [];
+        if (nextPageData.length === 0) break;
+        activeEmployees.push(...nextPageData);
+      }
+
+      return activeEmployees;
+    },
+    enabled: activePermTab === 'users'
+  });
+  const {
+    data: linkedEmployeeIdsRes,
+    isLoading: linkedEmployeesLoading,
+    error: linkedEmployeesError,
+    refetch: refetchLinkedEmployees
+  } = useQuery({
+    queryKey: ['users', 'linked-employee-ids'],
+    queryFn: () => systemSettingsApi.getLinkedEmployeeIds().then(res => res.data),
+    enabled: activePermTab === 'users'
+  });
+  const employees = employeesRes ?? [];
+  const linkedEmployeeIds = new Set(linkedEmployeeIdsRes?.data ?? []);
+  const availableEmployees = employees.filter(employee => !linkedEmployeeIds.has(employee.id));
+  const activeRoles = roles.filter(role => role.isActive);
+
   const updateUserRoles = useMutation({
-    mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
-      systemSettingsApi.updateUserRoles(userId, roleIds),
+    mutationFn: ({ userId, roleIds, reason }: { userId: string; roleIds: string[]; reason: string }) =>
+      usersApi.updateRoles(userId, { roleIds, reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setEditingUserRoles(null);
       alert('使用者角色已更新');
     },
-    onError: (err: any) => {
-      alert('更新失敗: ' + (err.response?.data?.message || err.message));
+    onError: (err: unknown) => {
+      alert('更新失敗: ' + getErrorMessage(err));
     }
   });
 
@@ -201,8 +280,8 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
       setEditingRolePerms(null);
       alert('角色權限已更新');
     },
-    onError: (err: any) => {
-      alert('更新失敗: ' + (err.response?.data?.message || err.message));
+    onError: (err: unknown) => {
+      alert('更新失敗: ' + getErrorMessage(err));
     }
   });
 
@@ -212,21 +291,78 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       alert('角色已刪除');
     },
-    onError: (err: any) => {
-      alert('刪除失敗: ' + (err.response?.data?.message || err.message));
+    onError: (err: unknown) => {
+      alert('刪除失敗: ' + getErrorMessage(err));
     }
   });
 
   const filteredUsers = users.filter(u => 
     u.username.toLowerCase().includes(searchUser.toLowerCase())
   );
+  const employeeLabels = new Map(employees.map(employee => [
+    employee.id,
+    `${employee.employeeNo} - ${employee.chineseName}`
+  ]));
+
+  const getCreateUserErrorMessage = (error: unknown): string => {
+    const responseData = typeof error === 'object' && error !== null && 'response' in error
+      ? (error as { response?: { data?: { message?: string } } }).response?.data
+      : undefined;
+    const serverMessage = responseData?.message
+      ?? (error instanceof Error ? error.message : undefined);
+    const translatedMessages: Record<string, string> = {
+      'Username already exists': '此帳號已存在，請使用其他帳號。',
+      'An employee must be linked to the account': '請選擇要綁定的員工。',
+      'Employee does not exist': '找不到所選員工，請重新整理後再試。',
+      'Only active employees can be linked to an account': '只能為在職員工建立帳號。',
+      'Employee already has an account': '此員工已綁定其他使用者帳號。',
+      'Employee must have an identity document, hire date, department, and job title before account provisioning': '員工需先補齊身分證件、到職日、部門與職稱資料。',
+      'Employee must be assigned to an active department before account provisioning': '員工必須指派至啟用中的部門。',
+      'Employee must be assigned to an active job title before account provisioning': '員工必須指派至啟用中的職稱。',
+      'One or more roles do not exist': '所選角色不存在或已停用，請重新選擇。',
+      'Username and password are invalid; password must be at least 8 characters and contain both letters and numbers': '帳號不可空白；密碼至少 8 個字元，並須同時包含英文字母與數字。'
+    };
+
+    return (serverMessage && translatedMessages[serverMessage])
+      || serverMessage
+      || '建立使用者失敗，請稍後再試。';
+  };
+
+  const handleCreateUser = async (data: Record<string, unknown>) => {
+    const password = String(data.password ?? '');
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      throw new Error('密碼至少 8 個字元，並須同時包含英文字母與數字。');
+    }
+
+    try {
+      await usersApi.create({
+        username: String(data.username ?? '').trim(),
+        password,
+        email: String(data.email ?? '').trim() || undefined,
+        employeeId: String(data.employeeId ?? ''),
+        roleIds: Array.isArray(data.roleIds) ? data.roleIds.map(String) : []
+      });
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      setShowCreateUserModal(false);
+      toast.success('使用者建立成功；首次登入時必須變更密碼。');
+    } catch (error) {
+      throw new Error(getCreateUserErrorMessage(error));
+    }
+  };
 
   const handleEditUserRoles = (user: UserWithRolesDto) => {
     setEditingUserRoles(user.id);
   };
 
   const handleSaveUserRoles = (userId: string, roleIds: string[]) => {
-    updateUserRoles.mutate({ userId, roleIds });
+    const reason = window.prompt('請輸入角色異動原因（將記錄於稽核日誌）');
+    if (reason === null)
+      return;
+    if (!reason.trim()) {
+      toast.error('請提供角色異動原因。');
+      return;
+    }
+    updateUserRoles.mutate({ userId, roleIds, reason: reason.trim() });
   };
 
   const handleEditRolePerms = (role: RoleWithPermissionsDto) => {
@@ -238,12 +374,8 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
     updateRolePerms.mutate({ roleId, permissionIds: selectedRolePerms });
   };
 
-  const handleTogglePermission = (permId: string) => {
-    setSelectedRolePerms(prev => 
-      prev.includes(permId) 
-        ? prev.filter(id => id !== permId)
-        : [...prev, permId]
-    );
+  const handleTogglePermission = (node: PermissionTreeDto) => {
+    setSelectedRolePerms(prev => togglePermissionSelection(node, prev));
   };
 
   const handleDeleteRole = (roleId: string, roleName: string) => {
@@ -268,12 +400,49 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
 
       {activePermTab === 'users' && (
         <div className="users-section">
-          <div className="filter-bar">
+          <div className="filter-bar" style={{ justifyContent: 'space-between', gap: 12 }}>
             <div className="filter-search">
               <Search size={14} />
               <input placeholder="搜尋使用者..." value={searchUser} onChange={e => setSearchUser(e.target.value)} />
             </div>
+            {employeesError || linkedEmployeesError ? (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  void refetchEmployees();
+                  void refetchLinkedEmployees();
+                }}
+              >
+                重新載入員工
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowCreateUserModal(true)}
+                disabled={employeesLoading || linkedEmployeesLoading || availableEmployees.length === 0 || activeRoles.length === 0}
+                title={activeRoles.length === 0 ? '請先建立或啟用至少一個角色' : undefined}
+              >
+                <Plus size={14} /> 建立使用者
+              </button>
+            )}
           </div>
+          {(employeesError || linkedEmployeesError) && (
+            <div role="alert" style={{ color: 'var(--crimson-400)', marginBottom: 12 }}>
+              {employeesError
+                ? `員工資料載入失敗：${employeesError instanceof Error ? employeesError.message : '未知錯誤'}`
+                : `員工帳號綁定資料載入失敗：${linkedEmployeesError instanceof Error ? linkedEmployeesError.message : '未知錯誤'}`}
+            </div>
+          )}
+          {!employeesError && !linkedEmployeesError && !employeesLoading && !linkedEmployeesLoading && availableEmployees.length === 0 && (
+            <div style={{ color: 'var(--slate-500)', marginBottom: 12, fontSize: 12 }}>
+              {employees.length === 0 ? '目前沒有可建立帳號的在職員工。' : '所有在職員工都已綁定使用者帳號。'}
+            </div>
+          )}
+          {activeRoles.length === 0 && (
+            <div style={{ color: 'var(--slate-500)', marginBottom: 12, fontSize: 12 }}>
+              尚無可指派的啟用角色，請先至「角色管理」建立或啟用角色。
+            </div>
+          )}
           <div className="glass-card">
             {isLoading ? (
               <div className="loading">載入中...</div>
@@ -283,6 +452,7 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
                   <tr>
                     <th>帳號</th>
                     <th>Email</th>
+                    <th>員工</th>
                     <th>角色</th>
                     <th>操作</th>
                   </tr>
@@ -292,18 +462,19 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
                     <tr key={user.id}>
                       <td>{user.username}</td>
                       <td>{user.email || '-'}</td>
+                      <td>{user.employeeId ? employeeLabels.get(user.employeeId) ?? user.employeeId : '-'}</td>
                       <td>
                         {editingUserRoles === user.id ? (
                           <RoleMultiSelect
-                            roles={roles}
+                            roles={roles.filter(role => role.isActive)}
                             selectedRoleIds={user.roles.map(r => r.id)}
-                            onChange={(roleIds) => handleSaveUserRoles(user.id, roleIds)}
+                            onSave={(roleIds) => handleSaveUserRoles(user.id, roleIds)}
                             onCancel={() => setEditingUserRoles(null)}
                           />
                         ) : (
                           <span className="role-tags">
                             {user.roles.length > 0 
-                              ? user.roles.map(r => <span key={r.id} className="role-tag">{r.roleName}</span>)
+                                ? user.roles.map(r => <span key={r.id} className="role-tag">{getRoleDisplayName(r.roleName)}</span>)
                               : <span className="no-role">未設定</span>
                             }
                           </span>
@@ -311,9 +482,16 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
                       </td>
                       <td>
                         {editingUserRoles !== user.id && (
-                          <button className="icon-action-btn" onClick={() => handleEditUserRoles(user)} title="編輯角色">
-                            <Edit2 size={14} />
-                          </button>
+                          <>
+                            <button className="icon-action-btn" onClick={() => setResetPasswordUser(user)} title="管理員重設密碼" aria-label={`重設 ${user.username} 的密碼`}>
+                              <KeyRound size={14} />
+                            </button>
+                            {user.username.toLowerCase() !== 'admin' && (
+                              <button className="icon-action-btn" onClick={() => handleEditUserRoles(user)} title="編輯角色">
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                          </>
                         )}
                       </td>
                     </tr>
@@ -322,6 +500,78 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
               </table>
             )}
           </div>
+          <FormModal
+            open={showCreateUserModal}
+            title="建立使用者"
+            onClose={() => setShowCreateUserModal(false)}
+            fields={[
+              { name: 'username', label: '帳號', type: 'text', required: true, placeholder: '輸入登入帳號' },
+              {
+                name: 'password',
+                label: '初始密碼',
+                type: 'password',
+                required: true,
+                min: 8,
+                placeholder: '至少 8 個字元，含英文字母與數字',
+                description: '首次登入後必須變更密碼。密碼至少 8 個字元，並須同時包含英文字母與數字。'
+              },
+              { name: 'email', label: 'Email（選填）', type: 'text', placeholder: 'name@example.com' },
+              {
+                name: 'employeeId',
+                label: '綁定員工',
+                type: 'select',
+                required: true,
+                searchable: true,
+                placeholder: '搜尋員工編號或姓名',
+                options: availableEmployees.map((employee: EmployeeDto) => ({
+                  value: employee.id,
+                  label: `${employee.employeeNo} - ${employee.chineseName}`
+                })),
+                description: employeesLoading
+                  ? '正在載入可綁定員工...'
+                  : employeesError
+                    ? '無法載入員工清單，請重新整理後再試。'
+                    : availableEmployees.length > 0
+                      ? '僅列出尚未綁定帳號的在職員工；員工需先具備身分證件、到職日、部門及職稱。'
+                      : '目前沒有可綁定的在職員工；請先建立符合條件的員工資料。'
+              },
+              {
+                name: 'roleIds',
+                label: '指派角色',
+                type: 'multi-select',
+                required: true,
+                options: activeRoles.map(role => ({ value: role.id, label: getRoleDisplayName(role.roleName) }))
+              }
+            ]}
+            onSubmit={handleCreateUser}
+          />
+          <FormModal
+            open={resetPasswordUser !== null}
+            title={`重設密碼 - ${resetPasswordUser?.username ?? ''}`}
+            onClose={() => setResetPasswordUser(null)}
+            fields={[
+              { name: 'secret', label: '管理員重設密鑰', type: 'password', required: true, description: '需輸入部署環境設定的 ADMIN_RESET_SECRET。' },
+              { name: 'newPassword', label: '新密碼', type: 'password', required: true, min: 8, placeholder: '至少 8 個字元，含英文字母與數字' },
+              { name: 'confirmPassword', label: '確認新密碼', type: 'password', required: true, min: 8, placeholder: '再次輸入新密碼' }
+            ]}
+            onSubmit={async data => {
+              const newPassword = String(data.newPassword ?? '');
+              if (newPassword !== String(data.confirmPassword ?? ''))
+                throw new Error('兩次輸入的密碼不一致。');
+              if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword))
+                throw new Error('密碼至少 8 個字元，並須同時包含英文字母與數字。');
+              if (!resetPasswordUser)
+                throw new Error('找不到要重設密碼的使用者，請關閉視窗後重試。');
+
+              await authApi.adminReset({
+                secret: String(data.secret ?? ''),
+                username: resetPasswordUser.username,
+                newPassword
+              });
+              setResetPasswordUser(null);
+              toast.success('密碼已重設；使用者下次登入時必須變更密碼。');
+            }}
+          />
         </div>
       )}
 
@@ -348,17 +598,21 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
                 <tbody>
                   {roles.map(role => (
                     <tr key={role.id}>
-                      <td>{role.roleName}</td>
-                      <td>{role.description || '-'}</td>
+                      <td>{getRoleDisplayName(role.roleName)}</td>
+                      <td>{getRoleDisplayDescription(role.roleName, role.description)}</td>
                       <td>{role.permissionIds.length}</td>
                       <td>{role.isSystem ? <span className="badge warning">系統</span> : '-'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="icon-action-btn" onClick={() => handleEditRolePerms(role)} title="編輯權限">
-                            <Eye size={14} />
-                          </button>
+                          {role.roleName.toLowerCase() === 'admin'
+                            ? <span className="badge warning">全域最高權限</span>
+                            : (
+                              <button className="icon-action-btn" onClick={() => handleEditRolePerms(role)} title="編輯權限">
+                                <Eye size={14} />
+                              </button>
+                            )}
                           {!role.isSystem && (
-                            <button className="icon-action-btn" onClick={() => handleDeleteRole(role.id, role.roleName)} title="刪除">
+                            <button className="icon-action-btn" onClick={() => handleDeleteRole(role.id, getRoleDisplayName(role.roleName))} title="刪除">
                               <Trash2 size={14} />
                             </button>
                           )}
@@ -408,7 +662,7 @@ function PermissionsTab({ permissionsTree, users, roles, isLoading, onAddRole, o
   );
 }
 
-function CurrencyTab({ queryClient }: { queryClient: any }) {
+function CurrencyTab({ queryClient }: { queryClient: QueryClient }) {
   const [showAddCurrency, setShowAddCurrency] = useState(false);
   const [showAddRate, setShowAddRate] = useState(false);
 
@@ -422,8 +676,8 @@ function CurrencyTab({ queryClient }: { queryClient: any }) {
     queryFn: () => currenciesApi.listRates().then(res => res.data)
   });
 
-  const currencies = (currenciesRes as any)?.data || [];
-  const rates = (ratesRes as any)?.data || [];
+  const currencies: Array<CurrencyDto & { isActive?: boolean }> = currenciesRes?.data ?? [];
+  const rates: Array<ExchangeRateDto & { rateType?: string; source?: string }> = ratesRes?.data ?? [];
 
   return (
     <div className="currency-tab" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -444,7 +698,7 @@ function CurrencyTab({ queryClient }: { queryClient: any }) {
               </tr>
             </thead>
             <tbody>
-              {currencies.map((c: any) => (
+              {currencies.map(c => (
                 <tr key={c.id}>
                   <td className="mono">{c.currencyCode}</td>
                   <td>{c.currencyName}</td>
@@ -479,14 +733,14 @@ function CurrencyTab({ queryClient }: { queryClient: any }) {
               </tr>
             </thead>
             <tbody>
-              {rates.map((r: any) => (
+              {rates.map(r => (
                 <tr key={r.id}>
                   <td className="mono">{r.fromCurrency}</td>
                   <td className="mono">{r.toCurrency}</td>
                   <td className="mono" style={{ color: 'var(--lux-gold)', fontWeight: 700 }}>{r.rate}</td>
-                  <td>{r.effectiveDate?.split('T')[0]}</td>
-                  <td>{r.rateType === 'Standard' ? '標準' : r.rateType}</td>
-                  <td>{r.source === 'Manual' ? '手動' : r.source}</td>
+                  <td>{r.validFrom.split('T')[0]}</td>
+                  <td>{r.rateType ? r.rateType === 'Standard' ? '標準' : r.rateType : '-'}</td>
+                  <td>{r.source ? r.source === 'Manual' ? '手動' : r.source : '-'}</td>
                 </tr>
               ))}
               {rates.length === 0 && !ratesLoading && (
@@ -513,7 +767,7 @@ function CurrencyTab({ queryClient }: { queryClient: any }) {
             toast.error(result.error.issues[0].message);
             return;
           }
-          await currenciesApi.createCurrency(result.data as any);
+          await currenciesApi.createCurrency(result.data);
           queryClient.invalidateQueries({ queryKey: ['currencies'] });
           setShowAddCurrency(false);
           toast.success('幣別已新增');
@@ -525,8 +779,8 @@ function CurrencyTab({ queryClient }: { queryClient: any }) {
         title="新增匯率"
         onClose={() => setShowAddRate(false)}
         fields={[
-          { name: 'fromCurrency', label: '來源幣別 *', type: 'select', required: true, options: currencies.map((c: any) => ({ value: c.currencyCode, label: c.currencyCode })) },
-          { name: 'toCurrency', label: '目標幣別 *', type: 'select', required: true, options: currencies.map((c: any) => ({ value: c.currencyCode, label: c.currencyCode })) },
+          { name: 'fromCurrency', label: '來源幣別 *', type: 'select', required: true, options: currencies.map(c => ({ value: c.currencyCode, label: c.currencyCode })) },
+          { name: 'toCurrency', label: '目標幣別 *', type: 'select', required: true, options: currencies.map(c => ({ value: c.currencyCode, label: c.currencyCode })) },
           { name: 'rate', label: '匯率 *', type: 'number', required: true, step: 0.0001 },
           { name: 'effectiveDate', label: '生效日期 *', type: 'date', required: true, defaultValue: new Date().toISOString().split('T')[0] },
           { name: 'rateType', label: '匯率類型 *', type: 'select', required: true, options: [{ value: 'Standard', label: '標準' }, { value: 'Custom', label: '自訂' }] },
@@ -538,7 +792,7 @@ function CurrencyTab({ queryClient }: { queryClient: any }) {
             toast.error(result.error.issues[0].message);
             return;
           }
-          await currenciesApi.createRate(result.data as any);
+          await currenciesApi.createRate({ ...result.data, validFrom: result.data.effectiveDate });
           queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
           setShowAddRate(false);
           toast.success('匯率已更新');
@@ -555,7 +809,7 @@ interface ThemesTabProps {
   setTheme: (name: ThemeName) => void;
   setCustomColors: (primary?: string, accent?: string) => void;
   isLoading: boolean;
-  queryClient: any;
+  queryClient: QueryClient;
 }
 
 function ThemesTab({ themes, currentTheme, setTheme, setCustomColors, isLoading }: ThemesTabProps) {
@@ -668,10 +922,10 @@ function ThemesTab({ themes, currentTheme, setTheme, setCustomColors, isLoading 
 
 // ========== Helper Components ==========
 
-function RoleMultiSelect({ roles, selectedRoleIds, onChange, onCancel }: {
+function RoleMultiSelect({ roles, selectedRoleIds, onSave, onCancel }: {
   roles: RoleWithPermissionsDto[];
   selectedRoleIds: string[];
-  onChange: (roleIds: string[]) => void;
+  onSave: (roleIds: string[]) => void;
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>(selectedRoleIds);
@@ -681,7 +935,6 @@ function RoleMultiSelect({ roles, selectedRoleIds, onChange, onCancel }: {
       ? selected.filter(id => id !== roleId)
       : [...selected, roleId];
     setSelected(newSelected);
-    onChange(newSelected);
   };
 
   return (
@@ -693,10 +946,11 @@ function RoleMultiSelect({ roles, selectedRoleIds, onChange, onCancel }: {
             checked={selected.includes(role.id)}
             onChange={() => handleToggle(role.id)}
           />
-          <span>{role.roleName}</span>
+          <span>{getRoleDisplayName(role.roleName)}</span>
         </label>
       ))}
-      <button className="btn btn-ghost btn-sm" onClick={onCancel}>完成</button>
+      <button className="btn btn-primary btn-sm" onClick={() => onSave(selected)}>儲存角色</button>
+      <button className="btn btn-ghost btn-sm" onClick={onCancel}>取消</button>
     </div>
   );
 }
@@ -706,7 +960,7 @@ function RolePermissionEditor({ roles, permissionsTree, editingRolePerms, select
   permissionsTree: PermissionTreeDto[];
   editingRolePerms: string;
   selectedRolePerms: string[];
-  onTogglePermission: (permId: string) => void;
+  onTogglePermission: (node: PermissionTreeDto) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
@@ -716,7 +970,7 @@ function RolePermissionEditor({ roles, permissionsTree, editingRolePerms, select
     <div className="modal-overlay">
       <div className="modal-content glass-card">
         <div className="modal-header">
-          <h3>編輯角色權限 - {role?.roleName}</h3>
+          <h3>編輯角色權限 - {role ? getRoleDisplayName(role.roleName) : ''}</h3>
           <button onClick={onCancel}><X size={18} /></button>
         </div>
         <div className="modal-body">
@@ -743,21 +997,20 @@ function RolePermissionEditor({ roles, permissionsTree, editingRolePerms, select
 function PermissionTreeNode({ node, selectedPerms, onToggle, level = 0 }: {
   node: PermissionTreeDto;
   selectedPerms?: string[];
-  onToggle?: (permId: string) => void;
+  onToggle?: (node: PermissionTreeDto) => void;
   level?: number;
 }) {
   const [expanded, setExpanded] = useState(level < 2);
+  const checkboxRef = useRef<HTMLInputElement>(null);
   const hasChildren = node.children && node.children.length > 0;
-  const isSelected = selectedPerms?.includes(node.id);
+  const { checked: isSelected, indeterminate: isPartiallySelected } = selectedPerms
+    ? getPermissionSelectionState(node, selectedPerms)
+    : { checked: false, indeterminate: false };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'menu': return 'var(--cobalt-400)';
-      case 'page': return 'var(--amber-400)';
-      case 'action': return 'var(--emerald-400)';
-      default: return 'var(--slate-400)';
-    }
-  };
+  useEffect(() => {
+    if (checkboxRef.current)
+      checkboxRef.current.indeterminate = isPartiallySelected;
+  }, [isPartiallySelected]);
 
   return (
     <div className="tree-node" style={{ marginLeft: level * 20 }}>
@@ -770,20 +1023,18 @@ function PermissionTreeNode({ node, selectedPerms, onToggle, level = 0 }: {
         {!hasChildren && <div style={{ width: 20 }} />}
         
         {selectedPerms !== undefined && onToggle ? (
-          <button 
+          <input
+            ref={checkboxRef}
             className="tree-checkbox"
-            onClick={() => onToggle(node.id)}
-            style={{ color: isSelected ? 'var(--emerald-400)' : 'var(--slate-400)' }}
-          >
-            {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-          </button>
+            type="checkbox"
+            checked={isSelected}
+            aria-label={`授權 ${getPermissionDisplayName(node.moduleName ?? '')}`}
+            onChange={() => onToggle(node)}
+          />
         ) : null}
         
-        <span className="tree-code" style={{ color: getTypeColor(node.permissionType) }}>
-          {node.permissionCode}
-        </span>
-        <span className="tree-name">{node.moduleName}</span>
-        <span className="tree-type-badge">{node.permissionType}</span>
+        <span className="tree-name">{getPermissionDisplayName(node.moduleName ?? '')}</span>
+        <span className="tree-type-badge">{getPermissionTypeLabel(node.permissionType ?? '')}</span>
       </div>
       
       {hasChildren && expanded && (

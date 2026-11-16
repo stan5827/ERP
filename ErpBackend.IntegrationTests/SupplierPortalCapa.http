@@ -1,0 +1,38 @@
+@baseUrl = https://localhost:5001
+@accessToken = replace-with-supplier-access-token
+@complaintId = 00000000-0000-0000-0000-000000000000
+
+### List complaints issued to the authenticated supplier
+GET {{baseUrl}}/api/supplier-portal/complaints
+Authorization: Bearer {{accessToken}}
+
+### Read a supplier-scoped complaint and its CAPA revisions
+GET {{baseUrl}}/api/supplier-portal/complaints/{{complaintId}}
+Authorization: Bearer {{accessToken}}
+
+### Save or update a CAPA draft
+PUT {{baseUrl}}/api/supplier-portal/complaints/{{complaintId}}/capa
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "d1Team": "Supplier quality team",
+  "d2ProblemDescription": "Describe the non-conformance and its impact",
+  "d3InterimContainment": "Describe immediate containment"
+}
+
+### Submit the complete D1-D8 response for internal review
+POST {{baseUrl}}/api/supplier-portal/complaints/{{complaintId}}/capa/submit
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "d1Team": "Supplier quality team",
+  "d2ProblemDescription": "Describe the non-conformance and its impact",
+  "d3InterimContainment": "Describe immediate containment",
+  "d4RootCause": "Describe the verified root cause",
+  "d5PermanentAction": "Describe the permanent corrective action",
+  "d6Verification": "Describe the effectiveness verification",
+  "d7Prevention": "Describe recurrence prevention",
+  "d8Closure": "Summarize closure evidence"
+}

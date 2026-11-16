@@ -1,0 +1,43 @@
+@baseUrl = http://localhost:5100
+@supplierAccessToken = {{supplierAccessToken}}
+@purchaseOrderId = {{purchaseOrderId}}
+@asnId = {{asnId}}
+@skuId = {{skuId}}
+
+### List this supplier's shipment notices
+GET {{baseUrl}}/api/supplier-portal/asns
+Authorization: Bearer {{supplierAccessToken}}
+
+### Get shipment options for one of this supplier's confirmed purchase orders
+GET {{baseUrl}}/api/supplier-portal/purchase-orders/{{purchaseOrderId}}/asn-options
+Authorization: Bearer {{supplierAccessToken}}
+
+### Submit an ASN; lot-controlled SKUs require lot, manufacture, and expiry dates
+POST {{baseUrl}}/api/supplier-portal/asns
+Authorization: Bearer {{supplierAccessToken}}
+Content-Type: application/json
+
+{
+  "purchaseOrderId": "{{purchaseOrderId}}",
+  "shipDate": "2026-10-27T00:00:00Z",
+  "expectedArrival": "2026-10-29T00:00:00Z",
+  "carrier": "Example Freight",
+  "trackingNumber": "TRACK-001",
+  "items": [
+    {
+      "skuId": "{{skuId}}",
+      "shippedQuantity": 10,
+      "lotNumber": "LOT-20261027",
+      "manufactureDate": "2026-10-20T00:00:00Z",
+      "expiryDate": "2027-10-20T00:00:00Z"
+    }
+  ]
+}
+
+### Get a shipment notice belonging to this supplier
+GET {{baseUrl}}/api/supplier-portal/asns/{{asnId}}
+Authorization: Bearer {{supplierAccessToken}}
+
+### Negative case: another supplier's shipment notice is not disclosed
+GET {{baseUrl}}/api/supplier-portal/asns/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{supplierAccessToken}}

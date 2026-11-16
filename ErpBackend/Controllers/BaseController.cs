@@ -14,9 +14,6 @@ public abstract class BaseController : ControllerBase
     protected ActionResult<ApiResponse> Ok(string? message = null)
         => base.Ok(ApiResponse.Ok(message));
 
-    protected ActionResult<ApiResponse> OkObject(object data, string? message = null)
-        => base.Ok(ApiResponse.Ok(data, message));
-
     protected ActionResult<ApiResponse> Fail(string message)
         => base.Ok(ApiResponse.Fail(message));
 
@@ -31,7 +28,16 @@ public abstract class BaseController : ControllerBase
 
     protected Guid GetUserId()
     {
-        var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst("user_id")?.Value;
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? User.FindFirst("user_id")?.Value
+            ?? User.FindFirst("nameid")?.Value;
         return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
+    }
+
+    protected Guid? GetEmployeeId()
+    {
+        var employeeIdClaim = User.FindFirst("employee_id")?.Value;
+        return Guid.TryParse(employeeIdClaim, out var employeeId) ? employeeId : null;
     }
 }

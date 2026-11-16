@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2, ChevronLeft, ChevronRight, Check, Circle, Search } from 'lucide-react';
+import { X, Save, Loader2, ChevronLeft, ChevronRight, Check, Search } from 'lucide-react';
 import { validateField, createFieldValidators } from '../utils/validation';
 
 export interface FormField {
   name: string;
   label?: string;
-  type: 'text' | 'number' | 'select' | 'date' | 'textarea' | 'checkbox' | 'custom' | 'button' | 'time' | 'month' | 'hidden';
+  type: 'text' | 'password' | 'number' | 'select' | 'multi-select' | 'date' | 'textarea' | 'checkbox' | 'custom' | 'button' | 'time' | 'month' | 'hidden';
   required?: boolean;
   placeholder?: string;
   description?: string;
@@ -18,6 +18,9 @@ export interface FormField {
   onBlur?: (name: string, value: string) => void;
   sameAs?: string;
   searchable?: boolean;
+  visibleWhen?: { field: string; equals: string };
+  visibleWhenChanged?: string[];
+  requiredWhenChanged?: string[];
 }
 
 export interface FormTab {
@@ -28,10 +31,9 @@ export interface FormTab {
 interface FormModalProps {
   open: boolean;
   title: string;
-  schema?: unknown;
   tabs?: FormTab[];
   fields?: FormField[];
-  initialValues?: object;
+  initialValues?: Record<string, unknown>;
   onClose: () => void;
   onSubmit?: (data: Record<string, unknown>) => Promise<void>;
   width?: number;
@@ -130,6 +132,53 @@ const SearchableSelect: React.FC<{
   );
 };
 
+const MultiSelect: React.FC<{
+  options: { value: string; label: string }[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+}> = ({ options, value, onChange, placeholder }) => {
+  const [search, setSearch] = useState('');
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ border: '1px solid var(--slate-700)', borderRadius: 6, padding: 8 }}>
+      <input
+        className="form-input"
+        aria-label="搜尋收件人"
+        placeholder={placeholder || '搜尋姓名或員工編號'}
+        value={search}
+        onChange={event => setSearch(event.target.value)}
+        style={{ width: '100%', marginBottom: 6 }}
+      />
+      <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+        {filteredOptions.map(option => (
+          <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', color: 'var(--slate-300)', fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={value.includes(option.value)}
+              onChange={event => onChange(event.target.checked
+                ? [...value, option.value]
+                : value.filter(id => id !== option.value))}
+            />
+            {option.label}
+          </label>
+        ))}
+        {filteredOptions.length === 0 && (
+          <div style={{ padding: 10, color: 'var(--slate-500)', fontSize: 12, textAlign: 'center' }}>
+            查無符合人員
+          </div>
+        )}
+      </div>
+      <div style={{ color: 'var(--slate-500)', fontSize: 11, marginTop: 6 }}>
+        已選擇 {value.length} 位收件人
+      </div>
+    </div>
+  );
+};
+
 function renderField(field: FormField, value: unknown, error: string | undefined, onChange: (name: string, value: unknown) => void, onBlur?: (name: string, error: string | null) => void, customRenderers?: Record<string, React.ReactNode>, getFieldOptionsFn?: (field: FormField) => { value: string; label: string }[], index?: number, sameAs?: boolean, onSameAsChange?: (checked: boolean) => void) {
   if (field.type === 'custom') {
     return <div key={field.name}>{customRenderers?.[field.name]}</div>;
@@ -156,6 +205,13 @@ function renderField(field: FormField, value: unknown, error: string | undefined
             {(getFieldOptionsFn ? getFieldOptionsFn(field) : field.options ?? []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         )
+      ) : field.type === 'multi-select' ? (
+        <MultiSelect
+          options={getFieldOptionsFn ? getFieldOptionsFn(field) : field.options ?? []}
+          value={Array.isArray(value) ? value.map(String) : []}
+          onChange={selected => onChange(field.name, selected)}
+          placeholder={field.placeholder}
+        />
       ) : field.type === 'textarea' ? (
         <textarea className="form-input" style={{ width: '100%', minHeight: 80, resize: 'vertical' }}
           value={String(value ?? '')}
@@ -208,7 +264,6 @@ function renderField(field: FormField, value: unknown, error: string | undefined
 }
 
 export function FormModal({ open, title, tabs, fields, initialValues, onClose, onSubmit, width = 600, customRenderers, onChangeData, onFieldDefaultChange, children, hiddenFields = [], isWizard = false, wizardConfig }: FormModalProps) {
-  const initialRecord = (initialValues ?? {}) as Record<string, unknown>;
   const hasTabs = tabs && tabs.length > 0;
   const isWizardMode = isWizard && !!wizardConfig;
   const wizardStepCount = isWizardMode ? wizardConfig!.stepTitles.length : 0;
@@ -217,7 +272,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
     if (tabs) return tabs.flatMap(t => t.fields || []);
     if (isWizardMode) {
       const all: FormField[] = [];
-      const currentValues = initialRecord;
+      const currentValues = initialValues || {};
       for (let i = 0; i < wizardStepCount; i++) {
         all.push(...wizardConfig!.getStepFields(i, currentValues));
       }
@@ -225,9 +280,6 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
     }
     return fields || [];
   };
-
-  const baseFields = getSafeAllFields();
-  const allFields = baseFields.filter(f => !hiddenFields.includes(f.name));
 
   const [activeTab, setActiveTab] = useState(0);
   const [wizardStep, setWizardStep] = useState(0);
@@ -237,9 +289,19 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
   const [fieldDefaults, setFieldDefaults] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [sameAsFields, setSameAsFields] = useState<Record<string, boolean>>({});
-
   const [initialized, setInitialized] = useState(false);
+  const baseFields = getSafeAllFields();
+  const hasChanged = (names: string[]) => initialized && names.some(name =>
+    String(initialValues?.[name] ?? '') !== String(values[name] ?? '')
+  );
+  const isFieldVisible = (field: FormField) =>
+    (!field.visibleWhen || String(values[field.visibleWhen.field] ?? '') === field.visibleWhen.equals)
+    && (!field.visibleWhenChanged || hasChanged(field.visibleWhenChanged));
+  const isFieldRequired = (field: FormField) =>
+    field.required || (!!field.requiredWhenChanged && hasChanged(field.requiredWhenChanged));
+  const allFields = baseFields.filter(field =>
+    !hiddenFields.includes(field.name) && isFieldVisible(field)
+  );
 
   useEffect(() => {
     if (open) {
@@ -252,10 +314,10 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
         const init: Record<string, unknown> = {};
         allFields.forEach(f => { 
           const effectiveDefault = fieldDefaults[f.name] !== undefined ? fieldDefaults[f.name] : f.defaultValue;
-          if (initialRecord[f.name] !== undefined) {
-            init[f.name] = initialRecord[f.name];
+          if (initialValues && initialValues[f.name] !== undefined) {
+            init[f.name] = initialValues[f.name];
           } else {
-            init[f.name] = effectiveDefault ?? (f.type === 'checkbox' ? false : '');
+            init[f.name] = effectiveDefault ?? (f.type === 'checkbox' ? false : f.type === 'multi-select' ? [] : '');
           }
         });
         setValues(init);
@@ -264,7 +326,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
     } else {
       setInitialized(false);
     }
-  }, [open, initialValues, initialized]);
+  }, [open, initialValues, initialized, allFields, fieldDefaults]);
 
   useEffect(() => {
     if (open && onFieldDefaultChange) {
@@ -292,7 +354,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
     const isSameAsToggle = name.startsWith('_sameAs_');
     
     setValues(prev => {
-      let next = { ...prev };
+      const next = { ...prev };
       const fieldsForSameAs = tabs ? tabs.flatMap(t => t.fields) : (wizardConfig ? getAllFields() : fields || []);
       
       if (isSameAsToggle) {
@@ -328,15 +390,11 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
     });
   };
 
-  const getFieldOptions = (field: FormField) => {
-    return fieldOptions[field.name] ?? field.options ?? [];
-  };
-
     const validate = () => {
       const errs: Record<string, string> = {};
       allFields.forEach(f => {
         if (f.type === 'custom') return;
-        const fieldValidators = createFieldValidators(f);
+        const fieldValidators = createFieldValidators({ ...f, required: isFieldRequired(f) });
         const error = validateField(values[f.name], fieldValidators);
         if (error) {
           errs[f.name] = error;
@@ -373,23 +431,36 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
     setSubmitError(null);
     if (!validate()) return;
     setSubmitting(true);
-    console.log('[FormModal] 提交表單:', JSON.stringify(values, null, 2));
+    const safeValues = Object.fromEntries(
+      Object.entries(values).map(([name, value]) => [name, /password/i.test(name) ? '[REDACTED]' : value])
+    );
+    console.log('[FormModal] 提交表單:', JSON.stringify(safeValues, null, 2));
     try {
       if (onSubmit) {
         await onSubmit(values);
       }
       onClose();
-    } catch (err: any) {
-      let message = err.message || String(err);
-      
+    } catch (error: unknown) {
+      let message = error instanceof Error ? error.message : String(error);
+      const response = error && typeof error === 'object' && 'response' in error
+        ? error.response
+        : undefined;
+      const responseData = response && typeof response === 'object' && 'data' in response
+        ? response.data
+        : undefined;
+      const responseBody = responseData && typeof responseData === 'object'
+        ? responseData as Record<string, unknown>
+        : undefined;
+
       // 嘗試從後端回應獲取更詳細的驗證錯誤
-      if (err.response?.data?.errors) {
-        const detailErrors = Object.entries(err.response.data.errors)
-          .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+      const errors = responseBody?.errors;
+      if (errors && typeof errors === 'object' && !Array.isArray(errors)) {
+        const detailErrors = Object.entries(errors as Record<string, unknown>)
+          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.map(String).join(', ') : String(messages)}`)
           .join(' | ');
         if (detailErrors) message = `驗證失敗 - ${detailErrors}`;
-      } else if (err.response?.data?.message) {
-        message = err.response.data.message;
+      } else if (typeof responseBody?.message === 'string') {
+        message = responseBody.message;
       }
       
       setSubmitError(message);
@@ -401,7 +472,8 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
 
   if (!open) return null;
 
-  const currentFields = hasTabs ? tabs![activeTab].fields : (isWizardMode ? wizardConfig.getStepFields(wizardStep, values) : allFields);
+  const currentFields = (hasTabs ? tabs![activeTab].fields : (isWizardMode ? wizardConfig.getStepFields(wizardStep, values) : allFields))
+    .filter(isFieldVisible);
   const stepHiddenFields = isWizardMode && wizardConfig.getStepHiddenFields ? wizardConfig.getStepHiddenFields(wizardStep, values) : [];
   const wizardFilteredFields = currentFields.filter(f => !stepHiddenFields.includes(f.name));
 
@@ -539,7 +611,7 @@ export function FormModal({ open, title, tabs, fields, initialValues, onClose, o
                 const allFieldsForSameAs = hasTabs ? tabs!.flatMap(t => t.fields) : (wizardConfig ? getAllFields() : allFields);
                 const sourceField = field.sameAs ? allFieldsForSameAs.find(f => f.name === field.sameAs) : null;
                 const isSameAs = sourceField ? values[field.name] === values[field.sameAs] : undefined;
-                return <React.Fragment key={field.name || index}>{renderField(field, values[field.name], errors[field.name], handleChange, (name, err) => {
+                return <React.Fragment key={field.name || index}>{renderField({ ...field, required: isFieldRequired(field) }, values[field.name], errors[field.name], handleChange, (name, err) => {
                   setErrors(prev => {
                     const next = { ...prev };
                     if (err) next[name] = err;

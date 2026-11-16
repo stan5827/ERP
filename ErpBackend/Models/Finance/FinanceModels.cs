@@ -14,6 +14,9 @@ public class BankAccount
     [MaxLength(10)] public string Currency { get; set; } = "TWD";
     [Column(TypeName = "decimal(18,2)")] public decimal CurrentBalance { get; set; }
     public bool IsActive { get; set; } = true;
+    public Guid? GLAccountId { get; set; }
+
+    [ForeignKey(nameof(GLAccountId))] public GLAccount? GLAccount { get; set; }
 }
 
 public class Loan
@@ -84,6 +87,7 @@ public class Guarantee
     [MaxLength(50)] public string? RelatedContractNo { get; set; }
     public DateTime? ReleaseDate { get; set; }
     [Column(TypeName = "decimal(18,2)")] public decimal ReleaseAmount { get; set; }
+    [MaxLength(20)] public string Status { get; set; } = "active";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

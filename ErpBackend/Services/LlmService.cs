@@ -2,67 +2,14 @@ using System.Text.Json;
 using System.Net.Http;
 using System.Text;
 using Prometheus;
+using ErpBackend.DTOs;
 
 namespace ErpBackend.Services;
 
 public interface ILlmService
 {
     Task<LlmResponse> CompleteAsync(LlmRequest request);
-    Task<string> GetModelName();
-}
-
-public class LlmRequest
-{
-    public string? Prompt { get; set; }
-    public string? SystemPrompt { get; set; }
-    public List<LlmChatMessage>? Messages { get; set; }
-    public List<LlmTool>? Tools { get; set; }
-    public int MaxTokens { get; set; } = 2000;
-    public double Temperature { get; set; } = 0.7;
-    public string Model { get; set; } = "gpt-4";
-}
-
-public class LlmChatMessage
-{
-    public string Role { get; set; } = null!;
-    public string? Content { get; set; }
-    public List<LlmToolCall>? ToolCalls { get; set; }
-    public string? ToolCallId { get; set; }
-}
-
-public class LlmTool
-{
-    public string Name { get; set; } = null!;
-    public string Description { get; set; } = null!;
-    public object Parameters { get; set; } = null!;
-}
-
-public class LlmToolCall
-{
-    public string Id { get; set; } = null!;
-    public string Name { get; set; } = null!;
-    public string Arguments { get; set; } = null!;
-}
-
-public class LlmResponse
-{
-    public bool Success { get; set; }
-    public string? Content { get; set; }
-    public List<LlmToolCall>? ToolCalls { get; set; }
-    public string? Error { get; set; }
-    public int TokensUsed { get; set; }
-    public string? Model { get; set; }
-}
-
-public class LlmConfig
-{
-    public string Provider { get; set; } = "openai";
-    public string ApiKey { get; set; } = null!;
-    public string BaseUrl { get; set; } = "https://api.openai.com/v1";
-    public string DefaultModel { get; set; } = "gpt-4";
-    public int MaxTokens { get; set; } = 2000;
-    public double Temperature { get; set; } = 0.7;
-    public int TimeoutSeconds { get; set; } = 60;
+    Task<string> GetModelNameAsync();
 }
 
 public class OpenAiLlmService : ILlmService
@@ -76,13 +23,13 @@ public class OpenAiLlmService : ILlmService
         _httpClient = httpClient;
         _config = config;
         _logger = logger;
-        
+
         _httpClient.BaseAddress = new Uri(_config.BaseUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds);
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
     }
 
-    public Task<string> GetModelName() => Task.FromResult(_config.DefaultModel);
+    public Task<string> GetModelNameAsync() => Task.FromResult(_config.DefaultModel);
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request)
     {
@@ -94,7 +41,7 @@ public class OpenAiLlmService : ILlmService
                 messages = new[]
                 {
                     new { role = "system", content = request.SystemPrompt ?? GetDefaultSystemPrompt() },
-                    new { role = "user", content = request.Prompt ?? string.Empty }
+                    new { role = "user", content = request.Prompt }
                 },
                 max_tokens = request.MaxTokens > 0 ? request.MaxTokens : _config.MaxTokens,
                 temperature = request.Temperature > 0 ? request.Temperature : _config.Temperature
@@ -105,13 +52,14 @@ public class OpenAiLlmService : ILlmService
 
             _logger.LogInformation("Calling LLM with model: {Model}", request.Model);
 
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             var response = await _httpClient.PostAsync("/chat/completions", content);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogError("LLM API error: {Status} - {Error}", response.StatusCode, errorContent);
-                
+
                 return new LlmResponse
                 {
                     Success = false,
@@ -161,34 +109,6 @@ public class OpenAiLlmService : ILlmService
     }
 }
 
-public class OpenAiResponse
-{
-    public string? Id { get; set; }
-    public string? Model { get; set; }
-    public List<OpenAiChoice>? Choices { get; set; }
-    public OpenAiUsage? Usage { get; set; }
-}
-
-public class OpenAiChoice
-{
-    public int Index { get; set; }
-    public OpenAiMessage? Message { get; set; }
-    public string? FinishReason { get; set; }
-}
-
-public class OpenAiMessage
-{
-    public string? Role { get; set; }
-    public string? Content { get; set; }
-}
-
-public class OpenAiUsage
-{
-    public int PromptTokens { get; set; }
-    public int CompletionTokens { get; set; }
-    public int TotalTokens { get; set; }
-}
-
 public class ClaudeLlmService : ILlmService
 {
     private readonly HttpClient _httpClient;
@@ -207,7 +127,7 @@ public class ClaudeLlmService : ILlmService
         _httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
     }
 
-    public Task<string> GetModelName() => Task.FromResult(_config.DefaultModel);
+    public Task<string> GetModelNameAsync() => Task.FromResult(_config.DefaultModel);
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request)
     {
@@ -266,28 +186,6 @@ public class ClaudeLlmService : ILlmService
             };
         }
     }
-}
-
-public class ClaudeResponse
-{
-    public string? Id { get; set; }
-    public string? Type { get; set; }
-    public string? Role { get; set; }
-    public List<ClaudeContent>? Content { get; set; }
-    public string? Model { get; set; }
-    public ClaudeUsage? Usage { get; set; }
-}
-
-public class ClaudeContent
-{
-    public string? Type { get; set; }
-    public string? Text { get; set; }
-}
-
-public class ClaudeUsage
-{
-    public int InputTokens { get; set; }
-    public int OutputTokens { get; set; }
 }
 
 public class LlmFactory

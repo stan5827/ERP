@@ -1,0 +1,419 @@
+import React, { useState, useMemo } from 'react';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Megaphone, UserPlus, ClipboardCheck, FileDown, Calendar, ChevronLeft, ChevronRight, Zap, Clock, ArrowRight, CalendarDays } from 'lucide-react';
+import { useDashboard, useCalendarRange } from '../hooks/useApi';
+import type { DashboardKpi, WorkOrderSummary, CalendarEventDto } from '../api/api';
+import type { ModuleId } from '../types/index.ts';
+import './Dashboard.css';
+
+const statusColors: Record<string, string> = {
+  positive: 'var(--emerald-400)', negative: 'var(--crimson-400)', neutral: 'var(--slate-400)',
+  warning: 'var(--amber-400)', info: 'var(--cobalt-400)',
+};
+
+function KpiCard({ kpi, delay }: { kpi: DashboardKpi; delay: number }) {
+  const [visible, setVisible] = React.useState(false);
+  React.useEffect(() => { const t = setTimeout(() => setVisible(true), delay); return () => clearTimeout(t); }, [delay]);
+  const color = statusColors[kpi.color || 'neutral'] || statusColors.neutral;
+  return (
+    <div className={`kpi-card ${visible ? 'visible' : ''}`} style={{ '--delay': `${delay}ms` } as React.CSSProperties}>
+      <div className="kpi-card-bg" style={{ background: `radial-gradient(ellipse at top right, ${color}12, transparent 60%)` }} />
+      <div className="kpi-card-top">
+        <div className="kpi-title">{kpi.title}</div>
+        <div className="kpi-status-dot" style={{ background: color, boxShadow: `0 0 8px ${color}80` }}>
+          <div className="pulse-ring" style={{ borderColor: color }} />
+        </div>
+      </div>
+      <div className="kpi-value-row">
+        <span className="kpi-big-value">{kpi.value}</span>
+        {kpi.unit && <span className="kpi-unit">{kpi.unit}</span>}
+      </div>
+      {kpi.changePercent !== undefined && (
+        <div className="kpi-trend" style={{ color: kpi.changeDirection === 'up' ? 'var(--emerald-400)' : 'var(--crimson-400)' }}>
+          {kpi.changeDirection === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+          <span>{kpi.changePercent > 0 ? '+' : ''}{kpi.changePercent}%</span>
+          <span className="kpi-trend-label">vs 上月</span>
+        </div>
+      )}
+      <div className="kpi-bottom-line" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
+    </div>
+  );
+}
+
+function WorkOrderItem({ wo }: { wo: WorkOrderSummary }) {
+  const priorityColors: Record<string, string> = { urgent: 'var(--crimson-400)', high: 'var(--amber-400)', normal: 'var(--cobalt-400)', low: 'var(--slate-500)' };
+  const progress = wo.plannedQty > 0 ? Math.round((wo.completedQty / wo.plannedQty) * 100) : 0;
+  return (
+    <div className="wo-item">
+      <div className="wo-item-header">
+        <div className="wo-item-left">
+          <div className="wo-priority-bar" style={{ background: priorityColors[wo.priority] || priorityColors.normal }} />
+          <div>
+            <div className="wo-number">{wo.woNumber}</div>
+            <div className="wo-product">{wo.productName || '未知產品'}</div>
+          </div>
+        </div>
+        <span className={`status-badge status-${wo.status === 'completed' ? 'active' : wo.status === 'in_progress' ? 'warning' : 'neutral'}`}>
+          {wo.status === 'completed' ? '完成' : wo.status === 'in_progress' ? '進行中' : wo.status === 'released' ? '已派發' : '待派發'}
+        </span>
+      </div>
+      <div className="wo-progress-row">
+        <div className="progress-bar" style={{ flex: 1 }}>
+          <div className="progress-fill" style={{ width: `${Math.min(progress, 100)}%`, background: progress >= 100 ? 'var(--emerald-400)' : progress < 60 ? 'var(--amber-400)' : 'var(--cobalt-400)' }} />
+        </div>
+        <span className="wo-progress-pct">{progress}%</span>
+      </div>
+      <div className="wo-meta">
+        <span>計畫 {wo.plannedQty}</span>
+        <span>完成 {wo.completedQty}</span>
+        {wo.dueDate && <span>截止 {new Date(wo.dueDate).toLocaleDateString('zh-TW')}</span>}
+      </div>
+    </div>
+  );
+}
+
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-tooltip glass-card no-lift">
+      <div className="chart-tooltip-label">{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} className="chart-tooltip-row">
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color, flexShrink: 0 }} />
+          <span style={{ color: 'var(--slate-400)' }}>{p.name}</span>
+          <span style={{ color: 'var(--slate-100)', marginLeft: 'auto', paddingLeft: 12 }}>{p.value.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ── 快捷工具箱 ── */
+const quickActions = [
+  { icon: <Megaphone size={16} />, label: '發布公告', color: 'var(--cobalt-400)', action: 'collaboration' },
+  { icon: <UserPlus size={16} />, label: '人事錄入', color: 'var(--emerald-400)', action: 'hr' },
+  { icon: <ClipboardCheck size={16} />, label: '考勤調整', color: 'var(--amber-400)', action: 'hr' },
+  { icon: <FileDown size={16} />, label: '導出報表', color: 'var(--slate-300)', action: 'finance' },
+];
+
+/* ── 小型月曆（接真實資料）── */
+function MiniCalendar({ events, onNavigate }: { events: CalendarEventDto[]; onNavigate: (id: ModuleId) => void }) {
+  const today = new Date();
+  const [current, setCurrent] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  // Build a Set of days that have events
+  const markedDays = useMemo(() => {
+    const set = new Set<number>();
+    events.forEach(e => {
+      const start = new Date(e.startDate);
+      const end = new Date(e.endDate);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          set.add(d.getDate());
+        }
+      }
+    });
+    return set;
+  }, [events, year, month]);
+
+  return (
+    <div className="mini-calendar">
+      <div className="cal-header">
+        <button className="cal-nav-btn" onClick={() => setCurrent(new Date(year, month - 1, 1))}><ChevronLeft size={13} /></button>
+        <span className="cal-title" style={{ cursor: 'pointer' }} onClick={() => onNavigate('calendar')}>{year} 年 {monthNames[month]}</span>
+        <button className="cal-nav-btn" onClick={() => setCurrent(new Date(year, month + 1, 1))}><ChevronRight size={13} /></button>
+      </div>
+      <div className="cal-weekdays">
+        {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+          <div key={d} className="cal-weekday">{d}</div>
+        ))}
+      </div>
+      <div className="cal-grid">
+        {cells.map((d, i) => (
+          <div
+            key={i}
+            className={[
+              'cal-day',
+              d === null ? 'empty' : '',
+              d === today.getDate() && month === today.getMonth() && year === today.getFullYear() ? 'today' : '',
+              d !== null && markedDays.has(d) ? 'marked' : '',
+            ].join(' ')}
+          >
+            {d ?? ''}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── 今日行程 Widget ── */
+function TodayEventsWidget({ events, onNavigate }: { events: CalendarEventDto[]; onNavigate: (id: ModuleId) => void }) {
+  const today = new Date();
+  const todayEvents = useMemo(() => {
+    return events.filter(e => {
+      const start = new Date(e.startDate);
+      const end = new Date(e.endDate);
+      const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+      const dayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+      return start <= dayEnd && end >= dayStart;
+    }).sort((a, b) => {
+      if (a.isAllDay && !b.isAllDay) return -1;
+      if (!a.isAllDay && b.isAllDay) return 1;
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    });
+  }, [events]);
+
+  return (
+    <div className="glass-card" style={{ padding: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <CalendarDays size={14} style={{ color: 'var(--cobalt-300)' }} />
+          <h3 className="section-title" style={{ fontSize: 13 }}>今日行程</h3>
+          {todayEvents.length > 0 && (
+            <span style={{ fontSize: 10, background: 'var(--cobalt-500)', color: 'white', borderRadius: 10, padding: '1px 6px', fontWeight: 600 }}>
+              {todayEvents.length}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => onNavigate('calendar')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cobalt-400)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}
+        >
+          查看全部 <ArrowRight size={12} />
+        </button>
+      </div>
+      {todayEvents.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--slate-500)', fontSize: 12 }}>
+          今日無行程安排
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {todayEvents.slice(0, 5).map((evt, i) => {
+            const color = evt.color || evt.categoryColor || '#3B82F6';
+            return (
+              <div
+                key={i}
+                onClick={() => onNavigate('calendar')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6,
+                  cursor: 'pointer', background: 'rgba(255,255,255,0.02)',
+                  borderLeft: `3px solid ${color}`, transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+              >
+                <span style={{ fontSize: 10, color: 'var(--slate-500)', minWidth: 40, textAlign: 'center' }}>
+                  {evt.isAllDay ? '全天' : new Date(evt.startDate).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--slate-200)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {evt.title}
+                </span>
+                {evt.meetingRoomName && (
+                  <span style={{ fontSize: 10, color: 'var(--slate-500)' }}>
+                    <Clock size={10} style={{ marginRight: 2 }} />{evt.meetingRoomName}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {todayEvents.length > 5 && (
+            <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--slate-500)', paddingTop: 4 }}>
+              還有 {todayEvents.length - 5} 項行程...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Skeleton 卡片 ── */
+function SkeletonKpiCard() {
+  return (
+    <div className="glass-card" style={{ padding: '16px 18px' }}>
+      <div className="skeleton" style={{ width: '60%', height: 12, marginBottom: 12 }} />
+      <div className="skeleton" style={{ width: '40%', height: 28, marginBottom: 8 }} />
+      <div className="skeleton" style={{ width: '50%', height: 10 }} />
+    </div>
+  );
+}
+
+export function Dashboard({ onNavigate }: { onNavigate?: (id: ModuleId) => void }) {
+  const { data: resp, isLoading, error } = useDashboard();
+  const data = resp?.data;
+
+  // Fetch this month's calendar events for the mini calendar
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+  const { data: calendarResp } = useCalendarRange(
+    monthStart.toISOString().slice(0, 10),
+    monthEnd.toISOString().slice(0, 10)
+  );
+  const calendarEvents = (calendarResp?.data as CalendarEventDto[]) || [];
+
+  const navigate = onNavigate || (() => {});
+
+  if (isLoading) return (
+    <div className="dashboard page-enter">
+      <div className="dashboard-header">
+        <div>
+          <div className="skeleton" style={{ width: 80, height: 14, marginBottom: 8 }} />
+          <div className="skeleton" style={{ width: 200, height: 28, marginBottom: 6 }} />
+          <div className="skeleton" style={{ width: 320, height: 12 }} />
+        </div>
+      </div>
+      <div className="kpi-grid">
+        {[0, 1, 2, 3].map(i => <SkeletonKpiCard key={i} />)}
+      </div>
+    </div>
+  );
+
+  if (error || !data) return (
+    <div className="dashboard page-enter" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+      <div style={{ textAlign: 'center', color: 'var(--crimson-400)' }}>
+        <AlertTriangle size={32} style={{ marginBottom: 12 }} />
+        <div>無法載入儀表板資料</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="dashboard page-enter">
+      <div className="dashboard-header">
+        <div>
+          <div className="dashboard-greeting">系統概覽</div>
+          <div className="dashboard-title">企業神經中樞</div>
+          <div className="dashboard-subtitle">在職人數 {data.totalEmployees} 人 | 今日出勤 {data.todayAttendanceCount} 人 | 待審批 {data.pendingApprovals} 件</div>
+        </div>
+      </div>
+
+      <div className="kpi-grid">
+        {data.kpiCards.map((kpi, i) => <KpiCard key={i} kpi={kpi} delay={i * 80} />)}
+      </div>
+
+      <div className="chart-grid">
+        <div className="glass-card no-lift chart-section chart-section-wide">
+          <div className="section-header">
+            <div>
+              <h3 className="section-title">生產效率趨勢</h3>
+              <div className="section-subtitle">近 7 天</div>
+            </div>
+            <div className="chart-legend">
+              <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--cobalt-400)' }} /><span>計畫</span></div>
+              <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--emerald-400)' }} /><span>實際</span></div>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={data.productionTrend} margin={{ top: 5, right: 8, bottom: 0, left: -30 }}>
+              <defs>
+                <linearGradient id="gPlanned" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--cobalt-400)" stopOpacity={0.3} /><stop offset="100%" stopColor="var(--cobalt-400)" stopOpacity={0} /></linearGradient>
+                <linearGradient id="gActual" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--emerald-400)" stopOpacity={0.3} /><stop offset="100%" stopColor="var(--emerald-400)" stopOpacity={0} /></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.08)" />
+              <XAxis dataKey="date" tick={{ fill: 'var(--slate-500)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--slate-500)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="planned" name="計畫" stroke="var(--cobalt-400)" fill="url(#gPlanned)" strokeWidth={2} />
+              <Area type="monotone" dataKey="actual" name="實際" stroke="var(--emerald-400)" fill="url(#gActual)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="glass-card no-lift chart-section">
+          <div className="section-header">
+            <div><h3 className="section-title">出勤人數趨勢</h3><div className="section-subtitle">近 7 天</div></div>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data.attendanceTrend} margin={{ top: 5, right: 8, bottom: 0, left: -30 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.08)" />
+              <XAxis dataKey="date" tick={{ fill: 'var(--slate-500)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--slate-500)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="present" name="出勤" fill="var(--emerald-400)" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="late" name="遲到" fill="var(--amber-400)" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="dashboard-row">
+        {/* 生產工單進度 */}
+        <div className="glass-card no-lift dashboard-card dashboard-card-wide">
+          <div className="section-header">
+            <div><h3 className="section-title">生產工單進度</h3><div className="section-subtitle">近期工單</div></div>
+          </div>
+          <div className="wo-list">
+            {data.recentWorkOrders.map(wo => <WorkOrderItem key={wo.id} wo={wo} />)}
+            {data.recentWorkOrders.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--slate-500)', fontSize: 13 }}>無近期工單</div>}
+          </div>
+        </div>
+
+        <div className="dashboard-right">
+          {/* 系統警示 */}
+          <div className="glass-card no-lift dashboard-card">
+            <div className="section-header">
+              <div><h3 className="section-title">系統警示</h3><div className="section-subtitle">{data.activeAlerts} 項異常</div></div>
+            </div>
+            <div className="alert-list">
+              {data.alerts.map(a => (
+                <div key={a.id} className="alert-item" style={{ background: a.severity === 'danger' ? 'rgba(199,31,61,0.08)' : a.severity === 'warning' ? 'rgba(179,106,0,0.08)' : 'rgba(45,110,245,0.06)', borderLeft: `3px solid ${a.severity === 'danger' ? 'var(--crimson-400)' : a.severity === 'warning' ? 'var(--amber-400)' : 'var(--cobalt-400)'}` }}>
+                  <div className="alert-item-top">
+                    {a.severity === 'danger' ? <AlertTriangle size={13} color="var(--crimson-400)" /> : a.severity === 'success' ? <CheckCircle size={13} color="var(--emerald-400)" /> : <AlertTriangle size={13} color="var(--amber-400)" />}
+                    <span className="alert-item-title">{a.title}</span>
+                    <span className="alert-time">{new Date(a.createdAt).toLocaleDateString('zh-TW')}</span>
+                  </div>
+                  {a.description && <div className="alert-item-msg">{a.description}</div>}
+                </div>
+              ))}
+              {data.alerts.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: 'var(--slate-500)', fontSize: 12 }}>無系統警示</div>}
+            </div>
+          </div>
+
+          {/* ── 今日行程 Widget ── */}
+          <TodayEventsWidget events={calendarEvents} onNavigate={navigate} />
+
+          {/* ── 快捷工具箱 ── */}
+          <div className="glass-card quick-actions-card" style={{ padding: '16px' }}>
+            <div className="section-header" style={{ padding: 0, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Zap size={14} style={{ color: 'var(--cobalt-300)' }} />
+                <h3 className="section-title" style={{ fontSize: 13 }}>快捷工具箱</h3>
+              </div>
+            </div>
+            <div className="quick-action-grid">
+              {quickActions.map((a, i) => (
+                <button key={i} className="quick-action-btn" onClick={() => navigate(a.action as any)}>
+                  <div className="quick-action-icon" style={{ color: a.color, background: `${a.color}15` }}>
+                    {a.icon}
+                  </div>
+                  <span className="quick-action-label">{a.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── 公司行事曆（MiniCalendar + 真實資料）── */}
+          <div className="glass-card" style={{ padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <Calendar size={14} style={{ color: 'var(--cobalt-300)' }} />
+              <h3 className="section-title" style={{ fontSize: 13 }}>公司行事曆</h3>
+            </div>
+            <MiniCalendar events={calendarEvents} onNavigate={navigate} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

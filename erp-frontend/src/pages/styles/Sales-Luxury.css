@@ -11,12 +11,12 @@
 .sales-container {
   min-height: 100vh;
   padding: 2.5rem;
-  background-color: var(--lux-obsidian);
-  color: #fff;
+  background-color: var(--theme-background, var(--lux-obsidian));
+  color: var(--theme-text, #fff);
   font-family: var(--font-body);
   background-image: 
-    radial-gradient(circle at 0% 0%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--lux-gold) 3%, transparent) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--lux-emerald) 3%, transparent) 0%, transparent 50%);
 }
 
 .lux-header {
@@ -87,7 +87,7 @@
 }
 
 .lux-stat-label {
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   font-size: 0.8rem;
   font-weight: 700;
   margin-bottom: 0.75rem;
@@ -99,7 +99,7 @@
   font-family: var(--font-mono);
   font-size: 2.25rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary, #fff);
 }
 
 /* 導覽按鈕組合 */
@@ -119,7 +119,7 @@
   transition: all 0.3s ease;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   cursor: pointer;
 }
 
@@ -151,7 +151,7 @@
 .lux-search-box input {
   background: transparent;
   border: none;
-  color: #fff;
+  color: var(--text-primary, #fff);
   width: 100%;
   outline: none;
 }

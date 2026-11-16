@@ -38,6 +38,12 @@
         {
           "locationAlwaysAndWhenInUsePermission": "允許APP使用您的位置進行打卡驗證"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "允許APP使用相機掃描庫存與成品批號 QR Code"
+        }
       ]
     ]
   }

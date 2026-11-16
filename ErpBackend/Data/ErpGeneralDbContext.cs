@@ -28,7 +28,7 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-    public DbSet<SystemJob> SystemJobs => Set<SystemJob>();
+    public DbSet<DisclosureLog> DisclosureLogs => Set<DisclosureLog>();
     public DbSet<SystemConfig> SystemConfigs => Set<SystemConfig>();
     public DbSet<NotificationQueue> NotificationQueues => Set<NotificationQueue>();
     public DbSet<UserThemePreference> UserThemePreferences => Set<UserThemePreference>();
@@ -59,7 +59,6 @@ public class ErpGeneralDbContext : DbContext
 
     // ========== Inventory ==========
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
-    public DbSet<WarehouseType> WarehouseTypes => Set<WarehouseType>();
     public DbSet<BinLocation> BinLocations => Set<BinLocation>();
     public DbSet<Uom> Uoms => Set<Uom>();
     public DbSet<UomConversion> UomConversions => Set<UomConversion>();
@@ -67,19 +66,22 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<UomGroupMember> UomGroupMembers => Set<UomGroupMember>();
     public DbSet<Sku> Skus => Set<Sku>();
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<ProductionReceipt> ProductionReceipts => Set<ProductionReceipt>();
+    public DbSet<ProductionReceiptItem> ProductionReceiptItems => Set<ProductionReceiptItem>();
     public DbSet<InventoryLot> InventoryLots => Set<InventoryLot>();
     public DbSet<SerialNumber> SerialNumbers => Set<SerialNumber>();
-    public DbSet<ErpBackend.Models.Inventory.InventoryReservation> InventoryReservations => Set<ErpBackend.Models.Inventory.InventoryReservation>();
+    public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<MaterialIssue> MaterialIssues => Set<MaterialIssue>();
     public DbSet<MaterialIssueItem> MaterialIssueItems => Set<MaterialIssueItem>();
+    public DbSet<MaterialIssueItemAllocation> MaterialIssueItemAllocations => Set<MaterialIssueItemAllocation>();
     public DbSet<MaterialReturn> MaterialReturns => Set<MaterialReturn>();
     public DbSet<MaterialReturnItem> MaterialReturnItems => Set<MaterialReturnItem>();
     public DbSet<MaterialSupplement> MaterialSupplements => Set<MaterialSupplement>();
     public DbSet<MaterialSupplementItem> MaterialSupplementItems => Set<MaterialSupplementItem>();
     public DbSet<SubcontractOrder> SubcontractOrders => Set<SubcontractOrder>();
     public DbSet<SubcontractItem> SubcontractItems => Set<SubcontractItem>();
-    public DbSet<InventoryTransfer> InventoryTransfers => Set<InventoryTransfer>();
-    public DbSet<InventoryTransferItem> InventoryTransferItems => Set<InventoryTransferItem>();
+    public DbSet<TransferOrder> TransferOrders => Set<TransferOrder>();
+    public DbSet<TransferOrderItem> TransferOrderItems => Set<TransferOrderItem>();
     public DbSet<CompletionOrder> CompletionOrders => Set<CompletionOrder>();
     public DbSet<CompletionOrderItem> CompletionOrderItems => Set<CompletionOrderItem>();
     public DbSet<DemandForecast> DemandForecasts => Set<DemandForecast>();
@@ -130,6 +132,10 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<WorkOrderMaterial> WorkOrderMaterials => Set<WorkOrderMaterial>();
     public DbSet<WorkOrderOperation> WorkOrderOperations { get; set; } = null!;
     public DbSet<WipReport> WipReports { get; set; } = null!;
+    public DbSet<WipReportEquipmentHour> WipReportEquipmentHours => Set<WipReportEquipmentHour>();
+    public DbSet<WipReportParticipant> WipReportParticipants => Set<WipReportParticipant>();
+    public DbSet<WipReportAuditEvent> WipReportAuditEvents => Set<WipReportAuditEvent>();
+    public DbSet<EquipmentUsageRecord> EquipmentUsageRecords => Set<EquipmentUsageRecord>();
     public DbSet<ScrapRecord> ScrapRecords { get; set; } = null!;
     public DbSet<ApsScheduleResult> ApsScheduleResults { get; set; } = null!;
     public DbSet<Equipment> Equipments => Set<Equipment>();
@@ -177,8 +183,11 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<Rfq> Rfqs => Set<Rfq>();
     public DbSet<RfqItem> RfqItems => Set<RfqItem>();
     public DbSet<RfqSupplierResponse> RfqSupplierResponses => Set<RfqSupplierResponse>();
+    public DbSet<RfqSupplierInvitation> RfqSupplierInvitations => Set<RfqSupplierInvitation>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+    public DbSet<PurchaseOrderSupplierResponse> PurchaseOrderSupplierResponses => Set<PurchaseOrderSupplierResponse>();
+    public DbSet<PurchaseOrderSupplierResponseItem> PurchaseOrderSupplierResponseItems => Set<PurchaseOrderSupplierResponseItem>();
     public DbSet<Asn> Asns => Set<Asn>();
     public DbSet<AsnItem> AsnItems => Set<AsnItem>();
     public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
@@ -187,6 +196,11 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<AccountsPayableItem> AccountsPayableItems => Set<AccountsPayableItem>();
     public DbSet<PaymentBatch> PaymentBatches => Set<PaymentBatch>();
     public DbSet<PaymentRecord> PaymentRecords => Set<PaymentRecord>();
+    public DbSet<SupplierApSubmission> SupplierApSubmissions => Set<SupplierApSubmission>();
+    public DbSet<SupplierApSubmissionRevision> SupplierApSubmissionRevisions => Set<SupplierApSubmissionRevision>();
+    public DbSet<SupplierApSubmissionRevisionLine> SupplierApSubmissionRevisionLines => Set<SupplierApSubmissionRevisionLine>();
+    public DbSet<SupplierApSubmissionAttachment> SupplierApSubmissionAttachments => Set<SupplierApSubmissionAttachment>();
+    public DbSet<SupplierApSubmissionReview> SupplierApSubmissionReviews => Set<SupplierApSubmissionReview>();
 
      // ========== R&D ==========
      public DbSet<RndProject> RndProjects => Set<RndProject>();
@@ -223,8 +237,284 @@ public class ErpGeneralDbContext : DbContext
 
     // ========== Accounting ==========
     public DbSet<GLAccount> GLAccounts => Set<GLAccount>();
+    public DbSet<GLAccountMapping> GLAccountMappings => Set<GLAccountMapping>();
     public DbSet<AccountingVoucher> AccountingVouchers => Set<AccountingVoucher>();
+    public DbSet<SalesCreditNote> SalesCreditNotes => Set<SalesCreditNote>();
+    public DbSet<SalesCreditNoteApproval> SalesCreditNoteApprovals => Set<SalesCreditNoteApproval>();
+    public DbSet<SupplierDebitNote> SupplierDebitNotes => Set<SupplierDebitNote>();
+    public DbSet<SupplierDebitNoteApproval> SupplierDebitNoteApprovals => Set<SupplierDebitNoteApproval>();
     public DbSet<AccountingEntry> AccountingEntries => Set<AccountingEntry>();
+    public DbSet<AccountingPeriod> AccountingPeriods => Set<AccountingPeriod>();
+
+    public override int SaveChanges()
+    {
+        ValidateAccountingChanges();
+        return base.SaveChanges();
+    }
+
+    private void ValidateSupplierDebitNoteMutations()
+    {
+        foreach (var entry in ChangeTracker.Entries<SupplierDebitNote>()
+                     .Where(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            if (entry.OriginalValues.GetValue<string>(nameof(SupplierDebitNote.Status))
+                .Equals("Posted", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("已過帳採購借項單不可修改或刪除");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<SupplierDebitNote>()
+                     .Where(entry => entry.State == EntityState.Added &&
+                                     entry.Entity.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("採購借項單必須經過簽核與過帳流程");
+
+        if (ChangeTracker.Entries<SupplierDebitNoteApproval>()
+            .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("採購借項簽核紀錄不可修改或刪除");
+
+        foreach (var entry in ChangeTracker.Entries<SupplierDebitNoteApproval>()
+                     .Where(entry => entry.State == EntityState.Added))
+        {
+            var note = SupplierDebitNotes.Local.FirstOrDefault(item => item.Id == entry.Entity.SupplierDebitNoteId);
+            var isPosted = note is not null
+                ? note.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)
+                : SupplierDebitNotes.Any(item =>
+                    item.Id == entry.Entity.SupplierDebitNoteId &&
+                    item.Status.ToUpper() == "POSTED");
+            if (isPosted)
+                throw new InvalidOperationException("已過帳採購借項單不可新增簽核紀錄");
+        }
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ValidateAccountingChanges();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return SaveChangesAsync(true, cancellationToken);
+    }
+
+    public override async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        await ValidateAccountingChangesAsync(cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void ValidateAccountingChanges()
+    {
+        ChangeTracker.DetectChanges();
+        ValidatePostedVoucherMutations();
+        ValidateSalesCreditNoteMutations();
+        ValidateSupplierDebitNoteMutations();
+        ValidateWorkOrderCostVarianceMutations();
+        ValidateClosedPeriodMutations();
+        ValidatePeriodRanges();
+
+        foreach (var voucherEntry in ChangeTracker.Entries<AccountingVoucher>()
+                     .Where(entry => entry.State is EntityState.Added or EntityState.Modified &&
+                                     entry.Entity.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)))
+        {
+            AccountingVoucherRules.ValidateForPosting(voucherEntry.Entity);
+            var postingDate = DateOnly.FromDateTime(voucherEntry.Entity.VoucherDate);
+            if (IsClosedAccountingPeriod(postingDate))
+                throw new InvalidOperationException("傳票日期所屬會計期間已關帳，禁止過帳");
+        }
+    }
+
+    private async Task ValidateAccountingChangesAsync(CancellationToken cancellationToken)
+    {
+        ChangeTracker.DetectChanges();
+        ValidatePostedVoucherMutations();
+        ValidateSalesCreditNoteMutations();
+        ValidateSupplierDebitNoteMutations();
+        ValidateWorkOrderCostVarianceMutations();
+        ValidateClosedPeriodMutations();
+        await ValidatePeriodRangesAsync(cancellationToken);
+
+        foreach (var voucherEntry in ChangeTracker.Entries<AccountingVoucher>()
+                     .Where(entry => entry.State is EntityState.Added or EntityState.Modified &&
+                                     entry.Entity.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)))
+        {
+            AccountingVoucherRules.ValidateForPosting(voucherEntry.Entity);
+            var postingDate = DateOnly.FromDateTime(voucherEntry.Entity.VoucherDate);
+            if (AccountingPeriods.Local.Any(period =>
+                    period.IsClosed &&
+                    period.StartDate <= postingDate &&
+                    period.EndDate >= postingDate) ||
+                await AccountingPeriods.AnyAsync(
+                    period => period.IsClosed &&
+                              period.StartDate <= postingDate &&
+                              period.EndDate >= postingDate,
+                    cancellationToken))
+                throw new InvalidOperationException("傳票日期所屬會計期間已關帳，禁止過帳");
+        }
+    }
+
+    private void ValidateWorkOrderCostVarianceMutations()
+    {
+        foreach (var entry in ChangeTracker.Entries<WorkOrderCostVarianceAllocation>()
+                     .Where(entry => entry.State == EntityState.Added &&
+                                     !entry.Entity.Status.Equals("PendingApproval", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("工單成本差異分攤必須經過簽核流程");
+
+        foreach (var entry in ChangeTracker.Entries<WorkOrderCostVarianceAllocation>()
+                     .Where(entry => entry.State == EntityState.Deleted ||
+                                     entry.State == EntityState.Modified &&
+                                     !entry.OriginalValues.GetValue<string>(
+                                         nameof(WorkOrderCostVarianceAllocation.Status))
+                                     .Equals("PendingApproval", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("已簽核或刪除的工單成本差異分攤不可修改或刪除");
+
+        if (ChangeTracker.Entries<WorkOrderCostVarianceAllocationApproval>()
+            .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("工單成本差異簽核紀錄不可修改或刪除");
+    }
+
+    private bool IsClosedAccountingPeriod(DateOnly postingDate) =>
+        AccountingPeriods.Local.Any(period =>
+            period.IsClosed &&
+            period.StartDate <= postingDate &&
+            period.EndDate >= postingDate) ||
+        AccountingPeriods.Any(period =>
+            period.IsClosed &&
+            period.StartDate <= postingDate &&
+            period.EndDate >= postingDate);
+
+    private void ValidateClosedPeriodMutations()
+    {
+        foreach (var entry in ChangeTracker.Entries<AccountingPeriod>()
+                     .Where(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            if (entry.OriginalValues.GetValue<bool>(nameof(AccountingPeriod.IsClosed)))
+                throw new InvalidOperationException("已關帳會計期間不可修改或刪除");
+        }
+    }
+
+    private void ValidatePeriodRanges()
+    {
+        foreach (var entry in ChangeTracker.Entries<AccountingPeriod>()
+                     .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+        {
+            if (entry.Entity.StartDate > entry.Entity.EndDate)
+                throw new InvalidOperationException("會計期間起日不可晚於迄日");
+            if (HasOverlappingPeriod(entry.Entity))
+                throw new InvalidOperationException("會計期間日期不可與既有期間重疊");
+        }
+    }
+
+    private async Task ValidatePeriodRangesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var entry in ChangeTracker.Entries<AccountingPeriod>()
+                     .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+        {
+            if (entry.Entity.StartDate > entry.Entity.EndDate)
+                throw new InvalidOperationException("會計期間起日不可晚於迄日");
+            if (AccountingPeriods.Local.Any(period =>
+                    period.Id != entry.Entity.Id &&
+                    Entry(period).State != EntityState.Deleted &&
+                    period.StartDate <= entry.Entity.EndDate &&
+                    period.EndDate >= entry.Entity.StartDate) ||
+                await AccountingPeriods.AnyAsync(
+                    period => period.Id != entry.Entity.Id &&
+                              period.StartDate <= entry.Entity.EndDate &&
+                              period.EndDate >= entry.Entity.StartDate,
+                    cancellationToken))
+                throw new InvalidOperationException("會計期間日期不可與既有期間重疊");
+        }
+    }
+
+    private bool HasOverlappingPeriod(AccountingPeriod period) =>
+        AccountingPeriods.Local.Any(candidate =>
+            candidate.Id != period.Id &&
+            Entry(candidate).State != EntityState.Deleted &&
+            candidate.StartDate <= period.EndDate &&
+            candidate.EndDate >= period.StartDate) ||
+        AccountingPeriods.Any(candidate =>
+            candidate.Id != period.Id &&
+            candidate.StartDate <= period.EndDate &&
+            candidate.EndDate >= period.StartDate);
+
+    private void ValidatePostedVoucherMutations()
+    {
+        var changedVouchers = ChangeTracker.Entries<AccountingVoucher>()
+            .Where(entry => entry.State is EntityState.Modified or EntityState.Deleted);
+        foreach (var entry in changedVouchers)
+        {
+            if (entry.OriginalValues.GetValue<string>(nameof(AccountingVoucher.Status))
+                .Equals("Posted", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("已過帳傳票不可直接修改或刪除，請建立沖銷傳票");
+        }
+
+        var changedLines = ChangeTracker.Entries<AccountingEntry>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
+        foreach (var entry in changedLines)
+        {
+            var voucherIds = new HashSet<Guid>();
+            if (entry.State != EntityState.Added)
+                voucherIds.Add(entry.OriginalValues.GetValue<Guid>(nameof(AccountingEntry.VoucherId)));
+            if (entry.State != EntityState.Deleted)
+                voucherIds.Add(entry.Entity.VoucherId);
+
+            foreach (var voucherId in voucherIds)
+            {
+                var trackedVoucher = AccountingVouchers.Local
+                    .FirstOrDefault(voucher => voucher.Id == voucherId);
+                if (trackedVoucher is not null)
+                {
+                    var state = Entry(trackedVoucher).State;
+                    if (state == EntityState.Added)
+                        continue;
+                    if (state == EntityState.Deleted ||
+                        (state != EntityState.Detached &&
+                         trackedVoucher.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidOperationException("已過帳傳票分錄不可直接修改或刪除，請建立沖銷傳票");
+                    continue;
+                }
+
+                if (AccountingVouchers.Any(voucher =>
+                        voucher.Id == voucherId &&
+                        voucher.Status.ToUpper() == "POSTED"))
+                    throw new InvalidOperationException("已過帳傳票分錄不可直接修改或刪除，請建立沖銷傳票");
+            }
+        }
+    }
+
+    private void ValidateSalesCreditNoteMutations()
+    {
+        foreach (var entry in ChangeTracker.Entries<SalesCreditNote>()
+                     .Where(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            if (entry.OriginalValues.GetValue<string>(nameof(SalesCreditNote.Status))
+                .Equals("Posted", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("已過帳銷貨折讓單不可修改或刪除");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<SalesCreditNote>()
+                     .Where(entry => entry.State == EntityState.Added &&
+                                     entry.Entity.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("銷貨折讓單必須經過簽核與過帳流程");
+
+        if (ChangeTracker.Entries<SalesCreditNoteApproval>()
+            .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("銷貨折讓簽核紀錄不可修改或刪除");
+
+        foreach (var entry in ChangeTracker.Entries<SalesCreditNoteApproval>()
+                     .Where(entry => entry.State == EntityState.Added))
+        {
+            var note = SalesCreditNotes.Local.FirstOrDefault(item => item.Id == entry.Entity.SalesCreditNoteId);
+            var isPosted = note is not null
+                ? note.Status.Equals("Posted", StringComparison.OrdinalIgnoreCase)
+                : SalesCreditNotes.Any(item =>
+                    item.Id == entry.Entity.SalesCreditNoteId &&
+                    item.Status.ToUpper() == "POSTED");
+            if (isPosted)
+                throw new InvalidOperationException("已過帳銷貨折讓單不可新增簽核紀錄");
+        }
+    }
 
     // ========== Cost Center ==========
     public DbSet<CostCenter> CostCenters => Set<CostCenter>();
@@ -240,6 +530,10 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<WorkOrderLaborActual> WorkOrderLaborActuals => Set<WorkOrderLaborActual>();
     public DbSet<WorkOrderMachineActual> WorkOrderMachineActuals => Set<WorkOrderMachineActual>();
     public DbSet<WorkOrderCost> WorkOrderCosts => Set<WorkOrderCost>();
+    public DbSet<WorkOrderCostVarianceAllocation> WorkOrderCostVarianceAllocations =>
+        Set<WorkOrderCostVarianceAllocation>();
+    public DbSet<WorkOrderCostVarianceAllocationApproval> WorkOrderCostVarianceAllocationApprovals =>
+        Set<WorkOrderCostVarianceAllocationApproval>();
 
     // ========== Budget ==========
     public DbSet<BudgetYear> BudgetYears => Set<BudgetYear>();
@@ -258,12 +552,20 @@ public class ErpGeneralDbContext : DbContext
     public DbSet<IqcReport> IqcReports => Set<IqcReport>();
     public DbSet<IqcReportItem> IqcReportItems => Set<IqcReportItem>();
     public DbSet<IpqcReport> IpqcReports => Set<IpqcReport>();
-    public DbSet<QaReviewLog> QaReviewLogs => Set<QaReviewLog>();
     public DbSet<IpqcReportItem> IpqcReportItems => Set<IpqcReportItem>();
     public DbSet<OqcReport> OqcReports => Set<OqcReport>();
+    public DbSet<InspectionTemplate> InspectionTemplates => Set<InspectionTemplate>();
+    public DbSet<InspectionTemplateItem> InspectionTemplateItems => Set<InspectionTemplateItem>();
+    public DbSet<ProcessInspectionReport> ProcessInspectionReports => Set<ProcessInspectionReport>();
+    public DbSet<ProcessInspectionReportItem> ProcessInspectionReportItems => Set<ProcessInspectionReportItem>();
+    public DbSet<FqcInspectionLot> FqcInspectionLots => Set<FqcInspectionLot>();
+    public DbSet<FqcInspectionFinding> FqcInspectionFindings => Set<FqcInspectionFinding>();
     public DbSet<NonConformanceReport> NonConformanceReports => Set<NonConformanceReport>();
     public DbSet<SupplierComplaint> SupplierComplaints => Set<SupplierComplaint>();
     public DbSet<SupplierCapa> SupplierCapas => Set<SupplierCapa>();
+    public DbSet<SupplierCapaResponseRevision> SupplierCapaResponseRevisions => Set<SupplierCapaResponseRevision>();
+    public DbSet<SupplierCapaReview> SupplierCapaReviews => Set<SupplierCapaReview>();
+    public DbSet<SupplierCapaAttachment> SupplierCapaAttachments => Set<SupplierCapaAttachment>();
 
     // ========== Portal ==========
     public DbSet<SupplierUser> SupplierUsers => Set<SupplierUser>();
@@ -295,6 +597,7 @@ public class ErpGeneralDbContext : DbContext
     // ========== Collaboration ==========
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<AnnouncementReadLog> AnnouncementReadLogs => Set<AnnouncementReadLog>();
+    public DbSet<AnnouncementRecipient> AnnouncementRecipients => Set<AnnouncementRecipient>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<CalendarCategory> CalendarCategories => Set<CalendarCategory>();
     public DbSet<CalendarShare> CalendarShares => Set<CalendarShare>();
@@ -326,11 +629,9 @@ public class ErpGeneralDbContext : DbContext
             {
                 modelBuilder.Entity(entityType.ClrType).Property<Guid?>("ModifiedBy");
             }
-            if (entityType.ClrType.GetProperty("CreatedAt") == null)
+if (entityType.ClrType.GetProperty("CreatedAt") == null)
             {
-                var isPostgres = Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
-                modelBuilder.Entity(entityType.ClrType).Property<DateTime>("CreatedAt")
-                    .HasDefaultValueSql(isPostgres ? "now()" : "GETUTCDATE()");
+                modelBuilder.Entity(entityType.ClrType).Property<DateTime>("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
             }
             if (entityType.ClrType.GetProperty("ModifiedAt") == null)
             {
@@ -350,11 +651,14 @@ public class ErpGeneralDbContext : DbContext
 
         // ========== System: Indexes ==========
         modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
+        modelBuilder.Entity<User>().Property(u => u.SecurityVersion).HasDefaultValue(0L);
         modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique();
         modelBuilder.Entity<Permission>().HasIndex(p => p.PermissionCode).IsUnique();
         modelBuilder.Entity<RolePermission>().HasIndex(rp => new { rp.RoleId, rp.PermissionId }).IsUnique();
         modelBuilder.Entity<UserRole>().HasIndex(ur => new { ur.UserId, ur.RoleId }).IsUnique();
         modelBuilder.Entity<AuditLog>().HasIndex(a => a.CreatedAt);
+        modelBuilder.Entity<DisclosureLog>().HasIndex(log => log.TraceId);
+        modelBuilder.Entity<DisclosureLog>().HasIndex(log => new { log.ActorUserId, log.CreatedAt });
         modelBuilder.Entity<SystemConfig>().HasIndex(s => s.ConfigKey).IsUnique();
 
         // ========== HR: Indexes ==========
@@ -401,17 +705,29 @@ public class ErpGeneralDbContext : DbContext
         modelBuilder.Entity<SerialNumber>().HasIndex(sn => sn.SerialNo).IsUnique();
         modelBuilder.Entity<InventoryTransaction>().HasIndex(it => it.CreatedAt);
         modelBuilder.Entity<InventoryTransaction>().HasIndex(it => new { it.SkuId, it.CreatedAt });
+        modelBuilder.Entity<InventoryTransaction>()
+            .HasOne<InventoryTransaction>()
+            .WithMany()
+            .HasForeignKey(it => it.ReversalOfTransactionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InventoryTransaction>()
+            .HasIndex(it => it.ReversalOfTransactionId)
+            .IsUnique()
+            .HasFilter("\"ReversalOfTransactionId\" IS NOT NULL");
         modelBuilder.Entity<MaterialIssue>().HasIndex(mi => mi.IssueNumber).IsUnique();
         modelBuilder.Entity<MaterialIssue>().HasOne<ErpBackend.Models.MES.WorkOrder>().WithMany().HasForeignKey(mi => mi.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<MaterialIssueItem>().HasOne(mii => mii.Issue).WithMany(mi => mi.Items).HasForeignKey(mii => mii.IssueId);
+        modelBuilder.Entity<MaterialIssueItem>().HasOne(mii => mii.Sku).WithMany().HasForeignKey(mii => mii.SkuId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<MaterialIssue>().HasOne(mi => mi.WorkOrder).WithMany().HasForeignKey(mi => mi.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<MaterialIssue>().HasOne(mi => mi.IssueWarehouse).WithMany().HasForeignKey(mi => mi.IssueWarehouseId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<MaterialReturn>().HasIndex(mr => mr.ReturnNumber).IsUnique();
         modelBuilder.Entity<MaterialReturnItem>().HasOne(mri => mri.Return).WithMany(mr => mr.Items).HasForeignKey(mri => mri.ReturnId);
         modelBuilder.Entity<MaterialSupplement>().HasIndex(ms => ms.SupplementNumber).IsUnique();
         modelBuilder.Entity<MaterialSupplementItem>().HasOne(msi => msi.Supplement).WithMany(ms => ms.Items).HasForeignKey(msi => msi.SupplementId);
         modelBuilder.Entity<SubcontractOrder>().HasIndex(so => so.SubcontractNumber).IsUnique();
         modelBuilder.Entity<SubcontractItem>().HasOne(si => si.SubcontractOrder).WithMany(so => so.Items).HasForeignKey(si => si.SubcontractOrderId);
-        modelBuilder.Entity<InventoryTransfer>().HasIndex(to => to.TransferNumber).IsUnique();
-        modelBuilder.Entity<InventoryTransferItem>().HasOne(t => t.InventoryTransfer).WithMany(to => to.Items).HasForeignKey(t => t.InventoryTransferId);
+        modelBuilder.Entity<TransferOrder>().HasIndex(to => to.TransferNumber).IsUnique();
+        modelBuilder.Entity<TransferOrderItem>().HasOne(t => t.TransferOrder).WithMany(to => to.Items).HasForeignKey(t => t.TransferOrderId);
         modelBuilder.Entity<CompletionOrder>().HasIndex(co => co.CompletionNumber).IsUnique();
         modelBuilder.Entity<CompletionOrderItem>().HasOne(coi => coi.CompletionOrder).WithMany(co => co.Items).HasForeignKey(coi => coi.CompletionOrderId);
         modelBuilder.Entity<StocktakeOrder>().HasIndex(so => so.StocktakeNumber).IsUnique();
@@ -466,6 +782,62 @@ public class ErpGeneralDbContext : DbContext
         modelBuilder.Entity<WorkOrderMaterial>().HasOne(wom => wom.WorkOrder).WithMany(wo => wo.Materials).HasForeignKey(wom => wom.WorkOrderId);
         modelBuilder.Entity<WorkOrderOperation>().HasOne(woo => woo.WorkOrder).WithMany(wo => wo.Operations).HasForeignKey(woo => woo.WorkOrderId);
         modelBuilder.Entity<WipReport>().HasIndex(wr => wr.ReportNumber).IsUnique();
+        modelBuilder.Entity<WipReportEquipmentHour>()
+            .HasIndex(hour => new { hour.WipReportId, hour.EquipmentId })
+            .IsUnique();
+        modelBuilder.Entity<WipReportEquipmentHour>()
+            .HasOne(hour => hour.WipReport)
+            .WithMany(report => report.EquipmentHours)
+            .HasForeignKey(hour => hour.WipReportId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<WipReportEquipmentHour>()
+            .HasOne(hour => hour.Equipment)
+            .WithMany()
+            .HasForeignKey(hour => hour.EquipmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<WipReportParticipant>()
+            .HasIndex(participant => new { participant.WipReportId, participant.EmployeeId })
+            .IsUnique();
+        modelBuilder.Entity<WipReportParticipant>()
+            .HasOne(participant => participant.WipReport)
+            .WithMany(report => report.Participants)
+            .HasForeignKey(participant => participant.WipReportId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<WipReportParticipant>()
+            .HasOne(participant => participant.Employee)
+            .WithMany()
+            .HasForeignKey(participant => participant.EmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<WipReportAuditEvent>()
+            .HasOne(auditEvent => auditEvent.WipReport)
+            .WithMany(report => report.AuditEvents)
+            .HasForeignKey(auditEvent => auditEvent.WipReportId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<EquipmentUsageRecord>()
+            .HasOne(usage => usage.WorkOrder)
+            .WithMany()
+            .HasForeignKey(usage => usage.WorkOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<EquipmentUsageRecord>()
+            .HasOne(usage => usage.Equipment)
+            .WithMany()
+            .HasForeignKey(usage => usage.EquipmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<EquipmentUsageRecord>()
+            .HasOne(usage => usage.RecordedByEmployee)
+            .WithMany()
+            .HasForeignKey(usage => usage.RecordedByEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<EquipmentUsageRecord>()
+            .HasIndex(usage => new { usage.WorkOrderId, usage.OperationSeq, usage.EquipmentId, usage.StartTime });
+        modelBuilder.Entity<WorkOrderMachineActual>()
+            .HasIndex(actual => actual.EquipmentUsageRecordId)
+            .IsUnique();
+        modelBuilder.Entity<WorkOrderMachineActual>()
+            .HasOne<EquipmentUsageRecord>()
+            .WithMany()
+            .HasForeignKey(actual => actual.EquipmentUsageRecordId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Equipment>().HasOne(e => e.Supplier).WithMany().HasForeignKey(e => e.SupplierId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Equipment>().HasOne(e => e.WorkCenter).WithMany().HasForeignKey(e => e.WorkCenterId).OnDelete(DeleteBehavior.SetNull);
 
@@ -487,15 +859,20 @@ public class ErpGeneralDbContext : DbContext
         modelBuilder.Entity<SalesOrderItem>().HasOne(soi => soi.Bom).WithMany().HasForeignKey(soi => soi.BomId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<SalesOrderItem>().HasOne(soi => soi.Routing).WithMany().HasForeignKey(soi => soi.RoutingId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<SalesOrderItem>().HasOne(soi => soi.WorkCenter).WithMany().HasForeignKey(soi => soi.WorkCenterId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<BankAccount>().HasOne(account => account.GLAccount).WithMany().HasForeignKey(account => account.GLAccountId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<SalesOrderProductionLink>().HasIndex(sopl => sopl.SalesOrderItemId);
         modelBuilder.Entity<SalesOrderProductionLink>().HasOne(sopl => sopl.SalesOrderItem).WithMany(soi => soi.ProductionLinks).HasForeignKey(sopl => sopl.SalesOrderItemId);
         modelBuilder.Entity<DeliveryOrder>().HasIndex(d => d.DeliveryNumber).IsUnique();
         modelBuilder.Entity<DeliveryOrder>().HasOne<ErpBackend.Models.Sales.SalesOrder>().WithMany().HasForeignKey(d => d.SalesOrderId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<DeliveryOrderItem>().HasOne(doi => doi.DeliveryOrder).WithMany(d => d.Items).HasForeignKey(doi => doi.DeliveryOrderId);
+        modelBuilder.Entity<DeliveryOrderItem>().HasOne(item => item.Warehouse).WithMany().HasForeignKey(item => item.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<DeliveryOrderItem>().HasOne(item => item.BinLocation).WithMany().HasForeignKey(item => item.BinLocationId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<SalesInvoice>().HasIndex(si => si.InvoiceNumber).IsUnique();
         modelBuilder.Entity<SalesInvoiceItem>().HasOne(sii => sii.SalesInvoice).WithMany(si => si.Items).HasForeignKey(sii => sii.SalesInvoiceId);
         modelBuilder.Entity<CashReceipt>().HasIndex(cr => cr.ReceiptNumber).IsUnique();
+        modelBuilder.Entity<CashReceipt>().Property(cr => cr.Currency).HasDefaultValue("TWD");
         modelBuilder.Entity<CashReceiptAllocation>().HasOne(cra => cra.CashReceipt).WithMany(cr => cr.Allocations).HasForeignKey(cra => cra.CashReceiptId);
+        modelBuilder.Entity<CashReceipt>().HasOne(receipt => receipt.BankAccount).WithMany().HasForeignKey(receipt => receipt.BankAccountId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<MonthlyPeriod>().HasIndex(mp => new { mp.Year, mp.Month }).IsUnique();
 
         // ========== Procurement: Indexes & Relations ==========
@@ -507,9 +884,17 @@ public class ErpGeneralDbContext : DbContext
         modelBuilder.Entity<Rfq>().HasIndex(r => r.RfqNumber).IsUnique();
         modelBuilder.Entity<RfqItem>().HasOne(ri => ri.Rfq).WithMany(r => r.Items).HasForeignKey(ri => ri.RfqId);
         modelBuilder.Entity<RfqSupplierResponse>().HasOne(rsr => rsr.Rfq).WithMany(r => r.SupplierResponses).HasForeignKey(rsr => rsr.RfqId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<RfqSupplierInvitation>().HasIndex(invitation => new { invitation.RfqId, invitation.SupplierId }).IsUnique();
+        modelBuilder.Entity<RfqSupplierInvitation>().HasOne(invitation => invitation.Rfq).WithMany(rfq => rfq.SupplierInvitations).HasForeignKey(invitation => invitation.RfqId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<RfqSupplierInvitation>().HasOne(invitation => invitation.Supplier).WithMany().HasForeignKey(invitation => invitation.SupplierId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<PurchaseOrder>().HasIndex(po => po.PoNumber).IsUnique();
         modelBuilder.Entity<PurchaseOrder>().HasOne(po => po.Supplier).WithMany().HasForeignKey(po => po.SupplierId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<PurchaseOrderItem>().HasOne(poi => poi.PurchaseOrder).WithMany(po => po.Items).HasForeignKey(poi => poi.PurchaseOrderId);
+        modelBuilder.Entity<PurchaseOrderSupplierResponse>().HasIndex(response => new { response.PurchaseOrderId, response.SubmittedAt });
+        modelBuilder.Entity<PurchaseOrderSupplierResponse>().HasOne(response => response.PurchaseOrder).WithMany(po => po.SupplierResponses).HasForeignKey(response => response.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PurchaseOrderSupplierResponse>().HasOne(response => response.Supplier).WithMany().HasForeignKey(response => response.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PurchaseOrderSupplierResponseItem>().HasOne(item => item.SupplierResponse).WithMany(response => response.Items).HasForeignKey(item => item.SupplierResponseId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PurchaseOrderSupplierResponseItem>().HasOne(item => item.PurchaseOrderItem).WithMany().HasForeignKey(item => item.PurchaseOrderItemId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Asn>().HasIndex(a => a.AsnNumber).IsUnique();
         modelBuilder.Entity<AsnItem>().HasOne(ai => ai.Asn).WithMany(a => a.Items).HasForeignKey(ai => ai.AsnId);
         modelBuilder.Entity<GoodsReceipt>().HasIndex(gr => gr.GrNumber).IsUnique();
@@ -518,6 +903,119 @@ public class ErpGeneralDbContext : DbContext
         modelBuilder.Entity<AccountsPayableItem>().HasOne(api => api.AccountsPayable).WithMany(ap => ap.Items).HasForeignKey(api => api.AccountsPayableId);
         modelBuilder.Entity<PaymentBatch>().HasIndex(pb => pb.BatchNumber).IsUnique();
         modelBuilder.Entity<PaymentRecord>().HasOne(pr => pr.PaymentBatch).WithMany(pb => pb.Records).HasForeignKey(pr => pr.PaymentBatchId);
+        modelBuilder.Entity<SupplierApSubmission>().HasIndex(submission => submission.SubmissionNumber).IsUnique();
+        modelBuilder.Entity<SupplierApSubmission>().HasIndex(submission =>
+            new { submission.SupplierId, submission.IdempotencyKey }).IsUnique();
+        modelBuilder.Entity<SupplierApSubmission>()
+            .HasIndex(submission => new { submission.SupplierId, submission.SupplierInvoiceNumberKey })
+            .IsUnique()
+            .HasFilter("\"SupplierInvoiceNumberKey\" IS NOT NULL");
+        modelBuilder.Entity<SupplierApSubmission>()
+            .HasIndex(submission => new { submission.SupplierId, submission.Status, submission.CreatedAt });
+        modelBuilder.Entity<SupplierApSubmission>()
+            .HasIndex(submission => submission.GeneratedAccountsPayableId)
+            .IsUnique()
+            .HasFilter("\"GeneratedAccountsPayableId\" IS NOT NULL");
+        modelBuilder.Entity<SupplierApSubmission>()
+            .Property(submission => submission.Version)
+            .IsConcurrencyToken();
+        modelBuilder.Entity<SupplierApSubmission>()
+            .HasOne(submission => submission.Supplier)
+            .WithMany()
+            .HasForeignKey(submission => submission.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmission>()
+            .HasOne(submission => submission.SubmittedBySupplierUser)
+            .WithMany()
+            .HasForeignKey(submission => submission.SubmittedBySupplierUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmission>()
+            .HasOne(submission => submission.GeneratedAccountsPayable)
+            .WithMany()
+            .HasForeignKey(submission => submission.GeneratedAccountsPayableId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevision>()
+            .HasIndex(revision => new { revision.SubmissionId, revision.RevisionNumber })
+            .IsUnique();
+        modelBuilder.Entity<SupplierApSubmissionRevision>()
+            .HasOne(revision => revision.Submission)
+            .WithMany(submission => submission.Revisions)
+            .HasForeignKey(revision => revision.SubmissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevision>()
+            .HasOne(revision => revision.PurchaseOrder)
+            .WithMany()
+            .HasForeignKey(revision => revision.PurchaseOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevision>()
+            .HasOne(revision => revision.GoodsReceipt)
+            .WithMany()
+            .HasForeignKey(revision => revision.GoodsReceiptId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevision>()
+            .HasOne(revision => revision.SubmittedBySupplierUser)
+            .WithMany()
+            .HasForeignKey(revision => revision.SubmittedBySupplierUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevisionLine>()
+            .HasIndex(line => new { line.RevisionId, line.GoodsReceiptItemId })
+            .IsUnique();
+        modelBuilder.Entity<SupplierApSubmissionRevisionLine>()
+            .HasOne(line => line.Revision)
+            .WithMany(revision => revision.Lines)
+            .HasForeignKey(line => line.RevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevisionLine>()
+            .HasOne(line => line.GoodsReceiptItem)
+            .WithMany()
+            .HasForeignKey(line => line.GoodsReceiptItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionRevisionLine>()
+            .HasOne(line => line.PurchaseOrderItem)
+            .WithMany()
+            .HasForeignKey(line => line.PurchaseOrderItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionAttachment>()
+            .HasIndex(attachment => new { attachment.SubmissionId, attachment.RevokedAt });
+        modelBuilder.Entity<SupplierApSubmissionAttachment>()
+            .HasIndex(attachment => new { attachment.RevisionId, attachment.ScanStatus });
+        modelBuilder.Entity<SupplierApSubmissionAttachment>()
+            .HasOne(attachment => attachment.Submission)
+            .WithMany(submission => submission.Attachments)
+            .HasForeignKey(attachment => attachment.SubmissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionAttachment>()
+            .HasOne(attachment => attachment.Revision)
+            .WithMany()
+            .HasForeignKey(attachment => attachment.RevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionAttachment>()
+            .HasOne(attachment => attachment.UploadedBySupplierUser)
+            .WithMany()
+            .HasForeignKey(attachment => attachment.UploadedBySupplierUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionReview>()
+            .HasIndex(review => new { review.SubmissionId, review.CreatedAt });
+        modelBuilder.Entity<SupplierApSubmissionReview>()
+            .HasOne(review => review.Submission)
+            .WithMany(submission => submission.Reviews)
+            .HasForeignKey(review => review.SubmissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionReview>()
+            .HasOne(review => review.Revision)
+            .WithMany()
+            .HasForeignKey(review => review.RevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionReview>()
+            .HasOne(review => review.Reviewer)
+            .WithMany()
+            .HasForeignKey(review => review.ReviewerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierApSubmissionReview>()
+            .HasOne(review => review.AccountsPayable)
+            .WithMany()
+            .HasForeignKey(review => review.AccountsPayableId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // ========== R&D: Indexes ==========
         modelBuilder.Entity<RndProject>().HasIndex(rp => rp.ProjectCode).IsUnique();
@@ -585,9 +1083,121 @@ public class ErpGeneralDbContext : DbContext
         // ========== Accounting: Indexes & Relations ==========
         modelBuilder.Entity<GLAccount>().HasIndex(g => g.AccountCode).IsUnique();
         modelBuilder.Entity<AccountingVoucher>().HasIndex(v => v.VoucherNumber).IsUnique();
+        modelBuilder.Entity<SalesCreditNote>().HasIndex(note => note.CreditNoteNumber).IsUnique();
+        modelBuilder.Entity<SalesCreditNote>().HasIndex(note => note.IdempotencyKey).IsUnique();
+        modelBuilder.Entity<SalesCreditNote>()
+            .HasOne(note => note.SalesInvoice)
+            .WithMany()
+            .HasForeignKey(note => note.SalesInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SalesCreditNote>()
+            .HasOne(note => note.DeliveryOrder)
+            .WithMany()
+            .HasForeignKey(note => note.DeliveryOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SalesCreditNoteApproval>()
+            .HasIndex(approval => new { approval.SalesCreditNoteId, approval.ApprovalRole })
+            .IsUnique();
+        modelBuilder.Entity<SalesCreditNoteApproval>()
+            .HasIndex(approval => new { approval.SalesCreditNoteId, approval.ApproverId })
+            .IsUnique();
+        modelBuilder.Entity<SalesCreditNoteApproval>()
+            .HasOne(approval => approval.SalesCreditNote)
+            .WithMany(note => note.Approvals)
+            .HasForeignKey(approval => approval.SalesCreditNoteId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<SupplierDebitNote>().HasIndex(note => note.DebitNoteNumber).IsUnique();
+        modelBuilder.Entity<SupplierDebitNote>().HasIndex(note => note.IdempotencyKey).IsUnique();
+        modelBuilder.Entity<SupplierDebitNote>()
+            .HasOne(note => note.AccountsPayable)
+            .WithMany()
+            .HasForeignKey(note => note.AccountsPayableId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierDebitNote>()
+            .HasOne(note => note.GoodsReceipt)
+            .WithMany()
+            .HasForeignKey(note => note.GoodsReceiptId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierDebitNote>()
+            .HasOne(note => note.GoodsReceiptItem)
+            .WithMany()
+            .HasForeignKey(note => note.GoodsReceiptItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierDebitNote>()
+            .HasOne(note => note.IqcReport)
+            .WithMany()
+            .HasForeignKey(note => note.IqcReportId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierDebitNote>()
+            .HasOne(note => note.Supplier)
+            .WithMany()
+            .HasForeignKey(note => note.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierDebitNote>()
+            .HasOne(note => note.Sku)
+            .WithMany()
+            .HasForeignKey(note => note.SkuId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierDebitNoteApproval>()
+            .HasIndex(approval => new { approval.SupplierDebitNoteId, approval.ApprovalRole })
+            .IsUnique();
+        modelBuilder.Entity<SupplierDebitNoteApproval>()
+            .HasIndex(approval => new { approval.SupplierDebitNoteId, approval.ApproverId })
+            .IsUnique();
+        modelBuilder.Entity<SupplierDebitNoteApproval>()
+            .HasOne(approval => approval.SupplierDebitNote)
+            .WithMany(note => note.Approvals)
+            .HasForeignKey(approval => approval.SupplierDebitNoteId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<WorkOrderCostVarianceAllocation>()
+            .HasIndex(allocation => new { allocation.WorkOrderId, allocation.Status });
+        modelBuilder.Entity<WorkOrderCostVarianceAllocation>()
+            .HasIndex(allocation => new { allocation.SourceType, allocation.SourceId });
+        modelBuilder.Entity<WorkOrderCostVarianceAllocation>()
+            .HasOne(allocation => allocation.WorkOrder)
+            .WithMany()
+            .HasForeignKey(allocation => allocation.WorkOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<WorkOrderCostVarianceAllocationApproval>()
+            .HasIndex(approval => new { approval.AllocationId, approval.ApprovalRole })
+            .IsUnique();
+        modelBuilder.Entity<WorkOrderCostVarianceAllocationApproval>()
+            .HasIndex(approval => new { approval.AllocationId, approval.ApproverId })
+            .IsUnique();
+        modelBuilder.Entity<WorkOrderCostVarianceAllocationApproval>()
+            .HasOne(approval => approval.Allocation)
+            .WithMany(allocation => allocation.Approvals)
+            .HasForeignKey(approval => approval.AllocationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<InventoryTransaction>()
+            .HasIndex(transaction => new { transaction.RelatedDocType, transaction.RelatedDocId })
+            .IsUnique()
+            .HasFilter("\"RelatedDocType\" = 'SupplierDebitNote'");
         modelBuilder.Entity<AccountingVoucher>().HasIndex(v => v.VoucherDate);
         modelBuilder.Entity<AccountingVoucher>().HasIndex(v => new { v.ReferenceType, v.ReferenceId });
+        modelBuilder.Entity<AccountingVoucher>()
+            .HasIndex(v => new { v.ReferenceType, v.ReferenceId, v.PostingPurpose })
+            .IsUnique()
+            .HasFilter("\"ReferenceType\" IS NOT NULL AND \"ReferenceId\" IS NOT NULL AND \"PostingPurpose\" IS NOT NULL");
+        modelBuilder.Entity<AccountingVoucher>()
+            .HasIndex(voucher => voucher.ReversalOfVoucherId)
+            .IsUnique()
+            .HasFilter("\"ReversalOfVoucherId\" IS NOT NULL");
+        modelBuilder.Entity<AccountingVoucher>()
+            .HasOne(voucher => voucher.ReversalOfVoucher)
+            .WithOne(voucher => voucher.ReversedByVoucher)
+            .HasForeignKey<AccountingVoucher>(voucher => voucher.ReversalOfVoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<GLAccountMapping>()
+            .HasIndex(mapping => mapping.MappingKey)
+            .IsUnique();
+        modelBuilder.Entity<GLAccountMapping>()
+            .HasOne(mapping => mapping.GLAccount)
+            .WithMany()
+            .HasForeignKey(mapping => mapping.GLAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<AccountingEntry>().HasOne(ae => ae.Voucher).WithMany(v => v.Entries).HasForeignKey(ae => ae.VoucherId);
+        modelBuilder.Entity<AccountingPeriod>().HasIndex(period => period.PeriodCode).IsUnique();
 
         // ========== Budget: Relations ==========
         modelBuilder.Entity<BudgetVersion>().HasOne(bv => bv.BudgetYear).WithMany(by => by.Versions).HasForeignKey(bv => bv.BudgetYearId);
@@ -598,18 +1208,91 @@ public class ErpGeneralDbContext : DbContext
 
         // ========== QA: Indexes ==========
         modelBuilder.Entity<IqcReport>().HasIndex(ir => ir.ReportNumber).IsUnique();
+        modelBuilder.Entity<IqcReport>()
+            .HasIndex(ir => ir.GoodsReceiptItemId)
+            .IsUnique()
+            .HasFilter("\"GoodsReceiptItemId\" IS NOT NULL");
+        modelBuilder.Entity<IqcReport>()
+            .HasOne(ir => ir.GoodsReceipt)
+            .WithMany()
+            .HasForeignKey(ir => ir.GoodsReceiptId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<IqcReport>()
+            .HasOne(ir => ir.GoodsReceiptItem)
+            .WithMany()
+            .HasForeignKey(ir => ir.GoodsReceiptItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<IqcReport>()
+            .HasOne(ir => ir.Sku)
+            .WithMany()
+            .HasForeignKey(ir => ir.SkuId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<IqcReport>()
+            .HasOne(ir => ir.ReleaseBinLocation)
+            .WithMany()
+            .HasForeignKey(ir => ir.ReleaseBinLocationId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<IqcReportItem>().HasOne(iri => iri.IqcReport).WithMany(ir => ir.Items).HasForeignKey(iri => iri.IqcReportId);
         modelBuilder.Entity<IpqcReport>().HasIndex(ir => ir.ReportNumber).IsUnique();
         modelBuilder.Entity<IpqcReportItem>().HasOne(ipqi => ipqi.IpqcReport).WithMany(ipqr => ipqr.Items).HasForeignKey(ipqi => ipqi.IpqcReportId);
         modelBuilder.Entity<OqcReport>().HasIndex(oqr => oqr.ReportNumber).IsUnique();
+        modelBuilder.Entity<InspectionTemplate>().HasIndex(t => new { t.TemplateCode, t.Version }).IsUnique();
+        modelBuilder.Entity<InspectionTemplate>().HasOne(t => t.Operation).WithMany().HasForeignKey(t => t.OperationId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InspectionTemplate>().HasOne(t => t.ProductSku).WithMany().HasForeignKey(t => t.ProductSkuId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InspectionTemplateItem>().HasOne(i => i.Template).WithMany(t => t.Items).HasForeignKey(i => i.TemplateId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProcessInspectionReport>().HasIndex(r => r.ReportNumber).IsUnique();
+        modelBuilder.Entity<ProcessInspectionReport>().HasIndex(r => new { r.WorkOrderId, r.OperationSeq, r.LotNumber });
+        modelBuilder.Entity<FqcInspectionLot>().HasIndex(lot => lot.InspectionNumber).IsUnique();
+        modelBuilder.Entity<FqcInspectionLot>().HasIndex(lot => new { lot.WorkOrderId, lot.LotNumber }).IsUnique();
+        modelBuilder.Entity<ProductionReceipt>().HasIndex(receipt => receipt.ReceiptNumber).IsUnique();
+        modelBuilder.Entity<ProductionReceiptItem>().HasIndex(item => new { item.ProductionReceiptId, item.FqcInspectionLotId }).IsUnique();
+        modelBuilder.Entity<ScrapRecord>().HasIndex(item => item.FqcInspectionLotId).IsUnique();
+        modelBuilder.Entity<ProductionReceiptItem>().HasOne(item => item.FqcInspectionLot).WithMany(lot => lot.ReceiptItems).HasForeignKey(item => item.FqcInspectionLotId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<FqcInspectionFinding>().HasOne(finding => finding.FqcInspectionLot).WithMany(lot => lot.Findings).HasForeignKey(finding => finding.FqcInspectionLotId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProcessInspectionReport>().HasOne(r => r.WorkOrder).WithMany().HasForeignKey(r => r.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ProcessInspectionReport>().HasOne(r => r.Template).WithMany().HasForeignKey(r => r.TemplateId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ProcessInspectionReport>().HasOne(r => r.ProductSku).WithMany().HasForeignKey(r => r.ProductSkuId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ProcessInspectionReportItem>().HasOne(i => i.Report).WithMany(r => r.Items).HasForeignKey(i => i.ReportId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProcessInspectionReportItem>().HasOne(i => i.TemplateItem).WithMany().HasForeignKey(i => i.TemplateItemId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<NonConformanceReport>().HasIndex(ncr => ncr.NcrNumber).IsUnique();
         modelBuilder.Entity<SupplierComplaint>().HasIndex(sc => sc.ComplaintNumber).IsUnique();
         modelBuilder.Entity<SupplierCapa>().HasIndex(sc => sc.CapaNumber).IsUnique();
         modelBuilder.Entity<SupplierCapa>().HasOne(sc => sc.Complaint).WithOne(c => c.Capa).HasForeignKey<SupplierCapa>(sc => sc.ComplaintId);
-        modelBuilder.Entity<QaReviewLog>().HasIndex(log => new { log.TargetType, log.TargetId, log.CreatedAt });
+        modelBuilder.Entity<SupplierCapaResponseRevision>().HasIndex(revision => new { revision.SupplierCapaId, revision.RevisionNumber }).IsUnique();
+        modelBuilder.Entity<SupplierCapaResponseRevision>()
+            .HasOne(revision => revision.SupplierCapa)
+            .WithMany(capa => capa.ResponseRevisions)
+            .HasForeignKey(revision => revision.SupplierCapaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierCapaReview>().HasIndex(review =>
+            new { review.SupplierCapaId, review.SupplierCapaResponseRevisionId, review.CreatedAt });
+        modelBuilder.Entity<SupplierCapaReview>()
+            .HasOne(review => review.SupplierCapa)
+            .WithMany(capa => capa.Reviews)
+            .HasForeignKey(review => review.SupplierCapaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierCapaReview>()
+            .HasOne(review => review.ResponseRevision)
+            .WithMany()
+            .HasForeignKey(review => review.SupplierCapaResponseRevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierCapaAttachment>().HasIndex(attachment =>
+            new { attachment.SupplierCapaId, attachment.RevokedAt });
+        modelBuilder.Entity<SupplierCapaAttachment>()
+            .HasOne(attachment => attachment.SupplierCapa)
+            .WithMany(capa => capa.Attachments)
+            .HasForeignKey(attachment => attachment.SupplierCapaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SupplierCapaAttachment>()
+            .HasOne(attachment => attachment.ResponseRevision)
+            .WithMany()
+            .HasForeignKey(attachment => attachment.SupplierCapaResponseRevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // ========== Portal: Indexes ==========
         modelBuilder.Entity<SupplierUser>().HasIndex(su => su.Username).IsUnique();
+        modelBuilder.Entity<SupplierUser>().HasIndex(su => su.IdentityProviderSubject).IsUnique();
+        modelBuilder.Entity<SupplierUser>().HasIndex(su => su.InvitationCorrelationId).IsUnique();
         modelBuilder.Entity<SupplierQuote>().HasIndex(sq => new { sq.RfqId, sq.SupplierId });
         modelBuilder.Entity<PortalMessage>().HasOne(pm => pm.Thread).WithMany(t => t.Messages).HasForeignKey(pm => pm.ThreadId);
         modelBuilder.Entity<SupplierEsgQuestionnaire>().HasIndex(seq => seq.QuestionnaireNumber).IsUnique();
@@ -626,6 +1309,18 @@ public class ErpGeneralDbContext : DbContext
 
         // ========== Collaboration: Relations ==========
         modelBuilder.Entity<AnnouncementReadLog>().HasOne(arl => arl.Announcement).WithMany(a => a.ReadLogs).HasForeignKey(arl => arl.AnnouncementId);
+        modelBuilder.Entity<AnnouncementRecipient>()
+            .HasKey(recipient => new { recipient.AnnouncementId, recipient.EmployeeId });
+        modelBuilder.Entity<AnnouncementRecipient>()
+            .HasOne(recipient => recipient.Announcement)
+            .WithMany(announcement => announcement.Recipients)
+            .HasForeignKey(recipient => recipient.AnnouncementId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AnnouncementRecipient>()
+            .HasOne(recipient => recipient.Employee)
+            .WithMany()
+            .HasForeignKey(recipient => recipient.EmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<MeetingReservation>().HasOne(mr => mr.Room).WithMany().HasForeignKey(mr => mr.RoomId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<CrossDeptTaskReply>().HasOne(cdtr => cdtr.Task).WithMany(t => t.Replies).HasForeignKey(cdtr => cdtr.TaskId);
         modelBuilder.Entity<DepartmentPage>().HasIndex(dp => dp.DepartmentId);

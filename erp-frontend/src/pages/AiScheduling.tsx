@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, Calendar, AlertTriangle, TrendingDown, Clock, CheckCircle, RefreshCw, Brain, Activity, Zap, Shield, Eye, Target } from 'lucide-react';
-import { aiApi } from '../api/api';
+import React, { useCallback, useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Users, Calendar, AlertTriangle, TrendingDown, RefreshCw, Brain, Activity, Shield, Target } from 'lucide-react';
+import { api } from '../api/api';
 
 interface ScheduleSummary {
   totalEmployees: number;
@@ -10,15 +10,6 @@ interface ScheduleSummary {
   avgShiftsPerEmployee: number;
   utilizationRate: number;
   warnings: string[];
-}
-
-interface ShiftScheduleDto {
-  employeeId: string;
-  employeeName: string;
-  yearMonth: string;
-  totalShifts: number;
-  weekendShifts: number;
-  avgDailyHours: number;
 }
 
 interface TurnoverRisk {
@@ -36,52 +27,52 @@ const RISK_COLORS = {
   low: { bg: '#f0fdf4', border: '#86efac', text: '#16a34a', accent: '#22c55e' },
 };
 
-const SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-
 export const AiScheduling: React.FC = () => {
-  const [yearMonth, setYearMonth] = useState(() => {
+  const [yearMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [scheduleData, setScheduleData] = useState<ShiftScheduleDto[]>([]);
   const [summary, setSummary] = useState<ScheduleSummary | null>(null);
   const [risks, setRisks] = useState<TurnoverRisk[]>([]);
   const [view, setView] = useState<'schedule' | 'risks'>('schedule');
-  const [loading, setLoading] = useState(false);
 
-  const loadSchedule = async () => {
-    setLoading(true);
+  const loadSchedule = useCallback(async () => {
     try {
-      const res = await aiApi.post('/scheduling/generate', { yearMonth, targetHeadcount: 20 });
+      const res = await api.post('/api/ai/schedule/generate', { yearMonth, targetHeadcount: 20 });
       if (res.data.success && res.data.data) {
-        setScheduleData(res.data.data.schedules || []);
         setSummary(res.data.data.summary);
       }
     } catch (e) {
       console.error('Generate schedule error:', e);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [yearMonth]);
 
-  const loadRisks = async () => {
-    setLoading(true);
+  const loadRisks = useCallback(async () => {
     try {
-      const res = await aiApi.get('/scheduling/risks');
+      const res = await api.get('/api/ai/schedule/risks');
       if (res.data.success && res.data.data) {
         setRisks(res.data.data || []);
       }
     } catch (e) {
       console.error('Load risks error:', e);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (view === 'schedule') loadSchedule();
-    else loadRisks();
-  }, [view]);
+    if (view === 'schedule') {
+      void api.post('/api/ai/schedule/generate', { yearMonth, targetHeadcount: 20 })
+        .then(res => {
+          if (res.data.success && res.data.data) setSummary(res.data.data.summary);
+        })
+        .catch(error => console.error('Generate schedule error:', error));
+    } else {
+      void api.get('/api/ai/schedule/risks')
+        .then(res => {
+          if (res.data.success && res.data.data) setRisks(res.data.data || []);
+        })
+        .catch(error => console.error('Load risks error:', error));
+    }
+  }, [view, yearMonth]);
 
   const getRiskColor = (level: string) => RISK_COLORS[level as keyof typeof RISK_COLORS] || RISK_COLORS.low;
 
@@ -412,7 +403,7 @@ export const AiScheduling: React.FC = () => {
             </div>
             離職風險預警排行
           </div>
-          {displayRisks.map((risk, idx) => {
+          {displayRisks.map((risk) => {
             const colors = getRiskColor(risk.riskLevel);
             return (
               <div 

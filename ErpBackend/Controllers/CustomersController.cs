@@ -1,51 +1,74 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.Sales;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
 public class CustomersController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly ICustomerService _customerService;
 
-    public CustomersController(ErpGeneralDbContext db)
+    public CustomersController(ICustomerService customerService)
     {
-        _db = db;
+        _customerService = customerService;
     }
 
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<CustomerDto>>>> GetCustomers(
         [FromQuery] bool? isActive,
-        [FromQuery] string? searchTerm)
+        [FromQuery] string? searchTerm,
+        CancellationToken cancellationToken)
     {
         var page = GetPage();
         var pageSize = GetPageSize();
 
-        var query = _db.Customers.AsQueryable();
+        var (items, totalCount) = await _customerService.GetCustomersAsync(
+            isActive,
+            page,
+            pageSize,
+            searchTerm,
+            cancellationToken);
 
-        if (isActive.HasValue)
-            query = query.Where(c => c.IsActive == isActive.Value);
+        return Ok(items, totalCount: totalCount);
+    }
 
-        if (!string.IsNullOrEmpty(searchTerm))
-            query = query.Where(c => c.CustomerCode.Contains(searchTerm) || c.CustomerName.Contains(searchTerm));
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<CustomerDto>>> GetCustomer(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var customer = await _customerService.GetCustomerByIdAsync(id, cancellationToken);
+        return customer is null
+            ? NotFound(ApiHelper.Fail<CustomerDto>("找不到客戶資料"))
+            : Ok(customer);
+    }
 
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderBy(c => c.CustomerCode)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse<CustomerDto>>> CreateCustomer(
+        [FromBody] CreateCustomerRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var (customer, duplicateCode) = await _customerService.CreateCustomerAsync(request, cancellationToken);
+        if (duplicateCode)
+            return Conflict(ApiHelper.Fail<CustomerDto>("客戶代碼已存在"));
 
-        var dtos = items.Select(c => new CustomerDto
-        {
-            Id = c.Id,
-            CustomerCode = c.CustomerCode,
-            CustomerName = c.CustomerName,
-            IsActive = c.IsActive
-        }).ToList();
+        return Ok(customer!, "客戶資料已建立");
+    }
 
-        return Ok(dtos, totalCount: totalCount);
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<CustomerDto>>> UpdateCustomer(
+        Guid id,
+        [FromBody] UpdateCustomerRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var (customer, notFound, duplicateCode) =
+            await _customerService.UpdateCustomerAsync(id, request, cancellationToken);
+
+        if (notFound)
+            return NotFound(ApiHelper.Fail<CustomerDto>("找不到客戶資料"));
+        if (duplicateCode)
+            return Conflict(ApiHelper.Fail<CustomerDto>("客戶代碼已存在"));
+
+        return Ok(customer!, "客戶資料已更新");
     }
 }

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, Package, QrCode, Camera, CheckCircle, XCircle, ArrowRight, RotateCcw, Download, Printer, Box, Truck, Factory, History, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Search, Package, QrCode, Camera, CheckCircle, XCircle, ArrowRight, RotateCcw, Download, Printer, Box, Truck, History, Loader2 } from 'lucide-react';
 import { barcodeApi } from '../api/api';
 import './BarcodeSystem.css';
 
@@ -10,7 +10,7 @@ interface BarcodeRecord {
   refType?: string;
   refId?: string;
   refName?: string;
-  location?: string;
+  locationCode?: string;
   qty?: number;
   lastScanTime: string;
   status: string;
@@ -25,6 +25,20 @@ interface ScanHistory {
   operator?: string;
   timestamp: string;
   details?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (isRecord(error)) {
+    const response = isRecord(error.response) ? error.response : undefined;
+    const data = isRecord(response?.data) ? response.data : undefined;
+    if (typeof data?.message === 'string') return data.message;
+    if (typeof error.message === 'string') return error.message;
+  }
+  return error instanceof Error ? error.message : fallback;
 }
 
 const barcodeTypeConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -46,17 +60,7 @@ export const BarcodeSystem: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'scan' && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [activeTab]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeTab === 'scan') {
@@ -64,14 +68,27 @@ export const BarcodeSystem: React.FC = () => {
         setRecords(res.data?.data ?? []);
       } else if (activeTab === 'history') {
         const res = await barcodeApi.history();
-        setHistory((res.data?.data ?? []) as any);
+        setHistory((res.data?.data?.data ?? []).map(record => ({
+          ...record,
+          operator: record.operatorName,
+        })));
       }
     } catch (err) {
       console.error('Failed to load barcode data:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadData();
+  }, [activeTab, loadData]);
+
+  useEffect(() => {
+    if (activeTab === 'scan' && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [activeTab]);
 
   const handleScan = async () => {
     if (!scanInput.trim()) return;
@@ -82,14 +99,14 @@ export const BarcodeSystem: React.FC = () => {
     try {
       const res = await barcodeApi.lookup(scanInput.trim());
       if (res.data?.data) {
-        setScanResult(res.data.data as any);
+        setScanResult(res.data.data);
       } else {
         setScanResult(null);
         setScanError('條碼不存在或已失效');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScanResult(null);
-      setScanError(err.response?.data?.message || '查詢失敗，請稍後再試');
+      setScanError(getErrorMessage(err, '查詢失敗，請稍後再試'));
     } finally {
       setIsScanning(false);
     }
@@ -102,8 +119,8 @@ export const BarcodeSystem: React.FC = () => {
         alert(`條碼生成成功：${res.data.data.barcode}`);
         await loadData();
       }
-    } catch (err: any) {
-      alert('生成失敗：' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert(`生成失敗：${getErrorMessage(err, '發生未知錯誤')}`);
     }
   };
 
@@ -221,10 +238,10 @@ export const BarcodeSystem: React.FC = () => {
                       <span className="result-value">{scanResult.refName}</span>
                     </div>
                   )}
-                  {scanResult.location && (
+                  {scanResult.locationCode && (
                     <div className="result-row">
                       <span className="result-label">庫位</span>
-                      <span className="result-value">{scanResult.location}</span>
+                      <span className="result-value">{scanResult.locationCode}</span>
                     </div>
                   )}
                   {scanResult.qty !== undefined && (
@@ -274,7 +291,7 @@ export const BarcodeSystem: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ fontSize: 12 }}>{r.refName ?? '—'}</td>
-                      <td className="mono" style={{ fontSize: 11 }}>{r.location ?? '—'}</td>
+                      <td className="mono" style={{ fontSize: 11 }}>{r.locationCode ?? '—'}</td>
                       <td className="mono" style={{ fontSize: 11, color: 'var(--slate-500)' }}>{r.lastScanTime}</td>
                       <td><span className={`status-badge status-${r.status === 'active' ? 'active' : r.status === 'used' ? 'warning' : 'neutral'}`}>{r.status === 'active' ? '有效' : r.status === 'used' ? '已使用' : '失效'}</span></td>
                     </tr>

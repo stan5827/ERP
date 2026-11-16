@@ -13,6 +13,7 @@ import { LeaveRequestScreen } from '../screens/LeaveRequestScreen';
 import { AnnouncementScreen } from '../screens/AnnouncementScreen';
 import { SalaryScreen } from '../screens/SalaryScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { OperationsScreen } from '../screens/OperationsScreen';
 import { COLORS } from '../constants/config';
 
 const Tab = createBottomTabNavigator();
@@ -25,6 +26,7 @@ const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => {
     '公告': '📢',
     '薪資': '💰',
     '我的': '👤',
+    '作業': '📦',
   };
   
   return (
@@ -60,27 +62,34 @@ const LeaveStack = () => (
   </Stack.Navigator>
 );
 
-const MainTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.gray,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabBarLabel,
-    })}
-  >
-    <Tab.Screen name="打卡" component={ClockInStack} />
-    <Tab.Screen name="請假" component={LeaveStack} />
-    <Tab.Screen name="公告" component={AnnouncementScreen} />
-    <Tab.Screen name="薪資" component={SalaryScreen} />
-    <Tab.Screen name="我的" component={ProfileScreen} />
-  </Tab.Navigator>
-);
+const MainTabs: React.FC<{ permissions: string[] }> = ({ permissions }) => {
+  const canUseOperations =
+    (permissions.includes('inventory:view') && permissions.includes('inventory:execute')) ||
+    (permissions.includes('quality:create') && permissions.includes('manufacturing:view'));
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.gray,
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
+      })}
+    >
+      <Tab.Screen name="打卡" component={ClockInStack} />
+      <Tab.Screen name="請假" component={LeaveStack} />
+      <Tab.Screen name="公告" component={AnnouncementScreen} />
+      <Tab.Screen name="薪資" component={SalaryScreen} />
+      <Tab.Screen name="我的" component={ProfileScreen} />
+      {canUseOperations && <Tab.Screen name="作業" component={OperationsScreen} />}
+    </Tab.Navigator>
+  );
+};
 
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -92,7 +101,7 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainTabs /> : <LoginScreen />}
+      {isAuthenticated ? <MainTabs permissions={user?.permissions ?? []} /> : <LoginScreen />}
     </NavigationContainer>
   );
 };

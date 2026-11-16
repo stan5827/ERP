@@ -1,177 +1,95 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
-using ErpBackend.Models.MES;
 using ErpBackend.DTOs;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
 [Route("api/erp/boms")]
 public class BomsController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly IBomService _bomService;
 
-    public BomsController(ErpGeneralDbContext db)
-    {
-        _db = db;
-    }
+    public BomsController(IBomService bomService) => _bomService = bomService;
 
+    [Authorize]
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<BomDto>>>> GetBoms([FromQuery] Guid? productSkuId)
-    {
-        var query = _db.Boms
-            .Include(b => b.Items)
-            .AsQueryable();
+        => Ok(await _bomService.GetBomsAsync(productSkuId));
 
-        if (productSkuId.HasValue)
-            query = query.Where(b => b.ProductSkuId == productSkuId.Value);
-
-        var items = await query
-            .OrderBy(b => b.BomCode)
-            .Select(b => new BomDto
-            {
-                Id = b.Id,
-                BomCode = b.BomCode,
-                ProductSkuId = b.ProductSkuId,
-                Items = b.Items.Select(i => new BomItemDto
-                {
-                    Id = i.Id,
-                    ChildSkuId = i.ChildSkuId,
-                    Quantity = i.Quantity,
-                    Unit = i.Unit
-                }).ToList()
-            })
-            .ToListAsync();
-
-        return Ok(items);
-    }
-
-    [HttpGet("{id}")]
+    [Authorize]
+    [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<BomDto>>> GetBom(Guid id)
     {
-        var b = await _db.Boms
-            .Include(b => b.Items)
-            .FirstOrDefaultAsync(b => b.Id == id);
-
-        if (b == null) return NotFound(ApiHelper.FailOf<BomDto>("找不到物料清單 (BOM)"));
-
-        // Fetch child SKU details
-        var itemDtos = new List<BomItemDto>();
-        foreach (var item in b.Items)
-        {
-            var sku = await _db.Skus.FindAsync(item.ChildSkuId);
-            itemDtos.Add(new BomItemDto
-            {
-                Id = item.Id,
-                ChildSkuId = item.ChildSkuId,
-                ChildSkuNumber = sku?.SkuNumber,
-                ChildSkuName = sku?.SkuName,
-                Quantity = item.Quantity,
-                Unit = item.Unit
-            });
-        }
-
-        return Ok(new BomDto
-        {
-            Id = b.Id,
-            BomCode = b.BomCode,
-            ProductSkuId = b.ProductSkuId,
-            Items = itemDtos
-        });
+        var dto = await _bomService.GetBomAsync(id);
+        return dto == null ? NotFound(ApiHelper.FailOf<BomDto>("找不到物料清單 (BOM)")) : Ok(dto);
     }
 
     [HttpPost]
     public async Task<ActionResult<ApiResponse<BomDto>>> CreateBom([FromBody] CreateBomRequest request)
     {
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            var bom = new Bom
-            {
-                BomCode = request.BomCode,
-                ProductSkuId = request.ProductSkuId,
-                Version = request.Version,
-                Status = request.Status,
-                EffectiveDate = request.EffectiveDate,
-                Notes = request.Notes
-            };
-
-            _db.Boms.Add(bom);
-            await _db.SaveChangesAsync();
-
-            if (request.Items != null)
-            {
-                foreach (var itemReq in request.Items)
-                {
-                    _db.BomItems.Add(new BomItem
-                    {
-                        BomId = bom.Id,
-                        ChildSkuId = itemReq.ChildSkuId,
-                        Quantity = itemReq.Quantity,
-                        Unit = itemReq.Unit,
-                        ScrapRate = itemReq.ScrapRate,
-                        OperationSeq = itemReq.OperationSeq
-                    });
-                }
-                await _db.SaveChangesAsync();
-            }
-
-            await transaction.CommitAsync();
-
-            return await GetBom(bom.Id);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return StatusCode(500, ApiHelper.FailOf<BomDto>($"建立 BOM 失敗: {ex.Message}"));
-        }
+        var (dto, status) = await _bomService.CreateBomAsync(request);
+        if (status == "invalid") return BadRequest(ApiHelper.FailOf<BomDto>("無效的 BOM 資料"));
+        if (status == "duplicate") return BadRequest(ApiHelper.FailOf<BomDto>($"BOM 代碼 {request.BomCode} 已存在"));
+        return Ok(dto!);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<BomDto>>> UpdateBom(Guid id, [FromBody] UpdateBomRequest request)
     {
-        var bom = await _db.Boms
-            .Include(b => b.Items)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var (dto, status) = await _bomService.UpdateBomAsync(id, request);
+        if (status == "not_found") return NotFound(ApiHelper.FailOf<BomDto>("找不到 BOM"));
+        if (status == "invalid") return BadRequest(ApiHelper.FailOf<BomDto>("無效的 BOM 資料"));
+        return Ok(dto!);
+    }
 
-        if (bom == null) return NotFound(ApiHelper.FailOf<BomDto>("找不到 BOM"));
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<ApiResponse>> DeleteBom(Guid id)
+    {
+        var (ok, status) = await _bomService.DeleteBomAsync(id);
+        if (status == "not_found") return NotFound(ApiHelper.Fail("找不到 BOM"));
+        return ok ? Ok("BOM 已刪除") : BadRequest(ApiHelper.Fail("無法刪除 BOM"));
+    }
 
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            if (request.BomCode != null) bom.BomCode = request.BomCode;
-            if (request.Version != null) bom.Version = request.Version;
-            if (request.Status != null) bom.Status = request.Status;
-            if (request.EffectiveDate.HasValue) bom.EffectiveDate = request.EffectiveDate.Value;
-            if (request.Notes != null) bom.Notes = request.Notes;
+    [Authorize]
+    [HttpPatch("{id:guid}/activate")]
+    public async Task<ActionResult<ApiResponse>> ActivateBom(Guid id)
+    {
+        var (ok, status) = await _bomService.SetBomStatusAsync(id, "active");
+        if (status == "not_found") return NotFound(ApiHelper.Fail("找不到 BOM"));
+        return ok ? Ok("BOM 已啟用") : BadRequest(ApiHelper.Fail("無法啟用 BOM"));
+    }
 
-            if (request.Items != null)
-            {
-                _db.BomItems.RemoveRange(bom.Items);
-                foreach (var itemReq in request.Items)
-                {
-                    _db.BomItems.Add(new BomItem
-                    {
-                        BomId = bom.Id,
-                        ChildSkuId = itemReq.ChildSkuId,
-                        Quantity = itemReq.Quantity,
-                        Unit = itemReq.Unit,
-                        ScrapRate = itemReq.ScrapRate,
-                        OperationSeq = itemReq.OperationSeq
-                    });
-                }
-            }
+    [Authorize]
+    [HttpPatch("{id:guid}/deprecate")]
+    public async Task<ActionResult<ApiResponse>> DeprecateBom(Guid id)
+    {
+        var (ok, status) = await _bomService.SetBomStatusAsync(id, "deprecated");
+        if (status == "not_found") return NotFound(ApiHelper.Fail("找不到 BOM"));
+        return ok ? Ok("BOM 已停用") : BadRequest(ApiHelper.Fail("無法停用 BOM"));
+    }
 
-            bom.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
+    [Authorize]
+    [HttpGet("{id:guid}/cost-rollup")]
+    public async Task<ActionResult<ApiResponse<BomCostRollupDto>>> CostRollup(Guid id)
+    {
+        var dto = await _bomService.GetCostRollupAsync(id);
+        return dto == null ? NotFound(ApiHelper.FailOf<BomCostRollupDto>("找不到 BOM")) : Ok(dto);
+    }
 
-            return await GetBom(id);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return StatusCode(500, ApiHelper.FailOf<BomDto>($"更新 BOM 失敗: {ex.Message}"));
-        }
+    [Authorize]
+    [HttpGet("{productSkuId:guid}/tree")]
+    public async Task<ActionResult<ApiResponse<BomTreeNodeDto>>> GetBomTree(Guid productSkuId)
+    {
+        var dto = await _bomService.GetBomTreeAsync(productSkuId);
+        return dto == null ? NotFound(ApiHelper.FailOf<BomTreeNodeDto>("找不到物料清單 (BOM) 數量清單")) : Ok(dto);
+    }
+
+    [Authorize]
+    [HttpGet("latest/{productSkuId:guid}")]
+    public async Task<ActionResult<ApiResponse<BomDto>>> GetLatestRevision(Guid productSkuId)
+    {
+        var dto = await _bomService.GetLatestActiveRevisionAsync(productSkuId);
+        return dto == null ? NotFound(ApiHelper.FailOf<BomDto>("找不到物料清單 (BOM)")) : Ok(dto);
     }
 }

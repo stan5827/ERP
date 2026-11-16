@@ -8,21 +8,30 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { useAuth } from '../context/AuthContext';
-import { attendanceApi } from '../services/api';
+import { attendanceApi, getApiErrorMessage } from '../services/api';
 import { COLORS } from '../constants/config';
 
 interface TodayAttendance {
   id?: string;
+  date?: string;
   clockIn?: string;
   clockOut?: string;
   status: string;
 }
 
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
+
 export const ClockInScreen: React.FC = () => {
-  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,10 +46,11 @@ export const ClockInScreen: React.FC = () => {
 
   const loadTodayAttendance = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await attendanceApi.list({ date: today });
-      if (response.data?.data?.length > 0) {
-        setTodayAttendance(response.data.data[0]);
+      const today = toLocalDateString(new Date());
+      const response = await attendanceApi.list({ startDate: today, endDate: today });
+      const records = response.data?.data ?? [];
+      if (records.length > 0) {
+        setTodayAttendance(records[0]);
       } else {
         setTodayAttendance({ status: 'not_clocked_in' });
       }
@@ -55,16 +65,16 @@ export const ClockInScreen: React.FC = () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('權限不足', '需要定位權限才能打卡');
+        showAlert('權限不足', '請在 Chrome 網址列左側的網站設定中允許「位置」，再重新整理頁面。');
         return null;
       }
       
-      const loc = await Location.getCurrentPositionAsync({});
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       setLocation(loc);
       return loc;
     } catch (error) {
       console.error('Location error:', error);
-      Alert.alert('定位失敗', '無法取得您的位置');
+      showAlert('定位失敗', '無法取得您的位置，請確認瀏覽器已允許定位，並開啟裝置的位置服務。');
       return null;
     }
   };
@@ -73,21 +83,17 @@ export const ClockInScreen: React.FC = () => {
     setClockingIn(true);
     try {
       const loc = await getCurrentLocation();
-      
-      const now = new Date();
-      await attendanceApi.create({
-        employeeId: user?.employeeId,
-        date: now.toISOString().split('T')[0],
-        clockIn: now.toISOString(),
-        latitude: loc?.coords.latitude,
-        longitude: loc?.coords.longitude,
-        status: 'normal',
+      if (!loc) return;
+
+      await attendanceApi.clockIn({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
       });
-      
-      Alert.alert('打卡成功', '上班打卡已完成');
-      loadTodayAttendance();
-    } catch (error: any) {
-      Alert.alert('打卡失敗', error.message || '請稍後再試');
+
+      showAlert('打卡成功', '上班打卡已完成');
+      await loadTodayAttendance();
+    } catch (error: unknown) {
+      showAlert('打卡失敗', getApiErrorMessage(error, '請稍後再試'));
     } finally {
       setClockingIn(false);
     }
@@ -97,20 +103,17 @@ export const ClockInScreen: React.FC = () => {
     setClockingIn(true);
     try {
       const loc = await getCurrentLocation();
-      
-      const now = new Date();
-      if (todayAttendance?.clockIn && todayAttendance.id) {
-        await attendanceApi.update(todayAttendance.id, {
-          clockOut: now.toISOString(),
-          latitude: loc?.coords.latitude,
-          longitude: loc?.coords.longitude,
-        });
-      }
-      
-      Alert.alert('打卡成功', '下班打卡已完成');
-      loadTodayAttendance();
-    } catch (error: any) {
-      Alert.alert('打卡失敗', error.message || '請稍後再試');
+      if (!loc) return;
+
+      await attendanceApi.clockOut({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+
+      showAlert('打卡成功', '下班打卡已完成');
+      await loadTodayAttendance();
+    } catch (error: unknown) {
+      showAlert('打卡失敗', getApiErrorMessage(error, '請稍後再試'));
     } finally {
       setClockingIn(false);
     }
@@ -123,6 +126,13 @@ export const ClockInScreen: React.FC = () => {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  const formatAttendanceTime = (time?: string) => {
+    if (!time) return '—';
+    return /^\d{2}:\d{2}/.test(time)
+      ? time.slice(0, 5)
+      : new Date(time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
   };
 
   if (loading) {
@@ -202,18 +212,14 @@ export const ClockInScreen: React.FC = () => {
           <View style={styles.statusRow}>
             <Text style={styles.statusLabel}>上班時間</Text>
             <Text style={styles.statusValue}>
-              {todayAttendance.clockIn
-                ? new Date(todayAttendance.clockIn).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
-                : '—'}
+              {formatAttendanceTime(todayAttendance.clockIn)}
             </Text>
           </View>
           
           <View style={styles.statusRow}>
             <Text style={styles.statusLabel}>下班時間</Text>
             <Text style={styles.statusValue}>
-              {todayAttendance.clockOut
-                ? new Date(todayAttendance.clockOut).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
-                : '—'}
+              {formatAttendanceTime(todayAttendance.clockOut)}
             </Text>
           </View>
           
@@ -235,6 +241,13 @@ export const ClockInScreen: React.FC = () => {
       </View>
     </ScrollView>
   );
+};
+
+const toLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const getStatusBadgeStyle = (status: string) => {

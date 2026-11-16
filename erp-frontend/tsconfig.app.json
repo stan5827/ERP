@@ -16,11 +16,7 @@
     "noPropertyAccessFromIndexSignature": false,
 
     /* Bundler mode */
-    "baseUrl": ".",
     "moduleResolution": "bundler",
-    "paths": {
-      "@/*": ["src/*"]
-    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "moduleDetection": "force",

@@ -1,35 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-
-type ToastType = 'success' | 'error' | 'warning' | 'info';
-
-interface Toast {
-  id: string;
-  type: ToastType;
-  title: string;
-  message?: string;
-  duration?: number;
-}
-
-interface ToastContextType {
-  toasts: Toast[];
-  addToast: (toast: Omit<Toast, 'id'>) => void;
-  removeToast: (id: string) => void;
-  clearAll: () => void;
-  showSuccess: (title: string, message?: string) => void;
-  showError: (message: string, title?: string) => void;
-  showWarning: (title: string, message?: string) => void;
-  showInfo: (title: string, message?: string) => void;
-}
-
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
-
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
-};
+import React, { useState, useCallback } from 'react';
+import { ToastContext, setToastFunction, useToast, type Toast, type ToastType } from './toastContext';
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -55,24 +25,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToasts([]);
   }, []);
 
-  const showSuccess = useCallback((title: string, message?: string) => {
-    addToast({ type: 'success', title, message });
-  }, [addToast]);
-
-  const showError = useCallback((message: string, title = '發生錯誤') => {
-    addToast({ type: 'error', title, message });
-  }, [addToast]);
-
-  const showWarning = useCallback((title: string, message?: string) => {
-    addToast({ type: 'warning', title, message });
-  }, [addToast]);
-
-  const showInfo = useCallback((title: string, message?: string) => {
-    addToast({ type: 'info', title, message });
-  }, [addToast]);
-
   return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast, clearAll, showSuccess, showError, showWarning, showInfo }}>
+    <ToastContext.Provider value={{ toasts, addToast, removeToast, clearAll }}>
       {children}
     </ToastContext.Provider>
   );
@@ -135,20 +89,6 @@ export const ToastContainer: React.FC = () => {
       ))}
     </div>
   );
-};
-
-// Toast utility function - must be used within ToastProvider
-let toastFn: ((toast: Omit<Toast, 'id'>) => void) | null = null;
-
-export const setToastFunction = (fn: (toast: Omit<Toast, 'id'>) => void) => {
-  toastFn = fn;
-};
-
-export const toast = {
-  success: (title: string, message?: string) => toastFn?.({ type: 'success', title, message }),
-  error: (title: string, message?: string) => toastFn?.({ type: 'error', title, message }),
-  warning: (title: string, message?: string) => toastFn?.({ type: 'warning', title, message }),
-  info: (title: string, message?: string) => toastFn?.({ type: 'info', title, message }),
 };
 
 // Initialize toast function when ToastProvider mounts

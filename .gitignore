@@ -1,123 +1,85 @@
-# ========================================
-# Environment & Secrets
-# ========================================
+# Build outputs
+bin/
+obj/
+dist/
+build/
+out/
+artifacts/
+publish/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# .NET
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.log
+*.vs/
+[Ll]og/
+[Ll]ogs/
+project.lock.json
+project.fragment.lock.json
+*.nupkg
+*.pfx
+*.snk
+*.csproj.user
+
+# Environment
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
+.env.*.production
+
+# Secrets
 *.pfx
 *.key
 *.cer
-*.jks
+secrets/
+appsettings.*.local.json
+deployment/keycloak/.local/
 
-# ========================================
-# Node.js
-# ========================================
-node_modules/
-dist/
-.vite/
-.next/
-*.tsbuildinfo
-
-# ========================================
-# .NET / C#
-# ========================================
-bin/
-obj/
-artifacts/
-TestResults/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-bld/
-[Bb]in/
-[Oo]bj/
-
-# Visual Studio cache/options
-.vs/
-.vscode/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-
-# Build results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-build/
-[Bb]uilds/
-*.dll
-*.pdb
-*.exe
-
-# ========================================
-# Expo / React Native
-# ========================================
-.expo/
-expo-env.d.ts
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
-web-build/
-
-# ========================================
-# Documentation (binary docs)
-# ========================================
-*.docx
-*.pptx
-*.xlsx
-*.pdf
-*.zip
-*.tar.gz
-*.rar
-
-# ========================================
-# Monitoring
-# ========================================
-monitoring/prometheus/prometheus_data/
-monitoring/grafana/grafana_data/
-
-# ========================================
-# OS & Editor
-# ========================================
+# OS
 Thumbs.db
 .DS_Store
-*.swp
-*~
+Desktop.ini
+
+# IDE / Editor
+.vs/
 .idea/
-*.cache
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.cursor/
+.cursorrules
+*.code-workspace
 
-# ========================================
-# Test Reports
-# ========================================
-playwright-report/
-test-results/
+# Test / Coverage
 coverage/
-eslint-pages-output.json
-strict-eslint-pages-output.json
+*.coverage
+*.coveragexml
+TestResults/
+src/erp-frontend/playwright-report/
+src/erp-frontend/test-results/
+src/erp-frontend/.tsupgrader/runtime-validation/
+src/erp-supplier-portal/.tsupgrader/
+.vite/
 
-# ========================================
-# Scripts output
-# ========================================
-tools/conversation_reports/
+# ERP specific
+*.db
+*.sqlite
+*.db3
+*.sqlite3
 
-# ========================================
-# Remotion video output
-# ========================================
-erp-remotion-video/output/
-
-# Import logs
-backend-import.err.log
-backend-import.out.log
-
-# Windows reserved name that somehow exists
-erp-employee-app/nul
+# Temporary files
+temp_sku_content.txt
+build_err.txt

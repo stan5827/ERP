@@ -8,17 +8,26 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { leaveRequestsApi } from '../services/api';
+import { getApiErrorMessage, leaveRequestsApi } from '../services/api';
 import { COLORS } from '../constants/config';
 import { LEAVE_TYPES } from '../types';
 
 import { useNavigation } from '@react-navigation/native';
 
+const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n${message}`);
+    onConfirm?.();
+    return;
+  }
+
+  Alert.alert(title, message, onConfirm ? [{ text: '確定', onPress: onConfirm }] : undefined);
+};
+
 export const LeaveRequestScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { user } = useAuth();
   const [selectedType, setSelectedType] = useState<string>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -27,35 +36,32 @@ export const LeaveRequestScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!selectedType) {
-      Alert.alert('錯誤', '請選擇請假類型');
+      showAlert('錯誤', '請選擇請假類型');
       return;
     }
 
     if (!startDate || !endDate) {
-      Alert.alert('錯誤', '請選擇請假日期');
+      showAlert('錯誤', '請選擇請假日期');
       return;
     }
 
     if (new Date(startDate) > new Date(endDate)) {
-      Alert.alert('錯誤', '結束日期必須晚於開始日期');
+      showAlert('錯誤', '結束日期必須晚於開始日期');
       return;
     }
 
     setLoading(true);
     try {
       await leaveRequestsApi.create({
-        employeeId: user?.employeeId,
         leaveType: selectedType,
         startDate,
         endDate,
         reason,
       });
 
-      Alert.alert('成功', '請假申請已送出', [
-        { text: '確定', onPress: () => navigation.goBack() },
-      ]);
-    } catch (error: any) {
-      Alert.alert('錯誤', error.message || '提交失敗，請稍後再試');
+      showAlert('成功', '請假申請已送出', () => navigation.goBack());
+    } catch (error: unknown) {
+      showAlert('錯誤', getApiErrorMessage(error, '提交失敗，請稍後再試'));
     } finally {
       setLoading(false);
     }

@@ -1,20 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using ErpBackend.Models.HR;
+using ErpBackend.Models.MES;
+using ErpBackend.Models.QA;
 
 namespace ErpBackend.Models.Inventory;
-
-public class WarehouseType
-{
-    [Key] public Guid Id { get; set; } = Guid.NewGuid();
-    [Required, MaxLength(20)] public string TypeCode { get; set; } = null!;
-    [Required, MaxLength(100)] public string TypeName { get; set; } = null!;
-    [MaxLength(300)] public string? Description { get; set; }
-    public bool IsActive { get; set; } = true;
-    public int SortOrder { get; set; } = 0;
-}
 
 public class Warehouse
 {
@@ -59,8 +48,6 @@ public class Sku
     [Column(TypeName = "decimal(10,4)")] public decimal ConversionRate { get; set; } = 1;
     public bool LotControlled { get; set; }
     public bool SerialControlled { get; set; }
-    [NotMapped] public string SkuCode => SkuNumber;
-    [NotMapped] public decimal CurrentStock { get => Qty; set => Qty = value; }
     [Column(TypeName = "decimal(10,2)")] public decimal? Length { get; set; }
     [Column(TypeName = "decimal(10,2)")] public decimal? Width { get; set; }
     [Column(TypeName = "decimal(10,2)")] public decimal? Height { get; set; }
@@ -205,14 +192,12 @@ public class InventoryTransaction
     [Required] public Guid SkuId { get; set; }
     [Required, MaxLength(50)] public string Type { get; set; } = null!;
     [Column(TypeName = "decimal(14,2)")] public decimal QtyChange { get; set; }
-    [NotMapped] public decimal Qty { get { return QtyChange; } set { QtyChange = value; } }
-    [NotMapped] public string TransactionType { get { return Type; } set { Type = value; } }
     [Column(TypeName = "decimal(14,2)")] public decimal QtyBefore { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal QtyAfter { get; set; }
     [MaxLength(50)] public string? LotNumber { get; set; }
     [MaxLength(50)] public string? RelatedDocType { get; set; }
     public Guid? RelatedDocId { get; set; }
-    [NotMapped] public Guid? ReferenceId { get { return RelatedDocId; } set { RelatedDocId = value; } }
+    public Guid? ReversalOfTransactionId { get; set; }
     public Guid? WarehouseId { get; set; }
     public Guid? BinLocationId { get; set; }
     public Guid? HandlerId { get; set; }
@@ -221,14 +206,43 @@ public class InventoryTransaction
     [Column(TypeName = "decimal(14,2)")] public decimal? TotalCost { get; set; }
     [MaxLength(500)] public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    [NotMapped] public Guid? BinId { get { return BinLocationId; } set { BinLocationId = value; } }
-    [NotMapped] public string? TrxType { get { return Type; } set { Type = value!; } }
-    [NotMapped] public string? ReferenceNumber { get { return TrxId; } set { TrxId = value!; } }
-    [NotMapped] public DateTime TransactionDate { get { return CreatedAt; } set { CreatedAt = value; } }
 
     [ForeignKey(nameof(SkuId))] public Sku Sku { get; set; } = null!;
     [ForeignKey(nameof(WarehouseId))] public Warehouse? Warehouse { get; set; }
     [ForeignKey(nameof(BinLocationId))] public BinLocation? BinLocation { get; set; }
+}
+
+public class ProductionReceipt
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required, MaxLength(30)] public string ReceiptNumber { get; set; } = null!;
+    [Required] public Guid WorkOrderId { get; set; }
+    [MaxLength(20)] public string Status { get; set; } = "posted";
+    public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+    [MaxLength(100)] public string? ReceivedBy { get; set; }
+    [MaxLength(500)] public string? Notes { get; set; }
+
+    [ForeignKey(nameof(WorkOrderId))] public WorkOrder WorkOrder { get; set; } = null!;
+    public ICollection<ProductionReceiptItem> Items { get; set; } = new List<ProductionReceiptItem>();
+}
+
+public class ProductionReceiptItem
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required] public Guid ProductionReceiptId { get; set; }
+    [Required] public Guid FqcInspectionLotId { get; set; }
+    [Required] public Guid SkuId { get; set; }
+    [Required] public Guid WarehouseId { get; set; }
+    [Required] public Guid BinLocationId { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal Quantity { get; set; }
+    [Column(TypeName = "decimal(14,4)")] public decimal UnitCost { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal TotalCost { get; set; }
+
+    [ForeignKey(nameof(ProductionReceiptId))] public ProductionReceipt ProductionReceipt { get; set; } = null!;
+    [ForeignKey(nameof(FqcInspectionLotId))] public FqcInspectionLot FqcInspectionLot { get; set; } = null!;
+    [ForeignKey(nameof(SkuId))] public Sku Sku { get; set; } = null!;
+    [ForeignKey(nameof(WarehouseId))] public Warehouse Warehouse { get; set; } = null!;
+    [ForeignKey(nameof(BinLocationId))] public BinLocation BinLocation { get; set; } = null!;
 }
 
 public class InventoryLot
@@ -268,14 +282,21 @@ public class MaterialIssue
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     [Required, MaxLength(30)] public string IssueNumber { get; set; } = null!;
     [Required] public Guid WorkOrderId { get; set; }
+    public Guid? ReversalOfIssueId { get; set; }
     public Guid? DepartmentId { get; set; }
     public Guid? IssueWarehouseId { get; set; }
+    [MaxLength(20)] public string? BomVersion { get; set; }
+    [MaxLength(500)] public string? Notes { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "draft";
     public Guid? IssuedBy { get; set; }
     public DateTime? IssuedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    [ForeignKey(nameof(ReversalOfIssueId))] public MaterialIssue? OriginalIssue { get; set; }
+    [ForeignKey(nameof(WorkOrderId))] public WorkOrder? WorkOrder { get; set; }
+    [ForeignKey(nameof(IssueWarehouseId))] public Warehouse? IssueWarehouse { get; set; }
     public ICollection<MaterialIssueItem> Items { get; set; } = new List<MaterialIssueItem>();
+    public ICollection<MaterialIssue> Reversals { get; set; } = new List<MaterialIssue>();
 }
 
 public class MaterialIssueItem
@@ -283,14 +304,38 @@ public class MaterialIssueItem
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     [Required] public Guid IssueId { get; set; }
     [Required] public Guid SkuId { get; set; }
+    public Guid? WorkOrderMaterialId { get; set; }
     [MaxLength(50)] public string? LotNumber { get; set; }
+    [MaxLength(20)] public string? Unit { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal RequiredQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal IssuedQty { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal ShortageQty { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal ClosedShortageQty { get; set; }
+    [MaxLength(500)] public string? ShortageClosureReason { get; set; }
     public Guid? BinLocationId { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "pending";
 
     [ForeignKey(nameof(IssueId))] public MaterialIssue Issue { get; set; } = null!;
+    [ForeignKey(nameof(SkuId))] public Sku Sku { get; set; } = null!;
+    [ForeignKey(nameof(WorkOrderMaterialId))] public WorkOrderMaterial? WorkOrderMaterial { get; set; }
+    public ICollection<MaterialIssueItemAllocation> Allocations { get; set; } = new List<MaterialIssueItemAllocation>();
+}
+
+public class MaterialIssueItemAllocation
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    [Required] public Guid IssueItemId { get; set; }
+    [Required] public Guid WarehouseId { get; set; }
+    public Guid? BinLocationId { get; set; }
+    [MaxLength(50)] public string? LotNumber { get; set; }
+    [Column(TypeName = "decimal(14,2)")] public decimal IssuedQty { get; set; }
+    [Column(TypeName = "decimal(14,4)")] public decimal UnitCost { get; set; }
+    public Guid? InventoryTransactionId { get; set; }
+
+    [ForeignKey(nameof(IssueItemId))] public MaterialIssueItem IssueItem { get; set; } = null!;
+    [ForeignKey(nameof(WarehouseId))] public Warehouse Warehouse { get; set; } = null!;
+    [ForeignKey(nameof(BinLocationId))] public BinLocation? BinLocation { get; set; }
+    [ForeignKey(nameof(InventoryTransactionId))] public InventoryTransaction? InventoryTransaction { get; set; }
 }
 
 public class MaterialReturn
@@ -374,7 +419,7 @@ public class SubcontractItem
     [ForeignKey(nameof(SubcontractOrderId))] public SubcontractOrder SubcontractOrder { get; set; } = null!;
 }
 
-public class InventoryTransfer
+public class TransferOrder
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     [Required, MaxLength(30)] public string TransferNumber { get; set; } = null!;
@@ -383,26 +428,21 @@ public class InventoryTransfer
     [MaxLength(20)] public string Status { get; set; } = "draft";
     public Guid? ApprovedBy { get; set; }
     public Guid? CreatedBy { get; set; }
-    public DateTime TransferDate { get; set; } = DateTime.UtcNow;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [ForeignKey(nameof(SourceWarehouseId))] public Warehouse? SourceWarehouse { get; set; }
-    [ForeignKey(nameof(TargetWarehouseId))] public Warehouse? TargetWarehouse { get; set; }
-    [ForeignKey(nameof(CreatedBy))] public Employee? CreatedByEmployee { get; set; }
-
-    public ICollection<InventoryTransferItem> Items { get; set; } = new List<InventoryTransferItem>();
+    public ICollection<TransferOrderItem> Items { get; set; } = new List<TransferOrderItem>();
 }
 
-public class InventoryTransferItem
+public class TransferOrderItem
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
-    [Required] public Guid InventoryTransferId { get; set; }
+    [Required] public Guid TransferOrderId { get; set; }
     [Required] public Guid SkuId { get; set; }
     [MaxLength(50)] public string? LotNumber { get; set; }
     [Column(TypeName = "decimal(14,2)")] public decimal TransferQty { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "pending";
 
-    [ForeignKey(nameof(InventoryTransferId))] public InventoryTransfer InventoryTransfer { get; set; } = null!;
+    [ForeignKey(nameof(TransferOrderId))] public TransferOrder TransferOrder { get; set; } = null!;
     [ForeignKey(nameof(SkuId))] public Sku? Sku { get; set; }
 }
 

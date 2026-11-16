@@ -1,18 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { ThemeName, Theme, themes, applyTheme } from './themes';
+import React, { useState, useEffect, ReactNode } from 'react';
+import { ThemeName, themes, applyTheme } from './themes';
 import { systemSettingsApi, UserThemePreferenceDto } from '../api/api';
-
-interface ThemeContextType {
-  themeName: ThemeName;
-  theme: Theme;
-  customPrimaryColor: string | null;
-  customAccentColor: string | null;
-  setTheme: (name: ThemeName) => void;
-  setCustomColors: (primary?: string, accent?: string) => void;
-  isLoading: boolean;
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+import { ThemeContext } from './themeContext';
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -38,7 +27,7 @@ export function ThemeProvider({ children, userId }: ThemeProviderProps) {
             setCustomPrimaryColor(pref.customPrimaryColor || null);
             setCustomAccentColor(pref.customAccentColor || null);
           }
-        } catch (e) {
+        } catch {
           console.log('No user theme found, using default');
         }
       }
@@ -101,12 +90,4 @@ export function ThemeProvider({ children, userId }: ThemeProviderProps) {
       {children}
     </ThemeContext.Provider>
   );
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
 }

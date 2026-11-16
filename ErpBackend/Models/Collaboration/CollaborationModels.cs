@@ -20,6 +20,16 @@ public class Announcement
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<AnnouncementReadLog> ReadLogs { get; set; } = new List<AnnouncementReadLog>();
+    public ICollection<AnnouncementRecipient> Recipients { get; set; } = new List<AnnouncementRecipient>();
+}
+
+public class AnnouncementRecipient
+{
+    public Guid AnnouncementId { get; set; }
+    public Guid EmployeeId { get; set; }
+
+    [ForeignKey(nameof(AnnouncementId))] public Announcement Announcement { get; set; } = null!;
+    [ForeignKey(nameof(EmployeeId))] public HR.Employee Employee { get; set; } = null!;
 }
 
 public class AnnouncementReadLog

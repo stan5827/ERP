@@ -127,8 +127,8 @@ public class RccpItemResource
     public decimal UsagePerUnit { get; set; }
     
     [ForeignKey(nameof(SkuId))]
-    public Sku Sku { get; set; } = null!;
+    public Sku? Sku { get; set; }
     
     [ForeignKey(nameof(ResourceId))]
-    public RccpResource Resource { get; set; } = null!;
+    public RccpResource? Resource { get; set; }
 }

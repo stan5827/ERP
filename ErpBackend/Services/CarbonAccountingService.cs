@@ -1,11 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ErpBackend.Data;
-using ErpBackend.Models.Digital;
 using ErpBackend.DTOs;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System;
-using System.Linq;
+using ErpBackend.Models.Digital;
 
 namespace ErpBackend.Services;
 
@@ -69,24 +65,20 @@ public class CarbonAccountingService : ICarbonAccountingService
 
         var sources = await _db.GhgEmissionSources.ToDictionaryAsync(s => s.Id, s => s.Scope);
 
-        var records = await query
-            .Include(r => r.Source)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
+        var records = await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
         
         if (!string.IsNullOrEmpty(scope))
         {
-            records = records.Where(r => r.Source?.Scope == scope).ToList();
+            records = records.Where(r => sources.GetValueOrDefault(r.SourceId, "") == scope).ToList();
         }
 
         return records.Select(r => new CarbonEmissionRecordDto
         {
             Id = r.Id,
             SourceId = r.SourceId,
-            SourceName = r.Source?.SourceName ?? "Unknown Source",
-            Period = r.Period ?? string.Empty,
+            Period = r.Period,
             ActivityData = r.ActivityData,
-            Unit = r.Unit ?? string.Empty,
+            Unit = r.Unit,
             CalculatedEmissions = r.CalculatedEmissions,
             CreatedAt = r.CreatedAt
         }).ToList();
@@ -114,21 +106,29 @@ public class CarbonAccountingService : ICarbonAccountingService
 
     public async Task<CarbonIntensityDto> CalculateIntensityAsync(int year)
     {
-        var currentTotal = await _db.GhgEmissionRecords
+        var currentTotal = (await _db.GhgEmissionRecords
             .Where(r => r.Period.StartsWith(year.ToString()))
-            .SumAsync(r => r.CalculatedEmissions);
+            .Select(r => r.CalculatedEmissions)
+            .ToListAsync())
+            .Sum();
 
-        var previousTotal = await _db.GhgEmissionRecords
+        var previousTotal = (await _db.GhgEmissionRecords
             .Where(r => r.Period.StartsWith((year - 1).ToString()))
-            .SumAsync(r => r.CalculatedEmissions);
+            .Select(r => r.CalculatedEmissions)
+            .ToListAsync())
+            .Sum();
 
-        var currentRevenue = await _db.SalesOrders
+        var currentRevenue = (await _db.SalesOrders
             .Where(o => o.OrderDate.Year == year && o.Status == "completed")
-            .SumAsync(o => o.TotalAmount);
+            .Select(o => o.TotalAmount)
+            .ToListAsync())
+            .Sum();
 
-        var previousRevenue = await _db.SalesOrders
+        var previousRevenue = (await _db.SalesOrders
             .Where(o => o.OrderDate.Year == year - 1 && o.Status == "completed")
-            .SumAsync(o => o.TotalAmount);
+            .Select(o => o.TotalAmount)
+            .ToListAsync())
+            .Sum();
 
         var intensity = currentRevenue > 0 ? currentTotal / currentRevenue * 1000000 : 0;
         var prevIntensity = previousRevenue > 0 ? previousTotal / previousRevenue * 1000000 : 0;

@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Package, Settings, Users, Loader2, X, Factory, Clock, Route, ArrowRight, ChevronRight, Layers, Zap, DollarSign, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { Search, Plus, Edit2, Trash2, Package, Settings, Loader2, X, Factory, Clock, Route, ArrowRight, ChevronUp, ChevronDown, Layers, Zap, DollarSign, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
 import { workCentersApi, operationsApi, routingsApi, skusApi, rccpApi, bomsApi } from '../api/api';
+import type { SkuDto } from '../api/api';
 import './ManufacturingEngineering.css';
 
-interface WorkCenter {
+interface EngineeringRecord {
+  id: string;
+  items?: BomItem[];
+  operations?: RoutingOp[];
+}
+
+interface WorkCenter extends EngineeringRecord {
   id: string;
   workCenterCode: string;
   workCenterName: string;
@@ -12,7 +19,7 @@ interface WorkCenter {
   isActive: boolean;
 }
 
-interface Operation {
+interface Operation extends EngineeringRecord {
   id: string;
   operationCode: string;
   operationName: string;
@@ -24,7 +31,7 @@ interface Operation {
 }
 
 interface RoutingOp {
-  id: string;
+  id?: string;
   operationSeq: number;
   operationId: string;
   operationName?: string;
@@ -34,7 +41,7 @@ interface RoutingOp {
   waitTime: number;
 }
 
-interface Routing {
+interface Routing extends EngineeringRecord {
   id: string;
   routingCode: string;
   routingName: string;
@@ -53,13 +60,14 @@ interface BomItem {
   childSkuName?: string;
   quantity: number;
   unit?: string;
+  unitName?: string;
   scrapRate: number;
   operationSeq: number;
   isPhantom: boolean;
   effectiveDate?: string;
 }
 
-interface Bom {
+interface Bom extends EngineeringRecord {
   id: string;
   bomCode: string;
   productSkuId: string;
@@ -73,7 +81,41 @@ interface Bom {
   items: BomItem[];
 }
 
+interface RccpResource extends EngineeringRecord {
+  resourceCode: string;
+  resourceName: string;
+  resourceType?: string;
+  workCenter?: { workCenterName?: string };
+  capacityPerBucket?: number;
+  uom?: string;
+  isActive?: boolean;
+}
+
 type TabType = 'boms' | 'workcenters' | 'operations' | 'routings' | 'rccp';
+
+function isRccpResource(value: unknown): value is RccpResource {
+  return typeof value === 'object'
+    && value !== null
+    && 'resourceCode' in value
+    && typeof value.resourceCode === 'string'
+    && 'resourceName' in value
+    && typeof value.resourceName === 'string';
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null)
+    return error instanceof Error ? error.message : String(error);
+  const response = 'response' in error ? error.response : undefined;
+  const responseData = typeof response === 'object' && response !== null && 'data' in response
+    ? response.data
+    : undefined;
+  const responseMessage = typeof responseData === 'object' && responseData !== null && 'message' in responseData
+    ? responseData.message
+    : undefined;
+  return typeof responseMessage === 'string'
+    ? responseMessage
+    : error instanceof Error ? error.message : String(error);
+}
 
 const TAB_CONFIG = {
   boms: {
@@ -114,30 +156,26 @@ export const ManufacturingEngineering: React.FC = () => {
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [routings, setRoutings] = useState<Routing[]>([]);
-  const [rccpResources, setRccpResources] = useState<any[]>([]);
+  const [rccpResources, setRccpResources] = useState<RccpResource[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<EngineeringRecord | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [routingOps, setRoutingOps] = useState<RoutingOp[]>([]);
   const [bomItems, setBomItems] = useState<BomItem[]>([]);
-  const [skus, setSkus] = useState<any[]>([]);
+  const [skus, setSkus] = useState<SkuDto[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  useEffect(() => {
     if (showModal && activeTab === 'routings') {
-      skusApi.all().then(r => setSkus((r.data?.data || []).filter((s: any) => s.status === 'active')));
+      skusApi.all().then(r => setSkus((r.data?.data || []).filter(s => s.status === 'active')));
     }
   }, [showModal, activeTab]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeTab === 'boms') {
@@ -151,17 +189,21 @@ export const ManufacturingEngineering: React.FC = () => {
         setOperations((res.data?.data ?? []) as Operation[]);
       } else if (activeTab === 'routings') {
         const res = await routingsApi.list();
-        setRoutings((res.data?.data ?? []) as any);
+        setRoutings((res.data?.data ?? []) as Routing[]);
       } else if (activeTab === 'rccp') {
         const res = await rccpApi.listResources();
-        setRccpResources(res.data?.data ?? []);
+        setRccpResources((res.data?.data ?? []).filter(isRccpResource));
       }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const openCreate = async () => {
     setModalMode('create');
@@ -173,7 +215,7 @@ export const ManufacturingEngineering: React.FC = () => {
       setFormData({ version: '1.0', status: 'active', effectiveDate: new Date().toISOString().split('T')[0] });
       if (skus.length === 0) {
         const skusRes = await skusApi.all();
-        setSkus((skusRes.data?.data || []).filter((s: any) => s.status === 'active'));
+        setSkus((skusRes.data?.data || []).filter(s => s.status === 'active'));
       }
     }
     if (activeTab === 'workcenters') setFormData({ isActive: true, capacity: 0, efficiency: 100 });
@@ -183,7 +225,7 @@ export const ManufacturingEngineering: React.FC = () => {
       // 載入產品、工序和工作中心
       if (skus.length === 0) {
         const skusRes = await skusApi.all();
-        setSkus((skusRes.data?.data || []).filter((s: any) => s.status === 'active'));
+        setSkus((skusRes.data?.data || []).filter(s => s.status === 'active'));
       }
       if (operations.length === 0) {
         const opsRes = await operationsApi.list();
@@ -197,18 +239,43 @@ export const ManufacturingEngineering: React.FC = () => {
     setShowModal(true);
   };
 
-  const openEdit = (item: any) => {
+  const openEdit = async (item: EngineeringRecord) => {
     setModalMode('edit');
     setEditingItem(item);
     setFormData({ ...item });
     if (activeTab === 'boms') {
-      setBomItems(item.items || []);
-      if (skus.length === 0) {
-        skusApi.all().then(r => setSkus((r.data?.data || []).filter((s: any) => s.status === 'active')));
+      let availableSkus = skus;
+      try {
+        if (availableSkus.length === 0) {
+          const response = await skusApi.all();
+          availableSkus = (response.data?.data || []).filter(sku => sku.status === 'active');
+          setSkus(availableSkus);
+        }
+      } catch (error: unknown) {
+        alert(`載入產品與元件 SKU 失敗：${getErrorMessage(error)}`);
+        return;
       }
+      setBomItems((item.items || []).map((bomItem: BomItem) => ({
+        ...bomItem,
+        unit: availableSkus.find(sku => sku.id === bomItem.childSkuId)?.productionUomCode || bomItem.unit || '',
+        unitName: availableSkus.find(sku => sku.id === bomItem.childSkuId)?.productionUomName || ''
+      })));
     }
     if (activeTab === 'routings') {
-      setRoutingOps(item.operations || []);
+      setRoutingOps([...(item.operations || [])].sort((a, b) => a.operationSeq - b.operationSeq));
+      try {
+        const [skuRes, opsRes, wcRes] = await Promise.all([
+          skusApi.all(),
+          operationsApi.list(),
+          workCentersApi.list(),
+        ]);
+        setSkus((skuRes.data?.data || []).filter(sku => sku.status === 'active'));
+        setOperations((opsRes.data?.data ?? []) as Operation[]);
+        setWorkCenters((wcRes.data?.data ?? []) as WorkCenter[]);
+      } catch (error: unknown) {
+        alert(`載入產品、工序與工作中心失敗：${getErrorMessage(error)}`);
+        return;
+      }
     }
     setShowModal(true);
   };
@@ -222,8 +289,8 @@ export const ManufacturingEngineering: React.FC = () => {
       else if (activeTab === 'routings') await routingsApi.delete(id);
       // NOTE: rccpApi delete endpoint not yet implemented in backend, skipping for now
       await loadData();
-    } catch (err: any) {
-      alert('刪除失敗：' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert('刪除失敗：' + getErrorMessage(err));
     }
   };
 
@@ -231,15 +298,22 @@ export const ManufacturingEngineering: React.FC = () => {
     setSubmitting(true);
     try {
       if (activeTab === 'boms') {
+        const items = bomItems.map(it => ({
+          childSkuId: it.childSkuId,
+          quantity: it.quantity,
+          unit: skus.find(sku => sku.id === it.childSkuId)?.productionUomCode || it.unit || '',
+          scrapRate: it.scrapRate,
+          operationSeq: it.operationSeq,
+          isPhantom: it.isPhantom
+        }));
+        const itemWithoutUnit = items.find(item => !item.childSkuId || !item.unit || item.quantity <= 0);
+        if (itemWithoutUnit) {
+          alert('每個 BOM 元件都必須選擇有效的 SKU，且數量須大於 0；元件 SKU 也必須設定生產單位。');
+          return;
+        }
         const bomData = {
           ...formData,
-          items: bomItems.map(it => ({
-            childSkuId: it.childSkuId,
-            quantity: it.quantity,
-            scrapRate: it.scrapRate,
-            operationSeq: it.operationSeq,
-            isPhantom: it.isPhantom
-          }))
+          items
         };
         if (modalMode === 'create') await bomsApi.create(bomData);
         else await bomsApi.update(editingItem.id, bomData);
@@ -268,8 +342,8 @@ export const ManufacturingEngineering: React.FC = () => {
       }
       setShowModal(false);
       await loadData();
-    } catch (err: any) {
-      alert('儲存失敗：' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert('儲存失敗：' + getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -591,7 +665,7 @@ export const ManufacturingEngineering: React.FC = () => {
             )}
 
             {activeTab === 'routings' && (
-              <table className="data-table">
+              <table className="data-table routing-table">
                 <thead>
                   <tr>
                     <th className="col-code">路線代碼</th>
@@ -804,7 +878,13 @@ export const ManufacturingEngineering: React.FC = () => {
                                   value={it.childSkuId} 
                                   onChange={e => {
                                     const newItems = [...bomItems];
-                                    newItems[idx] = { ...newItems[idx], childSkuId: e.target.value };
+                                    const selectedSku = skus.find(sku => sku.id === e.target.value);
+                                    newItems[idx] = {
+                                      ...newItems[idx],
+                                      childSkuId: e.target.value,
+                                      unit: selectedSku?.productionUomCode || '',
+                                      unitName: selectedSku?.productionUomName || ''
+                                    };
                                     setBomItems(newItems);
                                   }}
                                 >
@@ -814,7 +894,7 @@ export const ManufacturingEngineering: React.FC = () => {
                               </div>
                               <div className="form-grid form-grid-2">
                                 <FormField 
-                                  label="數量" 
+                                  label={`數量 (${it.unit ? `${it.unit}${it.unitName ? ` - ${it.unitName}` : ''}` : '單位未設定'})`}
                                   type="number" 
                                   value={it.quantity} 
                                   onChange={v => {
@@ -1006,13 +1086,42 @@ export const ManufacturingEngineering: React.FC = () => {
                                 <ArrowRight size={14} className="seq-arrow" />
                                 <span className="seq-label">工序 {idx + 1}</span>
                               </span>
-                              <button
-                                className="btn-icon-sm btn-icon-danger"
-                                onClick={() => setRoutingOps(p => p.filter((_, i) => i !== idx))}
-                                title="刪除此工序"
-                              >
-                                <Trash2 size={12} />
-                              </button>
+                              <div className="routing-op-actions">
+                                <button
+                                  className="btn-icon-sm routing-op-move"
+                                  onClick={() => setRoutingOps(current => {
+                                    const next = [...current];
+                                    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                    return next;
+                                  })}
+                                  disabled={idx === 0}
+                                  aria-label={`工序 ${idx + 1} 上移`}
+                                  title="上移工序"
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+                                <button
+                                  className="btn-icon-sm routing-op-move"
+                                  onClick={() => setRoutingOps(current => {
+                                    const next = [...current];
+                                    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                                    return next;
+                                  })}
+                                  disabled={idx === routingOps.length - 1}
+                                  aria-label={`工序 ${idx + 1} 下移`}
+                                  title="下移工序"
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                                <button
+                                  className="btn-icon-sm btn-icon-danger"
+                                  onClick={() => setRoutingOps(p => p.filter((_, i) => i !== idx))}
+                                  title="刪除此工序"
+                                  aria-label={`刪除工序 ${idx + 1}`}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </div>
                             <div className="routing-op-fields">
                               <div className="form-field">

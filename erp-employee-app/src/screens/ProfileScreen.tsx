@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { employeesApi } from '../services/api';
@@ -36,6 +37,13 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('確定要登出嗎？')) {
+        void logout();
+      }
+      return;
+    }
+
     Alert.alert(
       '登出',
       '確定要登出嗎？',

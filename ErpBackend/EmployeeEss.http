@@ -1,0 +1,62 @@
+@apiBase = http://localhost:5100/api/erp
+@authToken = replace-with-a-valid-access-token
+@latitude = 0
+@longitude = 0
+@leaveRequestId = 00000000-0000-0000-0000-000000000001
+
+### Get the authenticated employee's payroll records
+GET {{apiBase}}/ess/payroll?pageSize=12
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Get the authenticated employee's attendance records
+GET {{apiBase}}/ess/attendance?pageSize=30
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Clock in (replace placeholder coordinates with the configured company location)
+POST {{apiBase}}/ess/attendance/clock-in
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "latitude": {{latitude}},
+  "longitude": {{longitude}}
+}
+
+### Clock out (replace placeholder coordinates with the configured company location)
+POST {{apiBase}}/ess/attendance/clock-out
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "latitude": {{latitude}},
+  "longitude": {{longitude}}
+}
+
+### List the authenticated employee's leave requests
+GET {{apiBase}}/ess/leave-requests?pageSize=20
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Get one of the authenticated employee's leave requests
+GET {{apiBase}}/ess/leave-requests/{{leaveRequestId}}
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Submit a leave request (employee identity is taken from the token)
+POST {{apiBase}}/ess/leave-requests
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "leaveType": "annual",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-02",
+  "reason": "Personal leave"
+}
+
+### Get the authenticated employee's leave balances
+GET {{apiBase}}/ess/leave-balances
+Authorization: Bearer {{authToken}}
+Accept: application/json

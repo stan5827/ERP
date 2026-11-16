@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ErpBackend.Data;
+using ErpBackend.DTOs;
 using ErpBackend.Services;
 
 namespace ErpBackend.Services;
@@ -12,121 +13,7 @@ public interface IAIPlanningService
     Task<KpiValidationResult> ValidateKpiAsync();
     Task<AgentState> GetAgentStateAsync(string executionId);
     Task<List<AgentState>> GetExecutionHistoryAsync(int limit = 10);
-}
-
-public class PlanningRequest
-{
-    public string TaskDescription { get; set; } = null!;
-    public string? Context { get; set; }
-    public Dictionary<string, object>? Parameters { get; set; }
-    public string? ModelId { get; set; }
-}
-
-public class PlanningResponse
-{
-    public bool Success { get; set; }
-    public string? PlanId { get; set; }
-    public List<PlanTask> Tasks { get; set; } = new();
-    public string Strategy { get; set; } = "serial";
-    public decimal Confidence { get; set; }
-    public string? ErrorMessage { get; set; }
-    public List<string>? Reasoning { get; set; }
-}
-
-public class PlanTask
-{
-    public string Id { get; set; } = null!;
-    public string Description { get; set; } = null!;
-    public List<string> Dependencies { get; set; } = new();
-    public int EstimatedMinutes { get; set; }
-    public List<string> ToolsNeeded { get; set; } = new();
-    public string Status { get; set; } = "pending";
-    public int Priority { get; set; } = 50;
-}
-
-public class ExecutionRequest
-{
-    public string PlanId { get; set; } = null!;
-    public string? TaskId { get; set; }
-    public bool ParallelExecution { get; set; } = false;
-}
-
-public class ExecutionResponse
-{
-    public bool Success { get; set; }
-    public string? ExecutionId { get; set; }
-    public List<TaskResult> Results { get; set; } = new();
-    public decimal Duration { get; set; }
-    public string? ErrorMessage { get; set; }
-    public AgentState FinalState { get; set; } = new();
-}
-
-public class TaskResult
-{
-    public string TaskId { get; set; } = null!;
-    public string Status { get; set; } = null!;
-    public string? Output { get; set; }
-    public string? Error { get; set; }
-    public decimal Duration { get; set; }
-    public string? ToolUsed { get; set; }
-}
-
-public class ReviewRequest
-{
-    public string ExecutionId { get; set; } = null!;
-    public string? Feedback { get; set; }
-    public bool AutoApproval { get; set; } = true;
-}
-
-public class ReviewResponse
-{
-    public bool Approved { get; set; }
-    public decimal QualityScore { get; set; }
-    public List<string> Issues { get; set; } = new();
-    public string? Recommendations { get; set; }
-    public List<string>? SuggestedFixes { get; set; }
-}
-
-public class KpiValidationResult
-{
-    public decimal AccuracyRate { get; set; }
-    public decimal CurrentRoi { get; set; }
-    public bool TargetMet { get; set; }
-    public Dictionary<string, decimal> Metrics { get; set; } = new();
-    public Dictionary<string, decimal> Trends { get; set; } = new();
-    public DateTime LastUpdated { get; set; }
-}
-
-public class AgentState
-{
-    public string ExecutionId { get; set; } = null!;
-    public string CurrentNode { get; set; } = "idle";
-    public string Status { get; set; } = "pending";
-    public Dictionary<string, object> Context { get; set; } = new();
-    public List<string> History { get; set; } = new();
-    public DateTime StartedAt { get; set; }
-    public DateTime? CompletedAt { get; set; }
-}
-
-public class PlanningGraph
-{
-    public List<GraphNode> Nodes { get; set; } = new();
-    public List<GraphEdge> Edges { get; set; } = new();
-}
-
-public class GraphNode
-{
-    public string Id { get; set; } = null!;
-    public string Name { get; set; } = null!;
-    public string Type { get; set; } = null!;
-    public Dictionary<string, object> Config { get; set; } = new();
-}
-
-public class GraphEdge
-{
-    public string From { get; set; } = null!;
-    public string To { get; set; } = null!;
-    public string? Condition { get; set; }
+    List<ErpTool> GetAvailableTools();
 }
 
 public class AIPlanningService : IAIPlanningService
@@ -151,8 +38,12 @@ public class AIPlanningService : IAIPlanningService
         _metrics = metrics;
         _httpClient = httpClientFactory.CreateClient();
         _llmService = llmService;
-        _availableTools = InitializeTools();
+        _availableTools = InitializeTools()
+            .Where(tool => AgentToolAccessPolicy.IsAllowed(tool.Id, tool.Category))
+            .ToList();
     }
+
+    public List<ErpTool> GetAvailableTools() => _availableTools.ToList();
 
     private List<ErpTool> InitializeTools()
     {
@@ -195,9 +86,10 @@ public class AIPlanningService : IAIPlanningService
             
             var planId = $"PLAN-{DateTime.UtcNow:yyyyMMddHHmmss}";
             
-            var (tasks, reasoning) = _llmService != null 
+            var (tasks, reasoning) = _llmService != null
                 ? await AnalyzeWithLlmAsync(request)
                 : AnalyzeAndDecomposeTask(request);
+            RemoveUnapprovedTools(tasks, reasoning);
             
             sw.Stop();
             _metrics.RecordAgentLatency("planner", "plan_creation", sw.Elapsed.TotalSeconds);
@@ -246,6 +138,17 @@ public class AIPlanningService : IAIPlanningService
             _logger.LogInformation("Executing plan: {PlanId}", request.PlanId);
             
             var tasks = GetPlanTasks(request.PlanId);
+            var unapprovedToolIds = tasks
+                .SelectMany(task => task.ToolsNeeded)
+                .Where(toolId => !_availableTools.Any(tool =>
+                    string.Equals(tool.Id, toolId, StringComparison.OrdinalIgnoreCase)
+                    && AgentToolAccessPolicy.IsAllowed(tool.Id, tool.Category)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (unapprovedToolIds.Count > 0)
+                throw new InvalidOperationException(
+                    "Plan contains tools that are not approved for Agent execution.");
+
             var results = new List<TaskResult>();
             
             agentState.CurrentNode = "executor";
@@ -259,16 +162,16 @@ public class AIPlanningService : IAIPlanningService
                 results = await ExecuteTasksSerialAsync(tasks, agentState);
             }
 
-            agentState.CurrentNode = "reviewer";
-            agentState.Status = "completed";
-            agentState.CompletedAt = DateTime.UtcNow;
-            
             var successCount = results.Count(r => r.Status == "success");
             var successRate = tasks.Count > 0 ? (decimal)successCount / tasks.Count * 100 : 0;
+            var succeeded = successRate >= 95;
+            agentState.CurrentNode = succeeded ? "reviewer" : "error";
+            agentState.Status = succeeded ? "completed" : "failed";
+            agentState.CompletedAt = DateTime.UtcNow;
 
             sw.Stop();
             _metrics.RecordAgentLatency("executor", "plan_execution", sw.Elapsed.TotalSeconds);
-            _metrics.RecordAgentRequest("executor", "success");
+            _metrics.RecordAgentRequest("executor", succeeded ? "success" : "failure");
             
             _executionRecords[executionId] = new AgentExecutionRecord
             {
@@ -286,6 +189,9 @@ public class AIPlanningService : IAIPlanningService
                 ExecutionId = executionId,
                 Results = results,
                 Duration = (decimal)sw.Elapsed.TotalSeconds,
+                ErrorMessage = succeeded
+                    ? null
+                    : "Execution was stopped because one or more requested tools are not approved for Agent execution.",
                 FinalState = agentState
             };
         }
@@ -311,7 +217,7 @@ public class AIPlanningService : IAIPlanningService
         }
     }
 
-    public async Task<ReviewResponse> ReviewResultAsync(ReviewRequest request)
+    public Task<ReviewResponse> ReviewResultAsync(ReviewRequest request)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         
@@ -330,22 +236,13 @@ public class AIPlanningService : IAIPlanningService
             string? recommendations = null;
             List<string>? suggestedFixes = null;
 
-            if (_llmService != null && results.Count > 0)
-            {
-                var (llmRecs, llmFixes) = await ReviewWithLlmAsync(results);
-                recommendations = llmRecs;
-                suggestedFixes = llmFixes;
-            }
-            else
-            {
-                suggestedFixes = issues.Count > 0 
-                    ? issues.Select(i => $"Review and fix: {i}").ToList() 
-                    : null;
-                
-                recommendations = qualityScore < 95 
-                    ? $"任務品質分數 {qualityScore:F2}%，低於目標 95%。建議檢視任務分解邏輯與工具調用策略。" 
-                    : null;
-            }
+            suggestedFixes = issues.Count > 0
+                ? issues.Select(issue => $"Review and fix: {issue}").ToList()
+                : null;
+
+            recommendations = qualityScore < 95
+                ? $"任務品質分數 {qualityScore:F2}%，低於目標 95%。建議檢視任務分解邏輯與工具調用策略。"
+                : null;
 
             var reviewResponse = new ReviewResponse
             {
@@ -360,19 +257,19 @@ public class AIPlanningService : IAIPlanningService
             _metrics.RecordAgentLatency("reviewer", "result_review", sw.Elapsed.TotalSeconds);
             _metrics.RecordAgentRequest("reviewer", reviewResponse.Approved ? "approved" : "rejected");
             
-            return reviewResponse;
+            return Task.FromResult(reviewResponse);
         }
         catch (Exception ex)
         {
             sw.Stop();
             _logger.LogError(ex, "Failed to review result");
             
-            return new ReviewResponse
+            return Task.FromResult(new ReviewResponse
             {
                 Approved = false,
                 QualityScore = 0,
                 Issues = new List<string> { ex.Message }
-            };
+            });
         }
     }
 
@@ -468,11 +365,16 @@ public class AIPlanningService : IAIPlanningService
 
     private async Task<(List<PlanTask>, List<string>)> AnalyzeWithLlmAsync(PlanningRequest request)
     {
+        if (!IsLlmEgressApproved())
+            return AnalyzeAndDecomposeTask(request);
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         
         try
         {
-            var toolsList = string.Join(", ", _availableTools.Select(t => t.Id));
+            var toolsList = _availableTools.Count == 0
+                ? "目前沒有通過使用者權限與資料範圍審核的工具"
+                : string.Join(", ", _availableTools.Select(t => t.Id));
             
             var prompt = $@"分析以下 ERP 任務並生成執行計畫：
 
@@ -569,6 +471,9 @@ public class AIPlanningService : IAIPlanningService
 
     private async Task<(string?, List<string>?)> ReviewWithLlmAsync(List<TaskResult> results)
     {
+        if (!IsLlmEgressApproved())
+            return (null, null);
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         
         try
@@ -834,6 +739,9 @@ public class AIPlanningService : IAIPlanningService
         
         try
         {
+            if (task.ToolsNeeded.Count == 0)
+                throw new InvalidOperationException("No approved Agent tools are available for this task.");
+
             object? output = null;
             string? toolUsed = null;
             
@@ -869,21 +777,48 @@ public class AIPlanningService : IAIPlanningService
     private async Task<object?> ExecuteToolAsync(string toolId, string context)
     {
         var tool = _availableTools.FirstOrDefault(t => t.Id == toolId);
+        if (tool == null || !AgentToolAccessPolicy.IsAllowed(tool.Id, tool.Category))
+        {
+            _logger.LogWarning("Denied Agent execution for tool {ToolId}", toolId);
+            throw new InvalidOperationException($"Tool '{toolId}' is not approved for Agent execution.");
+        }
+
         _logger.LogInformation("Executing tool: {Tool} for: {Context}", toolId, context);
         
         await Task.Delay(50);
 
-        return tool?.Category switch
+        return tool.Category switch
         {
             "search" => new { status = "found", tool = toolId, timestamp = DateTime.UtcNow },
-            "compute" => new { status = "calculated", tool = toolId, result = "success" },
-            "create" => new { status = "created", tool = toolId, id = $"{toolId.Split('_')[0].ToUpper()}-{Random.Shared.Next(1000, 9999)}" },
-            "update" => new { status = "updated", tool = toolId },
             "check" => new { status = "checked", tool = toolId, result = "pass" },
-            "action" => new { status = "executed", tool = toolId },
-            "output" => new { status = "generated", tool = toolId, url = $"/reports/{Random.Shared.Next(1, 100)}" },
-            _ => new { status = "executed", tool = toolId }
+            _ => throw new InvalidOperationException($"Tool category '{tool.Category}' is not approved for Agent execution.")
         };
+    }
+
+    private void RemoveUnapprovedTools(List<PlanTask> tasks, List<string> reasoning)
+    {
+        var removedToolIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var task in tasks)
+        {
+            var approvedTools = task.ToolsNeeded
+                .Where(toolId => _availableTools.Any(tool =>
+                    string.Equals(tool.Id, toolId, StringComparison.OrdinalIgnoreCase)
+                    && AgentToolAccessPolicy.IsAllowed(tool.Id, tool.Category)))
+                .ToList();
+
+            foreach (var toolId in task.ToolsNeeded.Except(approvedTools, StringComparer.OrdinalIgnoreCase))
+                removedToolIds.Add(toolId);
+
+            task.ToolsNeeded = approvedTools;
+        }
+
+        if (removedToolIds.Count > 0)
+        {
+            _logger.LogWarning(
+                "Removed {ToolCount} unapproved tool references from the generated plan",
+                removedToolIds.Count);
+            reasoning.Add("未通過使用者權限與資料範圍審核的工具已移除；本階段不會執行 ERP 工具。");
+        }
     }
 
     private decimal CalculateConfidence(List<PlanTask> tasks)
@@ -902,22 +837,7 @@ public class AIPlanningService : IAIPlanningService
         
         return Math.Min(confidence, 0.98m);
     }
-}
 
-public class ErpTool
-{
-    public string Id { get; set; } = null!;
-    public string Name { get; set; } = null!;
-    public string Module { get; set; } = null!;
-    public string Category { get; set; } = null!;
-}
-
-public class AgentExecutionRecord
-{
-    public string ExecutionId { get; set; } = null!;
-    public string PlanId { get; set; } = null!;
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
-    public decimal SuccessRate { get; set; }
-    public List<TaskResult> Tasks { get; set; } = new();
+    // Direct provider calls remain disabled until a server-side egress gateway is approved.
+    private static bool IsLlmEgressApproved() => false;
 }

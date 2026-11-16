@@ -1,196 +1,86 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.Inventory;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
-[Route("api/erp/[controller]")]
+[Route("api/erp/inventory-transfers")]
+[Route("api/erp/InventoryTransfers")]
 public class InventoryTransfersController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly IInventoryTransferService _transferService;
 
-    public InventoryTransfersController(ErpGeneralDbContext db)
+    public InventoryTransfersController(IInventoryTransferService transferService)
     {
-        _db = db;
+        _transferService = transferService;
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<InventoryTransferDto>>>> GetTransfers([FromQuery] string? status)
+    public async Task<ActionResult<ApiResponse<List<object>>>> GetTransferOrders()
     {
-        var page = GetPage();
-        var pageSize = GetPageSize();
-
-        var query = _db.InventoryTransfers
-            .Include(t => t.SourceWarehouse)
-            .Include(t => t.TargetWarehouse)
-            .Include(t => t.CreatedByEmployee)
-            .AsQueryable();
-
-        if (!string.IsNullOrEmpty(status))
-            query = query.Where(t => t.Status == status);
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(t => t.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var dtos = items.Select(t => new InventoryTransferDto
-        {
-            Id = t.Id,
-            TransferNumber = t.TransferNumber,
-            SourceWarehouseId = t.SourceWarehouseId,
-            SourceWarehouseName = t.SourceWarehouse?.WarehouseName,
-            TargetWarehouseId = t.TargetWarehouseId,
-            TargetWarehouseName = t.TargetWarehouse?.WarehouseName,
-            Status = t.Status,
-            TransferDate = t.TransferDate,
-            CreatedByName = t.CreatedByEmployee?.ChineseName,
-            CreatedAt = t.CreatedAt
-        }).ToList();
-
-        return Ok(dtos, totalCount: totalCount);
+        var items = await _transferService.GetTransferOrdersAsync();
+        return Ok(items);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<InventoryTransferDto>>> GetTransfer(Guid id)
+    public async Task<ActionResult<ApiResponse<object>>> GetTransferOrder(Guid id)
     {
-        var t = await _db.InventoryTransfers
-            .Include(t => t.SourceWarehouse)
-            .Include(t => t.TargetWarehouse)
-            .Include(t => t.Items)
-                .ThenInclude(i => i.Sku)
-            .FirstOrDefaultAsync(t => t.Id == id);
-
-        if (t == null) return NotFound(ApiResponse.Fail("調撥單不存在"));
-
-        var dto = new InventoryTransferDto
-        {
-            Id = t.Id,
-            TransferNumber = t.TransferNumber,
-            SourceWarehouseId = t.SourceWarehouseId,
-            SourceWarehouseName = t.SourceWarehouse?.WarehouseName,
-            TargetWarehouseId = t.TargetWarehouseId,
-            TargetWarehouseName = t.TargetWarehouse?.WarehouseName,
-            Status = t.Status,
-            TransferDate = t.TransferDate,
-            Items = t.Items.Select(i => new InventoryTransferItemDto
-            {
-                Id = i.Id,
-                SkuId = i.SkuId,
-                SkuNumber = i.Sku?.SkuNumber,
-                SkuName = i.Sku?.SkuName,
-                Qty = i.TransferQty,
-                LotNumber = i.LotNumber
-            }).ToList()
-        };
-
+        var dto = await _transferService.GetTransferOrderAsync(id);
+        if (dto == null) return NotFound(ApiHelper.Fail<object>("找不到指定調撥單"));
         return Ok(dto);
     }
 
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<InventoryTransferDto>>> CreateTransfer(CreateInventoryTransferRequest request)
+    public async Task<ActionResult<ApiResponse<object>>> CreateTransferOrder([FromBody] CreateTransferOrderDto model)
     {
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
+        var (dto, status) = await _transferService.CreateTransferOrderAsync(model, GetUserId());
+        return status switch
         {
-            var transfer = new InventoryTransfer
-            {
-                Id = Guid.NewGuid(),
-                TransferNumber = $"TRF-{DateTime.UtcNow:yyyyMMddHHmmss}",
-                SourceWarehouseId = request.SourceWarehouseId,
-                TargetWarehouseId = request.TargetWarehouseId,
-                TransferDate = DateTime.UtcNow,
-                Status = "PENDING",
-                CreatedAt = DateTime.UtcNow
-            };
-
-            foreach (var item in request.Items)
-            {
-                transfer.Items.Add(new InventoryTransferItem
-                {
-                    Id = Guid.NewGuid(),
-                    SkuId = item.SkuId,
-                    TransferQty = item.Qty,
-                    LotNumber = item.LotNumber
-                });
-            }
-
-            _db.InventoryTransfers.Add(transfer);
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return Ok(new InventoryTransferDto { Id = transfer.Id, TransferNumber = transfer.TransferNumber });
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return BadRequest(ApiResponse.Fail(ex.Message));
-        }
+            "ok" => Ok(dto, "Created"),
+            "invalid" => BadRequest(ApiHelper.Fail<object>("請求參數不正確")),
+            "duplicate" => BadRequest(ApiHelper.Fail<object>("調撥單編號已存在")),
+            "not_found" => NotFound(ApiHelper.Fail<object>("倉庫不存在")),
+            _ => BadRequest(ApiHelper.Fail<object>("建立調撥單失敗"))
+        };
     }
 
-    [HttpPost("{id}/confirm")]
-    public async Task<ActionResult<ApiResponse>> ConfirmTransfer(Guid id)
+    [HttpPost("{id}/approve")]
+    public async Task<ActionResult<ApiResponse<object>>> ApproveTransferOrder(Guid id)
     {
-        var transfer = await _db.InventoryTransfers
-            .Include(t => t.Items)
-            .FirstOrDefaultAsync(t => t.Id == id);
-
-        if (transfer == null) return NotFound(ApiResponse.Fail("調撥單不存在"));
-        if (transfer.Status != "PENDING") return BadRequest(ApiResponse.Fail("僅待處理狀態可確認"));
-
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
+        var (dto, status) = await _transferService.ApproveTransferOrderAsync(id, GetUserId());
+        return status switch
         {
-            foreach (var item in transfer.Items)
-            {
-                // 這裡應該呼叫 InventoryService 進行實際扣減與增加
-                // 暫時簡化邏輯
-                var sourceStock = await _db.InventoryTransactions
-                    .Where(it => it.SkuId == item.SkuId && it.WarehouseId == transfer.SourceWarehouseId)
-                    .SumAsync(it => it.Qty);
+            "ok" => Ok(dto, "Approved"),
+            "not_found" => NotFound(ApiHelper.Fail<object>("找不到指定調撥單")),
+            "invalid" => BadRequest(ApiHelper.Fail<object>("僅可核准狀態為 draft 的調撥單")),
+            _ => BadRequest(ApiHelper.Fail<object>("核准調撥單失敗"))
+        };
+    }
 
-                if (sourceStock < item.TransferQty)
-                    throw new Exception($"庫存不足: SKU ID {item.SkuId}");
-
-                // 扣減來源
-                _db.InventoryTransactions.Add(new InventoryTransaction
-                {
-                    Id = Guid.NewGuid(),
-                    SkuId = item.SkuId,
-                    WarehouseId = transfer.SourceWarehouseId,
-                    Qty = -item.TransferQty,
-                    TransactionType = "TRANSFER_OUT",
-                    ReferenceId = transfer.Id,
-                    TransactionDate = DateTime.UtcNow
-                });
-
-                // 增加目標
-                _db.InventoryTransactions.Add(new InventoryTransaction
-                {
-                    Id = Guid.NewGuid(),
-                    SkuId = item.SkuId,
-                    WarehouseId = transfer.TargetWarehouseId,
-                    Qty = item.TransferQty,
-                    TransactionType = "TRANSFER_IN",
-                    ReferenceId = transfer.Id,
-                    TransactionDate = DateTime.UtcNow
-                });
-            }
-
-            transfer.Status = "CONFIRMED";
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return Ok("調撥確認成功");
-        }
-        catch (Exception ex)
+    [HttpPost("{id}/execute")]
+    public async Task<ActionResult<ApiResponse<object>>> ExecuteTransferOrder(Guid id)
+    {
+        var (dto, status) = await _transferService.ExecuteTransferOrderAsync(id, GetUserId());
+        return status switch
         {
-            await transaction.RollbackAsync();
-            return BadRequest(ApiResponse.Fail(ex.Message));
-        }
+            "ok" => Ok(dto, "Executed"),
+            "not_found" => NotFound(ApiHelper.Fail<object>("找不到指定調撥單")),
+            "invalid" => BadRequest(ApiHelper.Fail<object>("僅可執行狀態為 approved 的調撥單")),
+            "insufficient_stock" => BadRequest(ApiHelper.Fail<object>("來源倉庫庫存不足，無法執行調撥")),
+            _ => BadRequest(ApiHelper.Fail<object>("執行調撥單失敗"))
+        };
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult<ApiResponse<object>>> CancelTransferOrder(Guid id)
+    {
+        var (ok, status) = await _transferService.CancelTransferOrderAsync(id);
+        return status switch
+        {
+            "ok" => Ok<object>("Cancelled"),
+            "not_found" => NotFound(ApiHelper.Fail<object>("找不到指定調撥單")),
+            "invalid" => BadRequest(ApiHelper.Fail<object>("已完成或已取消的調撥單無法刪除")),
+            _ => BadRequest(ApiHelper.Fail<object>("取消調撥單失敗"))
+        };
     }
 }

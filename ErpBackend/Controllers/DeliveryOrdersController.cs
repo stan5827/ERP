@@ -1,19 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.Sales;
-using ErpBackend.Helpers;
+using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
 public class DeliveryOrdersController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
+    private readonly IDeliveryOrderService _deliveryOrderService;
+    private readonly IProcessInspectionService _processInspectionService;
 
-    public DeliveryOrdersController(ErpGeneralDbContext db)
+    public DeliveryOrdersController(
+        IDeliveryOrderService deliveryOrderService,
+        IProcessInspectionService processInspectionService)
     {
-        _db = db;
+        _deliveryOrderService = deliveryOrderService;
+        _processInspectionService = processInspectionService;
     }
 
     [HttpGet]
@@ -22,162 +23,60 @@ public class DeliveryOrdersController : BaseController
         var page = GetPage();
         var pageSize = GetPageSize();
 
-        var query = _db.DeliveryOrders
-            .Include(d => d.SalesOrder)
-                .ThenInclude(s => s!.Customer)
-            .AsQueryable();
-
-        if (!string.IsNullOrEmpty(status))
-            query = query.Where(d => d.Status == status);
-
-        if (!string.IsNullOrEmpty(searchTerm))
-            query = query.Where(d => d.DeliveryNumber.Contains(searchTerm) || 
-                (d.SalesOrder != null && d.SalesOrder.Customer != null && d.SalesOrder.Customer.CustomerName.Contains(searchTerm)));
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(d => d.DeliveryDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var dtos = items.Select(d => new DeliveryOrderDto
-        {
-            Id = d.Id,
-            DeliveryNumber = d.DeliveryNumber,
-            SalesOrderId = d.SalesOrderId,
-            SalesOrderNumber = d.SalesOrder?.OrderNumber,
-            CustomerName = d.SalesOrder?.Customer?.CustomerName,
-            DeliveryDate = d.DeliveryDate,
-            ShippingMethod = d.ShippingMethod,
-            TrackingNumber = d.TrackingNumber,
-            DeliveryAddress = d.DeliveryAddress,
-            SignedBy = d.SignedBy,
-            SignedAt = d.SignedAt,
-            Status = d.Status,
-            CreatedAt = d.CreatedAt,
-            ItemCount = d.Items.Count
-        }).ToList();
-
-        return Ok(dtos, totalCount: totalCount);
+        var dtos = await _deliveryOrderService.GetDeliveryOrdersAsync(status, searchTerm, page, pageSize);
+        return Ok(dtos, totalCount: dtos.Count);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<DeliveryOrderDto>>> GetDeliveryOrder(Guid id)
     {
-        var d = await _db.DeliveryOrders
-            .Include(d => d.SalesOrder)
-                .ThenInclude(s => s!.Customer)
-            .Include(d => d.Items)
-                .ThenInclude(i => i.Sku)
-            .FirstOrDefaultAsync(d => d.Id == id);
+        var dto = await _deliveryOrderService.GetDeliveryOrderAsync(id);
+        return dto == null ? NotFound(ApiHelper.Fail("Delivery order not found")) : Ok(dto);
+    }
 
-        if (d == null) return NotFound(ApiHelper.Fail("Delivery order not found"));
-
-        var dto = new DeliveryOrderDto
-        {
-            Id = d.Id,
-            DeliveryNumber = d.DeliveryNumber,
-            SalesOrderId = d.SalesOrderId,
-            SalesOrderNumber = d.SalesOrder?.OrderNumber,
-            CustomerName = d.SalesOrder?.Customer?.CustomerName,
-            DeliveryDate = d.DeliveryDate,
-            ShippingMethod = d.ShippingMethod,
-            TrackingNumber = d.TrackingNumber,
-            DeliveryAddress = d.DeliveryAddress,
-            SignedBy = d.SignedBy,
-            SignedAt = d.SignedAt,
-            Status = d.Status,
-            CreatedAt = d.CreatedAt,
-            Items = d.Items.Select(i => new DeliveryOrderItemDto
-            {
-                Id = i.Id,
-                SkuId = i.SkuId,
-                SkuNumber = i.Sku?.SkuNumber,
-                SkuName = i.Sku?.SkuName,
-                LotNumber = i.LotNumber,
-                DeliveredQty = i.DeliveredQty,
-                SerialNumber = i.SerialNumber
-            }).ToList()
-        };
-
-        return Ok(dto);
+    [HttpGet("{id:guid}/inspection-report")]
+    public async Task<ActionResult<ApiResponse<DeliveryInspectionReportDto>>> GetInspectionReport(Guid id)
+    {
+        var report = await _processInspectionService.GetDeliveryReportAsync(id);
+        return report == null
+            ? NotFound(ApiHelper.FailOf<DeliveryInspectionReportDto>("找不到出貨單"))
+            : Ok(report);
     }
 
     [HttpPost]
     public async Task<ActionResult<ApiResponse<DeliveryOrderDto>>> CreateDeliveryOrder([FromBody] CreateDeliveryOrderRequest req)
     {
-        var so = await _db.SalesOrders.FindAsync(req.SalesOrderId);
-        if (so == null) return BadRequest(ApiHelper.Fail("Sales order not found"));
-
-        var delivery = new DeliveryOrder
-        {
-            Id = Guid.NewGuid(),
-            DeliveryNumber = DocumentNumberGenerator.Generate("DEL"),
-            SalesOrderId = req.SalesOrderId,
-            DeliveryDate = req.DeliveryDate ?? DateTime.UtcNow,
-            ShippingMethod = req.ShippingMethod,
-            TrackingNumber = req.TrackingNumber,
-            DeliveryAddress = req.DeliveryAddress,
-            Status = "pending"
-        };
-
-        if (req.Items != null)
-        {
-            foreach (var item in req.Items)
-            {
-                delivery.Items.Add(new DeliveryOrderItem
-                {
-                    Id = Guid.NewGuid(),
-                    DeliveryOrderId = delivery.Id,
-                    SkuId = item.SkuId,
-                    LotNumber = item.LotNumber,
-                    DeliveredQty = item.Quantity,
-                    SerialNumber = item.SerialNumber
-                });
-            }
-        }
-
-        _db.DeliveryOrders.Add(delivery);
-        await _db.SaveChangesAsync();
-
-        var dto = new DeliveryOrderDto
-        {
-            Id = delivery.Id,
-            DeliveryNumber = delivery.DeliveryNumber,
-            SalesOrderId = delivery.SalesOrderId,
-            DeliveryDate = delivery.DeliveryDate,
-            Status = delivery.Status,
-            CreatedAt = delivery.CreatedAt
-        };
-
-        return Ok(dto);
+        var (dto, status) = await _deliveryOrderService.CreateDeliveryOrderAsync(req);
+        if (status != "ok")
+            return status == "sales_order_not_found"
+                ? BadRequest(ApiHelper.Fail("Sales order not found"))
+                : BadRequest(ApiHelper.Fail($"Delivery order rejected: {status}"));
+        return Ok(dto!);
     }
 
     [HttpPatch("{id}/status")]
     public async Task<ActionResult<ApiResponse>> UpdateStatus(Guid id, [FromBody] UpdateDeliveryStatusRequest req)
     {
-        var delivery = await _db.DeliveryOrders.FindAsync(id);
-        if (delivery == null) return NotFound(ApiHelper.Fail("Delivery order not found"));
-
-        delivery.Status = req.Status;
-        await _db.SaveChangesAsync();
-
+        var (found, status) = await _deliveryOrderService.UpdateStatusAsync(id, req);
+        if (!found) return NotFound(ApiHelper.Fail("Delivery order not found"));
+        if (status == "guarded") return BadRequest(ApiHelper.Fail("Completed deliveries cannot be changed, and only pending/cancelled are allowed"));
         return ApiResponse.Ok("Status updated");
     }
 
     [HttpPatch("{id}/sign")]
     public async Task<ActionResult<ApiResponse>> SignDelivery(Guid id, [FromBody] SignDeliveryRequest req)
     {
-        var delivery = await _db.DeliveryOrders.FindAsync(id);
-        if (delivery == null) return NotFound(ApiHelper.Fail("Delivery order not found"));
-
-        delivery.SignedBy = req.SignedBy;
-        delivery.SignedAt = DateTime.UtcNow;
-        delivery.Status = "completed";
-        await _db.SaveChangesAsync();
-
+        var (found, status) = await _deliveryOrderService.SignDeliveryAsync(id, req);
+        if (!found) return NotFound(ApiHelper.Fail("Delivery order not found"));
+        if (status != "ok")
+        {
+            var message = status.StartsWith("account_mapping_missing:", StringComparison.Ordinal)
+                ? "尚未設定有效的銷貨成本與成品存貨科目映射，禁止簽收出貨"
+                : status == "lot_cost_unavailable"
+                    ? "指定批號缺少完整的實際入庫成本資料，禁止出貨簽收"
+                    : $"Delivery signing rejected: {status}";
+            return BadRequest(ApiHelper.Fail(message));
+        }
         return ApiResponse.Ok("Delivery signed");
     }
 }
-

@@ -2,12 +2,40 @@ import React, { useState, useEffect } from 'react';
 import {
   Search, Megaphone, Eye, Loader2, Pin, AlertOctagon, Plus,
   Package, Factory, Activity, Truck, CheckSquare,
-  AlertTriangle, RefreshCw, Calendar, BarChart3, Zap
+  RefreshCw, Calendar, Zap
 } from 'lucide-react';
 import { useAnnouncements, useCreateAnnouncement, useCrossDeptTasks } from '../hooks/useApi';
+import { useActiveEmployees, useDepartments } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { mrpApi, apsApi, workOrdersApi, suppliersApi } from '../api/api';
+import type { AnnouncementDto, CrossDeptTaskDto, MrpRequirementDto, ProductionScheduleDto, SupplierDto, WorkOrderDto } from '../api/api';
+
+interface MrpResult extends MrpRequirementDto {
+  grossRequirement?: number;
+  onHand?: number;
+  onOrder?: number;
+}
+
+interface ScheduleDisplayItem extends ProductionScheduleDto {
+  workOrderNumber?: string;
+  productName?: string;
+  skuNumber?: string;
+  workCenter?: string;
+  machine?: string;
+  startTime?: string;
+  endTime?: string;
+  progress?: number;
+  priority?: string;
+}
+
+interface WorkOrderDisplayItem extends WorkOrderDto {
+  workOrderNumber?: string;
+  productName?: string;
+  skuNumber?: string;
+  plannedQuantity?: number;
+  completedQuantity?: number;
+}
 
 const tabs = [
   { id: 'announcements', label: '公告中心' },
@@ -44,35 +72,74 @@ function getTabIcon(id: string) {
   return icons[id] || null;
 }
 
-const announcementFields: FormField[] = [
-  { name: 'title', label: '標題', type: 'text', required: true, description: '公告的標題名稱，將顯示於公告列表與首頁跑馬燈。' },
-  { name: 'category', label: '分類', type: 'select', options: [
-    { value: 'general', label: '一般公告' },
-    { value: 'policy', label: '政策' },
-    { value: 'hr', label: '人事' },
-    { value: 'training', label: '教育訓練' },
-    { value: 'it', label: '資訊' },
-    { value: 'urgent', label: '緊急' },
-  ], description: '公告的分類，方便同仁依類型篩選查看。' },
-  { name: 'content', label: '內容', type: 'textarea', description: '公告的完整內容，可輸入文字、條列事項或說明。' },
-  { name: 'isPinned', label: '釘選', type: 'checkbox', description: '勾選後公告將置頂顯示於列表最上方。' },
-  { name: 'isUrgent', label: '緊急', type: 'checkbox', description: '勾選後將以跑馬燈或推播方式提醒全體注意。' },
-  { name: 'targetAudience', label: '發布對象', type: 'select', options: [
-    { value: 'all', label: '全體' },
-    { value: 'department', label: '部門' },
-    { value: 'custom', label: '自訂' },
-  ], description: '指定此公告的閱讀對象範圍。' },
-  { name: 'publishDate', label: '發布日期', type: 'date', required: true, description: '公告正式對外發布的日期，可預設未來日期自動發布。' },
-];
-
 function AnnouncementsTab() {
   const { data: resp, isLoading, refetch } = useAnnouncements();
   const announcements = resp?.data ?? [];
   const [showCreate, setShowCreate] = useState(false);
   const createAnnouncement = useCreateAnnouncement();
+  const { data: departmentResponse } = useDepartments({ isActive: 'true' });
+  const {
+    data: employees = [],
+    isLoading: isEmployeesLoading,
+    isError: isEmployeesError,
+  } = useActiveEmployees();
+  const departments = departmentResponse?.data ?? [];
+  const announcementFields: FormField[] = [
+    { name: 'title', label: '標題', type: 'text', required: true, description: '公告的標題名稱，將顯示於公告列表與首頁跑馬燈。' },
+    { name: 'category', label: '分類', type: 'select', options: [
+      { value: 'general', label: '一般公告' },
+      { value: 'policy', label: '政策' },
+      { value: 'hr', label: '人事' },
+      { value: 'training', label: '教育訓練' },
+      { value: 'it', label: '資訊' },
+      { value: 'urgent', label: '緊急' },
+    ], description: '公告的分類，方便同仁依類型篩選查看。' },
+    { name: 'content', label: '內容', type: 'textarea', description: '公告的完整內容，可輸入文字、條列事項或說明。' },
+    { name: 'isPinned', label: '釘選', type: 'checkbox', description: '勾選後公告將置頂顯示於列表最上方。' },
+    { name: 'isUrgent', label: '緊急', type: 'checkbox', description: '勾選後將以跑馬燈或推播方式提醒全體注意。' },
+    { name: 'targetAudience', label: '發布對象', type: 'select', required: true, options: [
+      { value: 'all', label: '全體' },
+      { value: 'department', label: '部門' },
+      { value: 'custom', label: '自訂' },
+    ], description: '指定此公告的閱讀對象範圍。' },
+    {
+      name: 'publishDeptId',
+      label: '指定部門',
+      type: 'select',
+      required: true,
+      searchable: true,
+      visibleWhen: { field: 'targetAudience', equals: 'department' },
+      options: departments.map(department => ({ value: department.id, label: `${department.deptCode} - ${department.deptName}` })),
+      description: '選擇此公告要發布的部門；僅該部門在職員工可見。'
+    },
+    {
+      name: 'recipientEmployeeIds',
+      label: '指定收件人',
+      type: 'multi-select',
+      required: true,
+      visibleWhen: { field: 'targetAudience', equals: 'custom' },
+      options: employees.map(employee => ({
+        value: employee.id,
+        label: `${employee.employeeNo} - ${employee.chineseName}${employee.departmentName ? `（${employee.departmentName}）` : ''}`
+      })),
+      description: isEmployeesLoading
+        ? '正在載入在職員工名單...'
+        : isEmployeesError
+          ? '員工名單載入失敗，請重新整理後再試。'
+          : `搜尋並勾選一位或多位在職員工（共 ${employees.length} 位）；只有被勾選者可見。`
+    },
+    { name: 'publishDate', label: '發布日期', type: 'date', required: true, description: '公告正式對外發布的日期，可預設未來日期自動發布。' },
+  ];
 
   const handleCreate = async (data: Record<string, unknown>) => {
-    await createAnnouncement.mutateAsync(data);
+    const targetAudience = String(data.targetAudience || 'all');
+    const request = {
+      ...data,
+      targetAudience,
+      publishDeptId: targetAudience === 'department' ? data.publishDeptId : null,
+      recipientEmployeeIds: targetAudience === 'custom' ? data.recipientEmployeeIds : []
+    };
+    await createAnnouncement.mutateAsync(request);
     refetch();
   };
 
@@ -90,7 +157,7 @@ function AnnouncementsTab() {
           </div>
         ) : (
           <div>
-            {(announcements as any[]).map((a: any) => (
+            {(announcements as AnnouncementDto[]).map(a => (
               <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '36px 1fr auto auto', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid rgba(100,116,139,0.08)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {a.isPinned && <Pin size={12} style={{ color: 'var(--cobalt-400)' }} />}
@@ -112,7 +179,7 @@ function AnnouncementsTab() {
 
 function MrpTab() {
   const [period, setPeriod] = useState('week');
-  const [mrpResults, setMrpResults] = useState<any[]>([]);
+  const [mrpResults, setMrpResults] = useState<MrpResult[]>([]);
   const [mrpLoading, setMrpLoading] = useState(true);
   const riskColors: Record<string, string> = { high: 'var(--crimson-400)', medium: 'var(--amber-400)', low: 'var(--emerald-400)' };
   const riskLabels: Record<string, string> = { high: '高風險', medium: '中風險', low: '安全' };
@@ -180,14 +247,14 @@ function MrpTab() {
           <table className="data-table">
             <thead><tr><th>品號</th><th>品名</th><th style={{ textAlign: 'right' }}>毛需求</th><th style={{ textAlign: 'right' }}>現有庫存</th><th style={{ textAlign: 'right' }}>在途量</th><th style={{ textAlign: 'right' }}>淨需求</th><th>風險</th><th>建議動作</th></tr></thead>
             <tbody>
-              {mrpResults.map((r: any, i: number) => {
+              {mrpResults.map((r, i) => {
                 const risk = r.netRequirement > 0 ? 'high' : 'low';
                 return (
                   <tr key={r.id || i}>
                     <td className="mono" style={{ fontSize: 12, color: 'var(--slate-300)' }}>{r.skuNumber || r.skuId}</td>
                     <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{r.skuName || r.skuNumber}</td>
-                    <td className="mono" style={{ textAlign: 'right', fontSize: 12 }}>{(r.grossRequirement || 0).toLocaleString()}</td>
-                    <td className="mono" style={{ textAlign: 'right', fontSize: 12, color: 'var(--emerald-400)' }}>{(r.onHand || 0).toLocaleString()}</td>
+                    <td className="mono" style={{ textAlign: 'right', fontSize: 12 }}>{(r.grossRequirement ?? r.requiredQty).toLocaleString()}</td>
+                    <td className="mono" style={{ textAlign: 'right', fontSize: 12, color: 'var(--emerald-400)' }}>{(r.onHand ?? r.availableQty).toLocaleString()}</td>
                     <td className="mono" style={{ textAlign: 'right', fontSize: 12, color: 'var(--amber-400)' }}>{(r.onOrder || 0).toLocaleString()}</td>
                     <td className="mono" style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: risk === 'high' ? 'var(--crimson-400)' : 'var(--emerald-400)' }}>{r.netRequirement > 0 ? r.netRequirement.toLocaleString() : '—'}</td>
                     <td><Badge color={riskColors[risk]}>{riskLabels[risk]}</Badge></td>
@@ -204,9 +271,8 @@ function MrpTab() {
 }
 
 function SchedulingTab() {
-  const [schedules, setSchedules] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleDisplayItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const hours = Array.from({ length: 16 }, (_, i) => i + 8);
   const priorityColors: Record<string, string> = { urgent: 'var(--crimson-400)', high: 'var(--amber-400)', normal: 'var(--cobalt-400)', low: 'var(--slate-500)' };
 
   useEffect(() => {
@@ -242,7 +308,7 @@ function SchedulingTab() {
           <table className="data-table">
             <thead><tr><th>工單</th><th>產品</th><th>機台</th><th>開始時間</th><th>結束時間</th><th>進度</th><th>優先級</th></tr></thead>
             <tbody>
-              {schedules.map((s: any) => (
+              {schedules.map(s => (
                 <tr key={s.id}>
                   <td className="mono" style={{ fontSize: 12, color: 'var(--slate-300)' }}>{s.workOrderNumber || s.id}</td>
                   <td style={{ fontSize: 12, color: 'var(--slate-200)' }}>{s.productName || s.skuNumber}</td>
@@ -269,7 +335,7 @@ function SchedulingTab() {
 }
 
 function MesTab() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<WorkOrderDisplayItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -305,7 +371,7 @@ function MesTab() {
           <table className="data-table">
             <thead><tr><th>工單</th><th>產品</th><th>計劃數量</th><th>完成數量</th><th>進度</th><th>狀態</th></tr></thead>
             <tbody>
-              {orders.map((o: any) => {
+              {orders.map(o => {
                 const progress = o.plannedQuantity > 0 ? Math.round((o.completedQuantity || 0) / o.plannedQuantity * 100) : 0;
                 return (
                   <tr key={o.id}>
@@ -334,7 +400,7 @@ function MesTab() {
 }
 
 function SupplierTab() {
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -353,9 +419,6 @@ function SupplierTab() {
     }
   };
 
-  const statusColors: Record<string, string> = { excellent: 'var(--emerald-400)', good: 'var(--cobalt-400)', warning: 'var(--amber-400)' };
-  const statusLabels: Record<string, string> = { excellent: '優良', good: '良好', warning: '待改善' };
-
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 40, color: 'var(--slate-500)' }}><Loader2 size={20} style={{ animation: 'spin 1s linear infinite', display: 'inline', marginRight: 8 }} />載入供應商資料...</div>;
   }
@@ -368,11 +431,11 @@ function SupplierTab() {
           <div style={{ fontSize: 11, color: 'var(--slate-400)', marginTop: 4 }}>活躍供應商</div>
         </div>
         <div className="glass-card" style={{ padding: 16, textAlign: 'center' }}>
-          <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: 'var(--amber-400)' }}>{suppliers.filter((s: any) => s.rating === 'A' || s.rating === 'B').length}</div>
+          <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: 'var(--amber-400)' }}>{suppliers.filter(s => s.rating === 'A' || s.rating === 'B').length}</div>
           <div style={{ fontSize: 11, color: 'var(--slate-400)', marginTop: 4 }}>評級良好</div>
         </div>
         <div className="glass-card" style={{ padding: 16, textAlign: 'center' }}>
-          <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: 'var(--emerald-400)' }}>{suppliers.filter((s: any) => s.status === 'active').length}</div>
+          <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: 'var(--emerald-400)' }}>{suppliers.filter(s => s.status === 'active').length}</div>
           <div style={{ fontSize: 11, color: 'var(--slate-400)', marginTop: 4 }}>啟用中</div>
         </div>
       </div>
@@ -387,7 +450,7 @@ function SupplierTab() {
           <table className="data-table">
             <thead><tr><th>供應商</th><th>編號</th><th>評級</th><th>付款條件</th><th>狀態</th></tr></thead>
             <tbody>
-              {suppliers.map((s: any) => (
+              {suppliers.map(s => (
                 <tr key={s.id}>
                   <td style={{ fontWeight: 500, color: 'var(--slate-200)' }}>{s.supplierName}</td>
                   <td className="mono" style={{ fontSize: 12, color: 'var(--slate-400)' }}>{s.supplierCode}</td>
@@ -411,8 +474,8 @@ function SupplierTab() {
 function TasksTab() {
   const [search, setSearch] = useState('');
   const { data: tasksResp, isLoading } = useCrossDeptTasks();
-  const tasks = tasksResp?.data ?? [];
-  const filteredTasks = (tasks as any[]).filter((t: any) => !search || (t.taskName ?? '').includes(search) || (t.ownerDeptName ?? '').includes(search));
+  const tasks = (tasksResp?.data ?? []) as CrossDeptTaskDto[];
+  const filteredTasks = tasks.filter(t => !search || (t.taskName ?? '').includes(search) || (t.ownerDeptName ?? '').includes(search));
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="glass-card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -428,7 +491,7 @@ function TasksTab() {
           <tbody>
             {isLoading ? (
               <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--slate-500)' }}><Loader2 size={20} className="spin" style={{ animation: 'spin 1s linear infinite', display: 'inline', marginRight: 8 }} />載入中...</td></tr>
-            ) : filteredTasks.map((t: any) => {
+            ) : filteredTasks.map(t => {
               const sc = taskStatusConfig[t.status] ?? { label: t.status, color: 'var(--slate-500)' };
               const uc = urgencyConfig[t.urgency] ?? { label: t.urgency, color: 'var(--slate-500)' };
               return (

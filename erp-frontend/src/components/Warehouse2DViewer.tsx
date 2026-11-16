@@ -22,12 +22,8 @@ const initialZones: WarehouseZone[] = [
   { id: 'zone-6', name: '出貨區', type: 'shipping', position: { x: 420, y: 170 }, size: { width: 180, height: 100 }, utilization: 0.20, status: 'normal', currentStock: 200, maxCapacity: 1000, items: 5 },
 ];
 
-interface WarehouseViewerProps {
-  warehouseId?: string;
-}
-
-export function Warehouse2DViewer({ warehouseId }: WarehouseViewerProps) {
-  const [zones, setZones] = useState(initialZones);
+export function Warehouse2DViewer() {
+  const zones = initialZones;
   const [selectedZone, setSelectedZone] = useState<WarehouseZone | null>(null);
   const [viewMode, setViewMode] = useState<'layout' | 'utilization' | 'stock'>('layout');
 

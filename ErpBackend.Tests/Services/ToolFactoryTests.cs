@@ -11,62 +11,41 @@ public class ToolFactoryTests
     private readonly Mock<ErpGeneralDbContext> _mockDb;
     private readonly Mock<ILogger<ToolFactory>> _mockLogger;
     private readonly Mock<IErpIntegrationService> _mockErpIntegration;
+    private readonly Mock<IMrpEngine> _mockMrpEngine;
 
     public ToolFactoryTests()
     {
         _mockDb = new Mock<ErpGeneralDbContext>(new Microsoft.EntityFrameworkCore.DbContextOptions<ErpGeneralDbContext>());
         _mockLogger = new Mock<ILogger<ToolFactory>>();
         _mockErpIntegration = new Mock<IErpIntegrationService>();
+        _mockMrpEngine = new Mock<IMrpEngine>();
     }
 
     [Fact]
-    public void GetAvailableTools_ReturnsToolList()
+    public void GetAvailableTools_ReturnsEmptyUntilToolsArePermissionScoped()
     {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
+        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object, _mockMrpEngine.Object);
 
         var tools = factory.GetAvailableTools();
 
         Assert.NotNull(tools);
-        Assert.True(tools.Count > 0);
+        Assert.Empty(tools);
     }
 
     [Fact]
-    public void GetAvailableTools_ContainsSearchTools()
+    public void GetAvailableTools_DoesNotExposeUnreviewedTools()
     {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
+        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object, _mockMrpEngine.Object);
 
         var tools = factory.GetAvailableTools();
 
-        Assert.Contains(tools, t => t.Category == "search");
-    }
-
-    [Fact]
-    public void GetAvailableTools_ContainsComputeTools()
-    {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
-
-        var tools = factory.GetAvailableTools();
-
-        Assert.Contains(tools, t => t.Category == "compute");
-    }
-
-    [Fact]
-    public void GetAvailableTools_AllTools_AreEnabled()
-    {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
-
-        var tools = factory.GetAvailableTools();
-
-        foreach (var tool in tools)
-        {
-            Assert.True(tool.IsEnabled, $"Tool {tool.Id} should be enabled");
-        }
+        Assert.DoesNotContain(tools, tool => tool.Category is "create" or "update" or "action");
     }
 
     [Fact]
     public async Task ExecuteToolAsync_WithInvalidToolId_ReturnsError()
     {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
+        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object, _mockMrpEngine.Object);
 
         var result = await factory.ExecuteToolAsync("invalid_tool", new Dictionary<string, object>());
 
@@ -75,31 +54,53 @@ public class ToolFactoryTests
     }
 
     [Fact]
-    public async Task ExecuteToolAsync_Calculator_ReturnsResult()
+    public async Task ExecuteToolAsync_Calculator_IsDeniedUntilApproved()
     {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
+        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object, _mockMrpEngine.Object);
 
         var result = await factory.ExecuteToolAsync("calculator", new Dictionary<string, object>
         {
             ["expression"] = "2+2"
         });
 
-        Assert.True(result.Success);
+        Assert.False(result.Success);
+        Assert.Contains("not approved", result.Error);
         Assert.True(result.ElapsedMs >= 0);
     }
 
     [Fact]
-    public void ToolFactory_InitializesAllToolDefinitions()
+    public void ToolFactory_DoesNotExposeUnreviewedSearchTools()
     {
-        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object);
+        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object, _mockMrpEngine.Object);
 
         var tools = factory.GetAvailableTools();
-        
-        Assert.Contains(tools, t => t.Id == "erp_inventory_search");
-        Assert.Contains(tools, t => t.Id == "erp_po_search");
-        Assert.Contains(tools, t => t.Id == "erp_so_search");
-        Assert.Contains(tools, t => t.Id == "erp_customer_search");
-        Assert.Contains(tools, t => t.Id == "calculator");
+
+        Assert.Empty(tools);
+    }
+
+    [Theory]
+    [InlineData("erp_wo_create")]
+    [InlineData("erp_pr_create")]
+    [InlineData("erp_po_create")]
+    [InlineData("erp_so_create")]
+    [InlineData("erp_goods_receipt_create")]
+    [InlineData("erp_delivery_create")]
+    [InlineData("erp_wo_update")]
+    [InlineData("erp_po_update")]
+    [InlineData("erp_inventory_adjust")]
+    [InlineData("erp_price_update")]
+    [InlineData("erp_wo_complete")]
+    [InlineData("erp_material_issue")]
+    [InlineData("erp_warehouse_transfer")]
+    [InlineData("erp_inventory_count")]
+    public async Task ExecuteToolAsync_MutatingTools_AreDenied(string toolId)
+    {
+        var factory = new ToolFactory(_mockDb.Object, _mockLogger.Object, _mockErpIntegration.Object, _mockMrpEngine.Object);
+
+        var result = await factory.ExecuteToolAsync(toolId, new Dictionary<string, object>());
+
+        Assert.False(result.Success);
+        Assert.Contains("not approved", result.Error);
     }
 }
 

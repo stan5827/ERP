@@ -1376,3 +1376,43 @@ h4 { font-size: 1.1rem; }
   background: rgba(16, 185, 122, 0.2);
   color: var(--emerald-400);
 }
+/* Theme option enhancements */
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px;
+  border: 2px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--navy-800);
+}
+
+.theme-option:hover {
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.theme-option.active {
+  border-color: var(--cobalt-400);
+  background: rgba(45, 110, 245, 0.15);
+  box-shadow: 0 0 0 2px rgba(45, 110, 245, 0.3);
+}
+
+.theme-icon {
+  font-size: 24px;
+}
+
+.theme-name {
+  font-weight: 600;
+  color: var(--slate-200);
+}
+
+.theme-check {
+  color: var(--cobalt-400);
+  font-size: 16px;
+}

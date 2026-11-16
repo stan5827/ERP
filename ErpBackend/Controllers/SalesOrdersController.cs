@@ -1,22 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ErpBackend.Data;
 using ErpBackend.DTOs;
-using ErpBackend.Models.Sales;
 using ErpBackend.Services;
 
 namespace ErpBackend.Controllers;
 
+[ApiController]
+[Route("api/erp/sales-orders")]
 public class SalesOrdersController : BaseController
 {
-    private readonly ErpGeneralDbContext _db;
-    private readonly IStateMachineService _stateMachine;
+    private readonly ISalesOrderService _salesOrderService;
 
-    public SalesOrdersController(ErpGeneralDbContext db, IStateMachineService stateMachine)
-    {
-        _db = db;
-        _stateMachine = stateMachine;
-    }
+    public SalesOrdersController(ISalesOrderService salesOrderService) => _salesOrderService = salesOrderService;
 
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<SalesOrderDto>>>> GetSalesOrders(
@@ -26,105 +20,48 @@ public class SalesOrdersController : BaseController
         var page = GetPage();
         var pageSize = GetPageSize();
 
-        var query = _db.SalesOrders
-            .Include(so => so.Customer)
-            .Include(so => so.Salesperson)
-            .AsQueryable();
-
-        if (!string.IsNullOrEmpty(status))
-            query = query.Where(so => so.Status == status);
-
-        if (!string.IsNullOrEmpty(searchTerm))
-            query = query.Where(so => so.OrderNumber.Contains(searchTerm) || so.Customer.CustomerName.Contains(searchTerm));
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(so => so.OrderDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var dtos = items.Select(so => new SalesOrderDto
-        {
-            Id = so.Id,
-            OrderNumber = so.OrderNumber,
-            CustomerId = so.CustomerId,
-            CustomerName = so.Customer?.CustomerName,
-            OrderDate = so.OrderDate,
-            TotalAmount = so.TotalAmount,
-            Status = so.Status,
-            CustomerPoNumber = so.CustomerPoNumber,
-            SalespersonId = so.SalespersonId,
-            SalespersonName = so.Salesperson?.ChineseName,
-            CreatedAt = so.CreatedAt
-        }).ToList();
-
-        return Ok(dtos, totalCount: totalCount);
+        var dtos = await _salesOrderService.GetSalesOrdersAsync(status, searchTerm, page, pageSize);
+        return Ok(dtos, totalCount: dtos.Count);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<SalesOrderDto>>> GetSalesOrder(Guid id)
     {
-        var so = await _db.SalesOrders
-            .Include(so => so.Customer)
-            .Include(so => so.Salesperson)
-            .Include(so => so.Items)
-                .ThenInclude(i => i.Sku)
-            .FirstOrDefaultAsync(so => so.Id == id);
+        var dto = await _salesOrderService.GetSalesOrderAsync(id);
+        return dto == null ? NotFound(ApiHelper.Fail("Error")) : Ok(dto);
+    }
 
-        if (so == null) return NotFound(ApiHelper.Fail("Error"));
-
-        var dto = new SalesOrderDto
-        {
-            Id = so.Id,
-            OrderNumber = so.OrderNumber,
-            CustomerId = so.CustomerId,
-            CustomerName = so.Customer?.CustomerName,
-            OrderDate = so.OrderDate,
-            TotalAmount = so.TotalAmount,
-            Status = so.Status,
-            CustomerPoNumber = so.CustomerPoNumber,
-            SalespersonId = so.SalespersonId,
-            SalespersonName = so.Salesperson?.ChineseName,
-            CreatedAt = so.CreatedAt,
-            Items = so.Items.Select(i => new SalesOrderItemDto
-            {
-                Id = i.Id,
-                SkuId = i.SkuId,
-                SkuNumber = i.Sku?.SkuNumber,
-                SkuName = i.Sku?.SkuName,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                Subtotal = i.Subtotal,
-                LineNumber = i.LineNumber,
-                Status = i.Status,
-                PlannedFinishDate = i.PlannedFinishDate
-            }).ToList()
-        };
-
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse<SalesOrderDto>>> CreateSalesOrder([FromBody] CreateSalesOrderRequest request)
+    {
+        var dto = await _salesOrderService.CreateSalesOrderAsync(request);
         return Ok(dto);
+    }
+
+    [HttpPost("{idOrNumber}/confirm")]
+    public async Task<ActionResult<ApiResponse<SalesOrderConfirmationDto>>> ConfirmSalesOrder(string idOrNumber)
+    {
+        var (found, status, result) = await _salesOrderService.ConfirmSalesOrderAsync(idOrNumber);
+        if (!found) return NotFound(ApiHelper.Fail("找不到訂單"));
+        if (status == "invalid_state") return BadRequest(ApiHelper.Fail("訂單狀態必須為 pending 才能確認"));
+        return Ok(result!, "訂單已確認");
+    }
+
+    [HttpPatch("{id}/manufacturing-status")]
+    public async Task<ActionResult<ApiResponse>> UpdateManufacturingStatus(Guid id, [FromBody] UpdateManufacturingStatusRequest request)
+    {
+        var (found, status) = await _salesOrderService.UpdateManufacturingStatusAsync(id, request);
+        if (!found) return NotFound(ApiHelper.Fail("找不到訂單"));
+        if (status == "invalid") return BadRequest(ApiHelper.Fail("缺少製造狀態值"));
+        return Ok($"製造狀態已更新為 {request.NewStatus ?? request.Status}");
     }
 
     [HttpPost("{id}/status")]
     public async Task<object> UpdateStatus(Guid id, [FromBody] UpdateStatusRequest request)
     {
-        var so = await _db.SalesOrders.FindAsync(id);
-        if (so == null) return NotFound(new { error = "Error" });
-
-        // 狀態機鎖定：防止狀態逆流
-        var error = _stateMachine.ValidateTransition("sales_order", so.Status, request.NewStatus);
-        if (error != null)
-            return BadRequest(new { error });
-
-        var oldStatus = so.Status;
-        so.Status = request.NewStatus;
-        await _db.SaveChangesAsync();
-
-        return Ok(new { message = $"狀態從 {oldStatus} 變更為 {request.NewStatus}" });
+        var (found, error, status) = await _salesOrderService.UpdateStatusAsync(id, request);
+        if (!found) return NotFound(new { error = "Error" });
+        if (status == "blocked") return BadRequest(new { error });
+        return Ok(new { message = $"狀態已更新為 {request.NewStatus}" });
     }
-}
-
-public class UpdateStatusRequest
-{
-    public string NewStatus { get; set; } = null!;
 }

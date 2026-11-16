@@ -5,6 +5,9 @@
 .manufacturing-engineering {
   padding: 28px 32px;
   max-width: 1600px;
+  background-color: var(--theme-background, transparent);
+  color: var(--theme-text, #1a202c);
+  min-height: 100vh;
 }
 
 /* ==========================================
@@ -310,6 +313,16 @@
 .manufacturing-engineering .col-version { width: 80px; }
 .manufacturing-engineering .col-ops { width: 80px; }
 .manufacturing-engineering .col-actions { width: 90px; }
+
+.manufacturing-engineering .routing-table .col-code {
+  width: 180px;
+  min-width: 180px;
+  white-space: nowrap;
+}
+
+.manufacturing-engineering .routing-table .code-badge {
+  white-space: nowrap;
+}
 
 /* ==========================================
    Cell Components
@@ -959,6 +972,27 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+}
+
+.manufacturing-engineering .routing-op-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.manufacturing-engineering .routing-op-move {
+  color: var(--text-secondary, #8b95a8);
+}
+
+.manufacturing-engineering .routing-op-move:not(:disabled):hover {
+  background: rgba(45, 110, 245, 0.1);
+  border-color: var(--cobalt-400, #4b8af5);
+  color: var(--cobalt-400, #4b8af5);
+}
+
+.manufacturing-engineering .routing-op-move:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .manufacturing-engineering .routing-op-seq {

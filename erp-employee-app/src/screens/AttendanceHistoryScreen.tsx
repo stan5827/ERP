@@ -43,6 +43,13 @@ export const AttendanceHistoryScreen: React.FC = () => {
     return `${date.getMonth() + 1}/${date.getDate()} ${['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}`;
   };
 
+  const formatAttendanceTime = (time?: string) => {
+    if (!time) return '—';
+    return /^\d{2}:\d{2}/.test(time)
+      ? time.slice(0, 5)
+      : new Date(time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'normal': return COLORS.success;
@@ -95,16 +102,12 @@ export const AttendanceHistoryScreen: React.FC = () => {
 
             <View style={styles.recordRow}>
               <Text style={styles.recordLabel}>上班</Text>
-              <Text style={styles.recordValue}>
-                {item.clockIn ? new Date(item.clockIn).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '—'}
-              </Text>
+              <Text style={styles.recordValue}>{formatAttendanceTime(item.clockIn)}</Text>
             </View>
 
             <View style={styles.recordRow}>
               <Text style={styles.recordLabel}>下班</Text>
-              <Text style={styles.recordValue}>
-                {item.clockOut ? new Date(item.clockOut).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '—'}
-              </Text>
+              <Text style={styles.recordValue}>{formatAttendanceTime(item.clockOut)}</Text>
             </View>
 
             {item.lateMinutes && item.lateMinutes > 0 && (

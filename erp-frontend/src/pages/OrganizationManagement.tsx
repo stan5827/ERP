@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, ChevronRight, ChevronDown, Building2, Users, Shield, Settings, Loader2, X, ArrowRight, UserCheck } from 'lucide-react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { Search, Plus, Edit2, Trash2, ChevronRight, ChevronDown, Building2, Users, Shield, Loader2, UserCheck } from 'lucide-react';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,80 +29,196 @@ const deptTypeConfig: Record<string, { label: string; color: string }> = {
   service: { label: '服務', color: 'var(--amber-400)' },
 };
 
+const applicableDeptTypeOptions = [
+  { value: '', label: '全部' },
+  { value: 'production', label: '生產部門' },
+  { value: 'admin', label: '管理部門' },
+  { value: 'service', label: '服務部門' },
+];
+
+type OrganizationView = 'departments' | 'grades' | 'titles' | 'approvals';
+
+interface DepartmentRecord {
+  id: string;
+  deptCode: string;
+  deptName: string;
+  deptType?: string;
+  fullPath?: string;
+  parentDeptId?: string;
+  costCenterCode?: string;
+  isCostCenter?: boolean;
+  budgetLimit?: number;
+  displayOrder?: number;
+  description?: string;
+  isActive?: boolean;
+  employeeCount: number;
+  children?: DepartmentRecord[];
+}
+
+interface JobGradeRecord {
+  id: string;
+  gradeCode: string;
+  gradeName: string;
+  level: number;
+  minSalary: number;
+  maxSalary: number;
+  overtimeRate: number;
+  travelLimit: number;
+  approvalLimit: number;
+  employeeCount: number;
+  description?: string;
+}
+
+interface JobTitleRecord {
+  id: string;
+  titleCode: string;
+  titleName: string;
+  gradeId?: string;
+  gradeCode?: string;
+  applicableDeptType?: string;
+  isSupervisor: boolean;
+  employeeCount: number;
+  description?: string;
+}
+
+interface ApprovalAuthorityRecord {
+  id: string;
+  docType: string;
+  docTypeName: string;
+  gradeId: string;
+  gradeCode: string;
+  gradeName: string;
+  approvalLevel: number;
+  minAmount: number;
+  maxAmount: number;
+  description?: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null)
+    return error instanceof Error ? error.message : String(error);
+  const response = 'response' in error ? error.response : undefined;
+  const responseData = typeof response === 'object' && response !== null && 'data' in response
+    ? response.data
+    : undefined;
+  const responseMessage = typeof responseData === 'object' && responseData !== null && 'message' in responseData
+    ? responseData.message
+    : undefined;
+  return typeof responseMessage === 'string'
+    ? responseMessage
+    : error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isDepartmentRecord(value: unknown): value is DepartmentRecord {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.deptCode === 'string'
+    && typeof value.deptName === 'string'
+    && typeof value.employeeCount === 'number'
+    && (value.children === undefined || (Array.isArray(value.children) && value.children.every(isDepartmentRecord)));
+}
+
+function isJobGradeRecord(value: unknown): value is JobGradeRecord {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.gradeCode === 'string'
+    && typeof value.gradeName === 'string'
+    && typeof value.level === 'number'
+    && typeof value.minSalary === 'number'
+    && typeof value.maxSalary === 'number'
+    && typeof value.overtimeRate === 'number'
+    && typeof value.travelLimit === 'number'
+    && typeof value.approvalLimit === 'number'
+    && typeof value.employeeCount === 'number';
+}
+
+function isJobTitleRecord(value: unknown): value is JobTitleRecord {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.titleCode === 'string'
+    && typeof value.titleName === 'string'
+    && typeof value.isSupervisor === 'boolean'
+    && typeof value.employeeCount === 'number';
+}
+
+function isApprovalAuthorityRecord(value: unknown): value is ApprovalAuthorityRecord {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.docType === 'string'
+    && typeof value.docTypeName === 'string'
+    && typeof value.gradeId === 'string'
+    && typeof value.gradeCode === 'string'
+    && typeof value.gradeName === 'string'
+    && typeof value.approvalLevel === 'number'
+    && typeof value.minAmount === 'number'
+    && typeof value.maxAmount === 'number';
+}
+
 export const OrganizationManagement: React.FC = () => {
-  const [activeView, setActiveView] = useState<'departments' | 'grades' | 'titles' | 'approvals'>('departments');
+  const [activeView, setActiveView] = useState<OrganizationView>('departments');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [departmentTree, setDepartmentTree] = useState<any[]>([]);
-  const [grades, setGrades] = useState<any[]>([]);
-  const [titles, setTitles] = useState<any[]>([]);
-  const [authorities, setAuthorities] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<DepartmentRecord[]>([]);
+  const [departmentTree, setDepartmentTree] = useState<DepartmentRecord[]>([]);
+  const [grades, setGrades] = useState<JobGradeRecord[]>([]);
+  const [titles, setTitles] = useState<JobTitleRecord[]>([]);
+  const [authorities, setAuthorities] = useState<ApprovalAuthorityRecord[]>([]);
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
-  const [showInactiveDepartments, setShowInactiveDepartments] = useState(false);
   const queryClient = useQueryClient();
 
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showGradeModal, setShowGradeModal] = useState(false);
   const [showTitleModal, setShowTitleModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [editingDept, setEditingDept] = useState<any>(null);
-  const [editingGrade, setEditingGrade] = useState<any>(null);
-  const [editingTitle, setEditingTitle] = useState<any>(null);
-  const [editingAuth, setEditingAuth] = useState<any>(null);
-  const [hasInactiveDepartments, setHasInactiveDepartments] = useState(false);
+  const [editingDept, setEditingDept] = useState<DepartmentRecord | null>(null);
+  const [editingGrade, setEditingGrade] = useState<JobGradeRecord | null>(null);
+  const [editingTitle, setEditingTitle] = useState<JobTitleRecord | null>(null);
+  const [editingAuth, setEditingAuth] = useState<ApprovalAuthorityRecord | null>(null);
 
-  useEffect(() => { loadData(); }, [activeView, showInactiveDepartments]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeView === 'departments') {
-        if (showInactiveDepartments) {
-          const [flatRes, treeRes] = await Promise.all([
-            departmentsApi.flat(true),
-            departmentsApi.tree(true),
-          ]);
-          setDepartments(flatRes.data?.data ?? []);
-          setDepartmentTree(treeRes.data?.data ?? []);
-          setHasInactiveDepartments(false);
-        } else {
-          const [flatRes, treeRes, flatAllRes] = await Promise.all([
-            departmentsApi.flat(false),
-            departmentsApi.tree(false),
-            departmentsApi.flat(true),
-          ]);
-          const activeDepartments = flatRes.data?.data ?? [];
-          const allDepartments = flatAllRes.data?.data ?? [];
-          setDepartments(activeDepartments);
-          setDepartmentTree(treeRes.data?.data ?? []);
-          setHasInactiveDepartments(allDepartments.length > activeDepartments.length);
-        }
+        const [flatRes, treeRes] = await Promise.all([
+          departmentsApi.flat(),
+          departmentsApi.tree(),
+        ]);
+        setDepartments((flatRes.data?.data ?? []).filter(isDepartmentRecord));
+        setDepartmentTree((treeRes.data?.data ?? []).filter(isDepartmentRecord));
       } else if (activeView === 'grades') {
         const res = await jobGradesApi.list();
-        setGrades(res.data?.data ?? []);
+        setGrades((res.data?.data ?? []).filter(isJobGradeRecord));
       } else if (activeView === 'titles') {
         const [titlesRes, gradesRes] = await Promise.all([
           jobTitlesApi.list(),
           jobGradesApi.list(),
         ]);
-        setTitles(titlesRes.data?.data ?? []);
-        setGrades(gradesRes.data?.data ?? []);
+        setTitles((titlesRes.data?.data ?? []).filter(isJobTitleRecord));
+        setGrades((gradesRes.data?.data ?? []).filter(isJobGradeRecord));
       } else if (activeView === 'approvals') {
         const [authRes, gradesRes] = await Promise.all([
           approvalsApi.authorities(),
           jobGradesApi.list(),
         ]);
-        setAuthorities(authRes.data?.data ?? []);
-        setGrades(gradesRes.data?.data ?? []);
+        setAuthorities((authRes.data?.data ?? []).filter(isApprovalAuthorityRecord));
+        setGrades((gradesRes.data?.data ?? []).filter(isJobGradeRecord));
       }
     } catch (err) { console.error('Failed to load:', err); }
     finally { setLoading(false); }
-  };
+  }, [activeView]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const toggleDept = (id: string) => {
     const newSet = new Set(expandedDepts);
-    newSet.has(id) ? newSet.delete(id) : newSet.add(id);
+    if (newSet.has(id))
+      newSet.delete(id);
+    else
+      newSet.add(id);
     setExpandedDepts(newSet);
   };
 
@@ -114,7 +230,6 @@ export const OrganizationManagement: React.FC = () => {
       { value: 'admin', label: '管理部門 (間接人工)' },
       { value: 'service', label: '服務部門' },
     ], defaultValue: 'admin' },
-    { name: 'isActive', label: '啟用狀態', type: 'checkbox', placeholder: '啟用', defaultValue: true },
     { name: 'parentDeptId', label: '上級部門', type: 'select', options: departments.map(d => ({ value: d.id, label: d.fullPath || d.deptName })) },
     { name: 'costCenterCode', label: '成本中心代碼', type: 'text', placeholder: '如: CC-MFG-001' },
     { name: 'isCostCenter', label: '是否為成本中心', type: 'checkbox', defaultValue: true },
@@ -139,12 +254,7 @@ export const OrganizationManagement: React.FC = () => {
     { name: 'titleCode', label: '職稱代碼', type: 'text', required: true, placeholder: '如: WORKER, ENGINEER...' },
     { name: 'titleName', label: '職稱名稱', type: 'text', required: true, placeholder: '如: 作業員、工程師...' },
     { name: 'gradeId', label: '預設職等', type: 'select', options: grades.map(g => ({ value: g.id, label: `${g.gradeCode} - ${g.gradeName}` })) },
-    { name: 'applicableDeptType', label: '適用部門類型', type: 'select', options: [
-      { value: '', label: '全部' },
-      { value: 'production', label: '生產部門' },
-      { value: 'admin', label: '管理部門' },
-      { value: 'service', label: '服務部門' },
-    ], defaultValue: '' },
+    { name: 'applicableDeptType', label: '適用部門類型', type: 'select', options: applicableDeptTypeOptions, defaultValue: '' },
     { name: 'isSupervisor', label: '是否為主管職', type: 'checkbox', defaultValue: false },
     { name: 'description', label: '說明', type: 'textarea' },
   ];
@@ -167,10 +277,10 @@ export const OrganizationManagement: React.FC = () => {
     { name: 'description', label: '說明', type: 'textarea' },
   ];
 
-  const handleSave = async (type: string, data: any, id?: string) => {
+  const handleSave = async (type: string, data: Record<string, unknown>, id?: string) => {
     const cleanedData: Record<string, unknown> = {};
     for (const key in data) {
-      let value = data[key];
+      const value = data[key];
       if (value === '' || value === undefined) {
         cleanedData[key] = key.includes('Is') || key.includes('Allow') ? false : null;
       } else if (typeof value === 'string') {
@@ -197,9 +307,9 @@ export const OrganizationManagement: React.FC = () => {
       }
       queryClient.invalidateQueries();
       loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Save error:', err);
-      alert('儲存失敗: ' + (err.response?.data?.message || err.message));
+      alert('儲存失敗: ' + getErrorMessage(err));
     }
   };
 
@@ -212,12 +322,12 @@ export const OrganizationManagement: React.FC = () => {
       else if (type === 'approvals/authorities') await approvalsApi.delete(id);
       queryClient.invalidateQueries();
       loadData();
-    } catch (err: any) {
-      alert('刪除失敗: ' + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      alert('刪除失敗: ' + getErrorMessage(err));
     }
   };
 
-  const renderDeptTree = (nodes: any[], level = 0) => {
+  const renderDeptTree = (nodes: DepartmentRecord[], level = 0) => {
     return nodes.map(node => {
       const hasChildren = node.children && node.children.length > 0;
       const isExpanded = expandedDepts.has(node.id);
@@ -267,7 +377,7 @@ export const OrganizationManagement: React.FC = () => {
           { key: 'titles', icon: UserCheck, label: '職稱管理' },
           { key: 'approvals', icon: Shield, label: '核決權限' },
         ].map(tab => (
-          <button key={tab.key} className={`rd-tab ${activeView === tab.key ? 'active' : ''}`} onClick={() => setActiveView(tab.key as any)}>
+          <button key={tab.key} className={`rd-tab ${activeView === tab.key ? 'active' : ''}`} onClick={() => setActiveView(tab.key as OrganizationView)}>
             <tab.icon size={14} />{tab.label}
           </button>
         ))}
@@ -278,23 +388,11 @@ export const OrganizationManagement: React.FC = () => {
           <Search size={13} style={{ color: 'var(--slate-500)' }} />
           <input className="search-input" placeholder="搜尋..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        {activeView === 'departments' && (
-          <>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowInactiveDepartments(prev => !prev)}>
-              {showInactiveDepartments ? '隱藏停用部門' : '顯示停用部門'}
-            </button>
-            <button className="btn btn-primary btn-sm" onClick={() => { setEditingDept(null); setShowDeptModal(true); }}><Plus size={13} />新增部門</button>
-          </>
-        )}
+        {activeView === 'departments' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingDept(null); setShowDeptModal(true); }}><Plus size={13} />新增部門</button>}
         {activeView === 'grades' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingGrade(null); setShowGradeModal(true); }}><Plus size={13} />新增職等</button>}
         {activeView === 'titles' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingTitle(null); setShowTitleModal(true); }}><Plus size={13} />新增職稱</button>}
         {activeView === 'approvals' && <button className="btn btn-primary btn-sm" onClick={() => { setEditingAuth(null); setShowAuthModal(true); }}><Plus size={13} />新增核決</button>}
       </div>
-      {activeView === 'departments' && hasInactiveDepartments && !showInactiveDepartments && !loading && (
-        <div className="glass-card" style={{ marginTop: 12, borderLeft: '4px solid var(--amber-400)', background: 'rgba(250, 211, 51, 0.08)', color: 'var(--slate-100)', padding: '12px 16px' }}>
-          <strong>注意：</strong> 系統中存在停用部門。若你剛新增的部門沒有出現在架構中，請點選「顯示停用部門」檢查該部門是否為停用狀態。
-        </div>
-      )}
 
       {loading ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: 40 }}><Loader2 size={24} className="spin-icon" style={{ color: 'var(--slate-500)' }} /></div>
@@ -347,7 +445,9 @@ export const OrganizationManagement: React.FC = () => {
                       <td className="mono" style={{ color: 'var(--cobalt-300)', fontWeight: 700 }}>{t.titleCode}</td>
                       <td style={{ fontWeight: 500 }}>{t.titleName}</td>
                       <td>{t.gradeCode ? <span style={{ padding: '2px 8px', background: 'var(--slate-700)', borderRadius: 4, fontSize: 12 }}>{t.gradeCode}</span> : <span style={{ color: 'var(--slate-500)' }}>—</span>}</td>
-                      <td style={{ color: 'var(--slate-400)', fontSize: 12 }}>{t.applicableDeptType || '全部'}</td>
+                      <td style={{ color: 'var(--slate-400)', fontSize: 12 }}>
+                        {applicableDeptTypeOptions.find(option => option.value === t.applicableDeptType)?.label ?? t.applicableDeptType ?? '全部'}
+                      </td>
                       <td><span style={{ fontSize: 11, padding: '2px 8px', background: t.isSupervisor ? 'rgba(16,185,129,0.15)' : 'var(--slate-700)', color: t.isSupervisor ? 'var(--emerald-400)' : 'var(--slate-500)', borderRadius: 4 }}>{t.isSupervisor ? '是' : '否'}</span></td>
                       <td><span style={{ padding: '2px 8px', background: 'var(--slate-700)', borderRadius: 4, fontSize: 12 }}>{t.employeeCount}</span></td>
                       <td>
@@ -397,7 +497,7 @@ export const OrganizationManagement: React.FC = () => {
       />
 
       <FormModal open={showGradeModal} title={editingGrade ? '編輯職等' : '新增職等'} fields={gradeFields}
-        initialValues={editingGrade || { level: 1, minSalary: 28000, maxSalary: 35000, overtimeRate: 1.33, travelLimit: 5000, approvalLimit: 10000 }}
+        initialValues={editingGrade ? { ...editingGrade } : { level: 1, minSalary: 28000, maxSalary: 35000, overtimeRate: 1.33, travelLimit: 5000, approvalLimit: 10000 }}
         onClose={() => { setShowGradeModal(false); setEditingGrade(null); }}
         onSubmit={async data => {
           if (Number(data.minSalary) > Number(data.maxSalary)) {
@@ -409,13 +509,13 @@ export const OrganizationManagement: React.FC = () => {
       />
 
       <FormModal open={showTitleModal} title={editingTitle ? '編輯職稱' : '新增職稱'} fields={titleFields}
-        initialValues={editingTitle || { isSupervisor: false, applicableDeptType: '' }}
+        initialValues={editingTitle ? { ...editingTitle } : { isSupervisor: false, applicableDeptType: '' }}
         onClose={() => { setShowTitleModal(false); setEditingTitle(null); }}
         onSubmit={data => handleSave('job-titles', data, editingTitle?.id)}
       />
 
       <FormModal open={showAuthModal} title={editingAuth ? '編輯核決權限' : '新增核決權限'} fields={authFields}
-        initialValues={editingAuth || { approvalLevel: 1, minAmount: 0, maxAmount: 10000 }}
+        initialValues={editingAuth ? { ...editingAuth } : { approvalLevel: 1, minAmount: 0, maxAmount: 10000 }}
         onClose={() => { setShowAuthModal(false); setEditingAuth(null); }}
         onSubmit={async data => {
           if (Number(data.minAmount) >= Number(data.maxAmount)) {

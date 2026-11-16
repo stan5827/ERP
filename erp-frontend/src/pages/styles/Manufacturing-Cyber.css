@@ -11,8 +11,8 @@
 .manufacturing-container {
   min-height: 100vh;
   padding: 2rem;
-  background: var(--cy-dark);
-  color: #f8fafc;
+  background-color: var(--theme-background, var(--cy-dark));
+  color: var(--theme-text, #f8fafc);
   font-family: var(--font-body);
   position: relative;
   overflow: hidden;
@@ -27,10 +27,10 @@
   width: 100%;
   height: 100%;
   background: 
-    radial-gradient(circle at 10% 10%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 90%, rgba(0, 98, 255, 0.05) 0%, transparent 40%),
-    linear-gradient(rgba(15, 23, 42, 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.3) 1px, transparent 1px);
+    radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--cy-cyan) 5%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 90% 90%, color-mix(in srgb, var(--cy-blue) 5%, transparent) 0%, transparent 40%),
+    linear-gradient(color-mix(in srgb, var(--cy-slate) 20%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--cy-slate) 20%, transparent) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
   pointer-events: none;
   z-index: 0;
@@ -115,7 +115,7 @@
 
 .cy-stat-label {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-secondary, #94a3b8);
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
@@ -124,7 +124,7 @@
   font-family: var(--font-mono);
   font-size: 2rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary, #fff);
 }
 
 .cy-stat-trend {
@@ -160,7 +160,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.75rem;
   padding: 0.75rem 1rem 0.75rem 2.75rem;
-  color: #fff;
+  color: var(--text-primary, #fff);
   font-size: 0.9rem;
   transition: all 0.2s ease;
 }
@@ -188,7 +188,7 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   font-weight: 700;
 }
 
@@ -238,7 +238,7 @@
 
 .btn-cy {
   background: linear-gradient(135deg, var(--cy-blue), #004ecc);
-  color: #fff;
+  color: var(--text-primary, #fff);
   border: none;
   border-radius: 0.5rem;
   padding: 0.6rem 1.2rem;
@@ -264,7 +264,7 @@
   border: 1px solid transparent;
 }
 
-.cy-status-pending { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border-color: rgba(148, 163, 184, 0.2); }
+.cy-status-pending { background: rgba(148, 163, 184, 0.1); color: var(--text-secondary, #94a3b8); border-color: rgba(148, 163, 184, 0.2); }
 .cy-status-active { background: rgba(0, 242, 255, 0.1); color: var(--cy-cyan); border-color: rgba(0, 242, 255, 0.2); }
 .cy-status-complete { background: rgba(16, 185, 122, 0.1); color: #10b981; border-color: rgba(16, 185, 122, 0.2); }
 
@@ -278,7 +278,7 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #94a3b8;
+  color: var(--text-secondary, #94a3b8);
   cursor: pointer;
   transition: all 0.2s ease;
 }

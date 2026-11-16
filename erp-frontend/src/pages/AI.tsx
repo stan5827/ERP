@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   AreaChart, Area, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -7,7 +7,8 @@ import {
   Activity, AlertTriangle, CheckCircle, Clock, Cpu, GitBranch,
   RefreshCw, Server, Zap, Shield, ChevronDown, Eye, Play, Settings, BookOpen
 } from 'lucide-react';
-import { useAgentMetricsSummary, useAgentLatencyHistory, useAgentQpsHistory, useAgentErrorHistory, useAgentFlowExecutions, useAgentTopology, usePlanningCreatePlan, usePlanningExecutePlan, usePlanningReview, usePlanningHealth, usePlanningTools, usePlanningToolExecute } from '../hooks/useApi';
+import { useAgentMetricsSummary, useAgentLatencyHistory, useAgentQpsHistory, useAgentErrorHistory, useAgentFlowExecutions, useAgentTopology, usePlanningCreatePlan, usePlanningExecutePlan, usePlanningToolExecute } from '../hooks/useApi';
+import { AgentWipFactsPanel } from './AgentWipFactsPanel';
 
 // ── Mock data generators (fallback when API unavailable) ──
 function generateMockLatencyData(hours: number) {
@@ -295,13 +296,6 @@ export function AI() {
   const { data: flowResp } = useAgentFlowExecutions();
   const { data: topologyResp } = useAgentTopology();
 
-  const { data: healthResp } = usePlanningHealth();
-  const { data: toolsResp } = usePlanningTools();
-  const createPlan = usePlanningCreatePlan();
-  const executePlan = usePlanningExecutePlan();
-  const reviewResult = usePlanningReview();
-  const executeTool = usePlanningToolExecute();
-
   // Use mock data when API unavailable
   const latencyData = latencyResp?.data || generateMockLatencyData(timeRange);
   const qpsData = qpsResp?.data || generateMockQpsData(timeRange);
@@ -349,6 +343,8 @@ export function AI() {
           </select>
         </div>
       </div>
+
+      <AgentWipFactsPanel />
 
       {/* ── Top Health Bar ── */}
       <div className="glass-card" style={{ padding: '20px 24px' }}>
@@ -546,12 +542,48 @@ export function AI() {
 }
 
 // ── Planning Test Panel ──
+interface PlanTaskResult {
+  id: string;
+  description: string;
+  toolsNeeded?: string[];
+}
+
+interface PlanResult {
+  success?: boolean;
+  planId?: string;
+  strategy?: string;
+  confidence?: number;
+  tasks?: PlanTaskResult[];
+  errorMessage?: string;
+  error?: string;
+}
+
+interface ExecutionResult {
+  success?: boolean;
+  executionId?: string;
+  duration?: number;
+  results?: Array<{ status: string; taskId: string; output?: string }>;
+  errorMessage?: string;
+  error?: string;
+}
+
+interface ToolExecutionResult {
+  success?: boolean;
+  elapsedMs?: number;
+  data?: unknown;
+  error?: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function PlanningTestPanel() {
   const [taskDescription, setTaskDescription] = useState('建立 100 個 A 產品的工單');
   const [activeTab, setActiveTab] = useState<'plan' | 'execute' | 'tools'>('plan');
-  const [planResult, setPlanResult] = useState<any>(null);
-  const [executeResult, setExecuteResult] = useState<any>(null);
-  const [toolResult, setToolResult] = useState<any>(null);
+  const [planResult, setPlanResult] = useState<PlanResult | null>(null);
+  const [executeResult, setExecuteResult] = useState<ExecutionResult | null>(null);
+  const [toolResult, setToolResult] = useState<ToolExecutionResult | null>(null);
   const [selectedTool, setSelectedTool] = useState('erp_inventory_search');
   const [toolParams, setToolParams] = useState('{}');
 
@@ -565,9 +597,9 @@ function PlanningTestPanel() {
         taskDescription,
         context: 'test',
       });
-      setPlanResult(result?.data);
-    } catch (err: any) {
-      setPlanResult({ error: err.message });
+      setPlanResult(result?.data as PlanResult | undefined ?? null);
+    } catch (err: unknown) {
+      setPlanResult({ error: getErrorMessage(err) });
     }
   };
 
@@ -578,23 +610,30 @@ function PlanningTestPanel() {
         planId: planResult.planId,
         parallelExecution: false,
       });
-      setExecuteResult(result?.data);
-    } catch (err: any) {
-      setExecuteResult({ error: err.message });
+      setExecuteResult(result?.data as ExecutionResult | undefined ?? null);
+    } catch (err: unknown) {
+      setExecuteResult({ error: getErrorMessage(err) });
     }
   };
 
   const handleToolExecute = async () => {
     try {
-      let params = {};
-      try { params = JSON.parse(toolParams); } catch {}
+      let params: Record<string, unknown>;
+      try {
+        const parsed: unknown = JSON.parse(toolParams);
+        params = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+          ? parsed as Record<string, unknown>
+          : {};
+      } catch {
+        params = {};
+      }
       const result = await executeTool.mutateAsync({
         toolId: selectedTool,
         parameters: params,
       });
-      setToolResult(result?.data);
-    } catch (err: any) {
-      setToolResult({ error: err.message });
+      setToolResult(result?.data as ToolExecutionResult | undefined ?? null);
+    } catch (err: unknown) {
+      setToolResult({ error: getErrorMessage(err) });
     }
   };
 
@@ -670,7 +709,7 @@ function PlanningTestPanel() {
                   <div style={{ color: 'var(--slate-400)', marginBottom: 4 }}>Strategy: {planResult.strategy}</div>
                   <div style={{ color: 'var(--cobalt-400)', marginBottom: 8 }}>Confidence: {(planResult.confidence * 100).toFixed(1)}%</div>
                   <div style={{ color: 'var(--slate-500)', marginBottom: 6 }}>Tasks ({planResult.tasks?.length || 0}):</div>
-                  {planResult.tasks?.map((task: any, i: number) => (
+                  {planResult.tasks?.map((task, i) => (
                     <div key={i} style={{ padding: '4px 8px', background: 'rgba(45,110,245,0.1)', borderRadius: 3, marginBottom: 4, fontSize: 10 }}>
                       <span style={{ color: 'var(--slate-200)' }}>{task.id}</span>: {task.description}
                       <span style={{ color: 'var(--slate-500)', marginLeft: 8 }}>[{task.toolsNeeded?.join(', ')}]</span>
@@ -701,7 +740,7 @@ function PlanningTestPanel() {
                   <div style={{ color: 'var(--slate-300)', marginBottom: 4 }}>Execution ID: {executeResult.executionId}</div>
                   <div style={{ color: 'var(--slate-400)', marginBottom: 8 }}>Duration: {executeResult.duration?.toFixed(2)}s</div>
                   <div style={{ color: 'var(--slate-500)', marginBottom: 6 }}>Results ({executeResult.results?.length || 0}):</div>
-                  {executeResult.results?.map((r: any, i: number) => (
+                  {executeResult.results?.map((r, i) => (
                     <div key={i} style={{ padding: '4px 8px', background: r.status === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(199,31,61,0.1)', borderRadius: 3, marginBottom: 4, fontSize: 10 }}>
                       <span style={{ color: r.status === 'success' ? 'var(--emerald-400)' : 'var(--crimson-400)' }}>{r.status}</span> - {r.taskId}
                       {r.output && <span style={{ color: 'var(--slate-500)', marginLeft: 6 }}>{r.output}</span>}
@@ -761,7 +800,11 @@ function PlanningTestPanel() {
               </div>
               {toolResult.success ? (
                 <pre style={{ color: 'var(--slate-400)', whiteSpace: 'pre-wrap', fontSize: 10, maxHeight: 200, overflow: 'auto' }}>
-                  {toolResult.data || '執行成功，無回傳資料'}
+                  {typeof toolResult.data === 'string'
+                    ? toolResult.data
+                    : toolResult.data == null
+                      ? '執行成功，無回傳資料'
+                      : JSON.stringify(toolResult.data, null, 2)}
                 </pre>
               ) : (
                 <div style={{ color: 'var(--crimson-400)' }}>{toolResult.error}</div>

@@ -1,25 +1,17 @@
-import React, { useState, Suspense, lazy } from 'react';
+﻿import React, { useState, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { useLogin, useLogout, useCurrentUser } from './hooks/useApi';
 import type { ModuleId } from './types';
 import { Lock, User, Eye, EyeOff } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
-
-const disabledModules = new Set<ModuleId>([
-  'budget',
-  'supplierportal',
-  'suppliers',
-  'ai',
-  'agentflows',
-  'aidecision',
-  'aischeduling',
-]);
+import { authApi } from './api/auth';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Manufacturing = lazy(() => import('./pages/Manufacturing').then(m => ({ default: m.Manufacturing })));
 const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
 const Sales = lazy(() => import('./pages/Sales').then(m => ({ default: m.Sales })));
+const CustomersManagement = lazy(() => import('./pages/CustomersManagement').then(m => ({ default: m.CustomersManagement })));
 const Procurement = lazy(() => import('./pages/Procurement').then(m => ({ default: m.Procurement })));
 const HR = lazy(() => import('./pages/HR').then(m => ({ default: m.HR })));
 const Finance = lazy(() => import('./pages/Finance').then(m => ({ default: m.Finance })));
@@ -71,6 +63,7 @@ function PageLoader() {
 const moduleLabels: Record<ModuleId, string> = {
   dashboard: '系統儀表板',
   sales: '銷貨及收款',
+  customers: '客戶管理',
   procurement: '採購及付款',
   inventory: '庫存管理',
   manufacturing: '生產製造 · MES',
@@ -120,8 +113,8 @@ function LoginPage() {
     try {
       const res = await login.mutateAsync({ username, password });
       if (!res.success) setError(res.message || '登入失敗');
-    } catch {
-      setError('帳號或密碼錯誤');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '登入失敗，請稍後再試');
     }
   };
 
@@ -163,7 +156,7 @@ function LoginPage() {
           </button>
         </form>
         <div style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'var(--slate-500)' }}>
-          請使用系統管理員提供的帳號登入
+          管理員初始帳密由部署環境設定；請洽系統管理員。
         </div>
       </div>
     </div>
@@ -177,18 +170,20 @@ function App() {
   const logout = useLogout();
 
   if (!currentUser) return <LoginPage />;
+  if (currentUser.mustChangePassword)
+    return <ChangePasswordPage username={currentUser.username} onComplete={() => {
+      localStorage.removeItem('erp_token');
+      localStorage.removeItem('erp_user');
+    }} onLogout={logout} />;
 
   const renderPage = () => {
-    if (disabledModules.has(activeModule)) {
-      return <Suspense fallback={<PageLoader />}><Dashboard onNavigate={setActiveModule} /></Suspense>;
-    }
-
     const pageElement = (() => {
       switch (activeModule) {
         case 'dashboard': return <Dashboard onNavigate={setActiveModule} />;
         case 'manufacturing': return <Manufacturing onNavigate={setActiveModule} />;
         case 'inventory': return <Inventory />;
         case 'sales': return <Sales />;
+        case 'customers': return <CustomersManagement />;
         case 'procurement': return <Procurement />;
         case 'hr': return <HR />;
         case 'finance': return <Finance />;
@@ -223,6 +218,7 @@ function App() {
         case 'actual_costing': return <WorkOrderCostReport />;
         default: return <Dashboard onNavigate={setActiveModule} />;
       }
+
     })();
 
     return <Suspense fallback={<PageLoader />}>{pageElement}</Suspense>;
@@ -243,6 +239,102 @@ function App() {
         <main className="page-content" style={{ paddingTop: 'calc(var(--topbar-height) + 24px)' }}>
           {renderPage()}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function ChangePasswordPage({
+  username,
+  onComplete,
+  onLogout,
+}: {
+  username: string;
+  onComplete: () => void;
+  onLogout: () => void;
+}) {
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+
+    if (newPassword.length < 12) {
+      setError('新密碼至少需要 12 個字元');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('新密碼與確認密碼不一致');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await authApi.changePassword({
+        oldPassword,
+        newPassword,
+      });
+      if (!response.data.success) {
+        setError(response.data.message || '變更密碼失敗');
+        return;
+      }
+      onComplete();
+      setIsComplete(true);
+    } catch (changeError) {
+      setError(changeError instanceof Error ? changeError.message : '變更密碼失敗');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(135deg, #04080f 0%, #0a1628 50%, #0d1f3c 100%)',
+    }}>
+      <div className="glass-card" style={{ width: 420, padding: '40px' }}>
+        {isComplete ? (
+          <div role="status">
+            <h2 style={{ marginBottom: 8 }}>密碼已更新</h2>
+            <p style={{ color: 'var(--slate-400)', marginBottom: 24 }}>
+              為使其他登入中的工作階段立即失效，請使用新密碼重新登入。
+            </p>
+            <button className="btn btn-primary" type="button" style={{ width: '100%' }} onClick={onLogout}>
+              重新登入
+            </button>
+          </div>
+        ) : (
+          <>
+            <h2 style={{ marginBottom: 8 }}>首次登入請變更密碼</h2>
+            <p style={{ color: 'var(--slate-400)', marginBottom: 24 }}>帳號：{username}。請設定至少 12 個字元的新密碼。</p>
+            <form onSubmit={handleSubmit}>
+              <label style={{ display: 'block', marginBottom: 16 }}>
+                目前密碼
+                <input className="form-input" style={{ width: '100%' }} type="password" autoComplete="current-password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} required />
+              </label>
+              <label style={{ display: 'block', marginBottom: 16 }}>
+                新密碼
+                <input className="form-input" style={{ width: '100%' }} type="password" autoComplete="new-password" minLength={12} value={newPassword} onChange={event => setNewPassword(event.target.value)} required />
+              </label>
+              <label style={{ display: 'block', marginBottom: 20 }}>
+                確認新密碼
+                <input className="form-input" style={{ width: '100%' }} type="password" autoComplete="new-password" minLength={12} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required />
+              </label>
+              {error && <div role="alert" style={{ color: 'var(--crimson-300)', marginBottom: 16 }}>{error}</div>}
+              <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={isSaving}>
+                {isSaving ? '儲存中...' : '變更密碼並重新登入'}
+              </button>
+              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 10 }} onClick={onLogout}>
+                登出
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

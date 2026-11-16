@@ -1,26 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Download, Search, Edit2, Eye, Check, X, Calendar, Clock, DollarSign } from 'lucide-react';
 import { useEmployees } from '../hooks/useApi';
 import { FormModal } from '../components/FormModal';
 import type { FormTab, FormField } from '../components/FormModal';
 import { employeesApi, attendanceApi, leaveRequestsApi, payrollApi, departmentsApi, jobTitlesApi, jobGradesApi } from '../api/api';
-import type { AttendanceRecordDto, LeaveRequestDto, PayrollDto } from '../api/api';
+import type { AttendanceRecordDto, EmployeeDto, LeaveRequestDto, PayrollDto } from '../api/api';
+import { getApplicableJobTitles } from '../utils/hrOrganization';
 
 type TabType = 'employees' | 'attendance' | 'leave' | 'payroll';
 
 /* ── 統計卡片（動態計算）── */
-function getHRStats(employees: any[], attendanceRecords: any[], leaveRequests: any[]) {
+function getHRStats(employees: EmployeeDto[], attendanceRecords: AttendanceRecordDto[], leaveRequests: LeaveRequestDto[]) {
   const today = new Date().toISOString().slice(0, 10);
-  const activeEmployees = employees.filter((e: any) => e.status === 'active').length;
-  const todayAttendance = attendanceRecords.filter((a: any) => a.date?.slice(0, 10) === today).length;
-  const pendingLeave = leaveRequests.filter((l: any) => l.status === 'pending').length;
-  const abnormal = attendanceRecords.filter((a: any) => a.status === 'abnormal' || a.lateMinutes > 0).length;
+  const activeEmployees = employees.filter(e => e.status === 'active').length;
+  const todayAttendance = attendanceRecords.filter(a => a.date?.slice(0, 10) === today).length;
+  const pendingLeave = leaveRequests.filter(l => l.status === 'pending').length;
+  const abnormal = attendanceRecords.filter(a => a.status === 'abnormal' || a.lateMinutes > 0).length;
   return [
     { label: '在職員工', value: activeEmployees, color: 'var(--cobalt-400)' },
     { label: '今日出勤', value: todayAttendance, color: 'var(--emerald-400)' },
     { label: '待審請假', value: pendingLeave, color: 'var(--amber-400)' },
     { label: '出勤異常', value: abnormal, color: 'var(--crimson-400)' },
   ];
+}
+
+function getErrorRecord(error: unknown): Record<string, unknown> | undefined {
+  if (error === null || typeof error !== 'object') return undefined;
+  return error as Record<string, unknown>;
+}
+
+function getErrorMessage(error: unknown): string {
+  const errorRecord = getErrorRecord(error);
+  const response = getErrorRecord(errorRecord?.response);
+  const data = getErrorRecord(response?.data);
+  if (typeof data?.message === 'string') return data.message;
+  return error instanceof Error ? error.message : String(error);
 }
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
@@ -50,6 +64,42 @@ const payrollStatusConfig: Record<string, { label: string; cls: string }> = {
   paid: { label: '已發放', cls: 'active' },
   void: { label: '作廢', cls: 'danger' },
 };
+
+const jobCategoryOptions = [
+  { value: 'production', label: '生產部門' },
+  { value: 'admin', label: '管理部門' },
+  { value: 'service', label: '服務部門' },
+];
+
+const getLocalDateString = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 10);
+};
+
+interface DepartmentOptionSource {
+  id: string;
+  deptCode: string;
+  deptName: string;
+  deptType?: string;
+}
+
+interface JobTitleOptionSource {
+  id: string;
+  titleCode: string;
+  titleName: string;
+  gradeId?: string;
+  applicableDeptType?: string;
+}
+
+interface JobGradeOptionSource {
+  id: string;
+  gradeCode: string;
+  gradeName: string;
+  level: number;
+  minSalary: number;
+  maxSalary: number;
+}
 
 const leaveTypes = [
   { value: 'annual', label: '特休/年假' },
@@ -105,10 +155,9 @@ function buildEmployeeTabs(
         { name: 'departmentId', label: '所屬部門', type: 'select', required: true, options: deptOptions, description: '員工所屬的行政部門，決定組織架構歸屬與成本中心歸屬。' },
         { name: 'jobTitleId', label: '職稱', type: 'select', required: true, options: titleOptions, description: '正式任用後的職稱，如工程師、課長、經理等，影響薪資與考核標準。' },
         { name: 'gradeId', label: '職等', type: 'select', required: true, options: gradeOptions, description: '薪資職等(如P1-P6或 Grade A-F)，決定薪資範圍與晉升路徑。' },
-        { name: 'jobCategory', label: '職務類別', type: 'select', options: [
-          { value: 'production', label: '生產部門' }, { value: 'admin', label: '管理部門' }, { value: 'service', label: '服務部門' },
-        ], description: '部門的業務屬性，用於HR統計分析與相關法規適用。' },
-        { name: 'hireDate', label: '到職日', type: 'date', required: true, description: '正式到公司報到的日期，作為年資計算、試用期起算與勞健保生效日依據。' },
+        { name: 'changeReason', label: '部門／職稱／職等異動原因', type: 'textarea', requiredWhenChanged: ['departmentId', 'jobTitleId', 'gradeId'], max: 200, placeholder: '若異動部門、職稱或職等，請填寫異動原因（最多 200 字）', description: '此欄位固定顯示；只有變更部門、職稱或職等時才必填。' },
+        { name: 'jobCategory', label: '職務類別', type: 'select', options: jobCategoryOptions, description: '依所屬部門的部門類型自動帶入。' },
+        { name: 'hireDate', label: '到職日', type: 'date', required: true, defaultValue: getLocalDateString(), description: '正式到公司報到的日期，預設為今天。' },
         { name: 'probationEndDate', label: '試用期截止日', type: 'date', description: '試用期期滿日期，試用期一般為3-6個月，屆滿前需完成考核以決定是否正式任用。' },
       ],
     },
@@ -161,8 +210,27 @@ function buildEmployeeTabs(
 function buildEmployeeWizardFields(
   deptOptions: { value: string; label: string }[],
   titleOptions: { value: string; label: string }[],
-  gradeOptions: { value: string; label: string }[]
+  gradeOptions: { value: string; label: string }[],
+  gradeSources: JobGradeOptionSource[],
+  selectedGradeId?: unknown
 ): FormField[][] {
+  const selectedGrade = gradeSources.find(grade => grade.id === selectedGradeId);
+  const salaryRangeDescription = selectedGrade
+    ? `所選職等薪資區間：${selectedGrade.minSalary.toLocaleString()}～${selectedGrade.maxSalary.toLocaleString()} 元。`
+    : '請先於「組織職位」步驟選擇職等，以查看該職等薪資區間。';
+  const baseSalaryField: FormField = {
+    name: 'baseSalary',
+    label: '底薪（本薪）',
+    type: 'number',
+    required: true,
+    placeholder: selectedGrade
+      ? `${selectedGrade.minSalary.toLocaleString()}～${selectedGrade.maxSalary.toLocaleString()}`
+      : '請先選擇職等',
+    min: selectedGrade?.minSalary ?? 0,
+    max: selectedGrade?.maxSalary,
+    description: `基本工資，不含津貼與獎金。${salaryRangeDescription}作為勞健保投保金額、資遣費、職業災害計算基準。`
+  };
+
   return [
     [
       { name: 'chineseName', label: '中文姓名', type: 'text', required: true, placeholder: '請輸入中文姓名', description: '員工的中文姓名，必須與身分證件相符，用於人事資料與薪資發放。' },
@@ -181,6 +249,7 @@ function buildEmployeeWizardFields(
   { value: 'leave', label: '留職停薪' },
   { value: 'inactive', label: '離職' }
 ], defaultValue: 'active', description: '員工目前的在職狀態。' },
+{ name: 'statusChangeReason', label: '狀態異動原因', type: 'textarea', placeholder: '狀態異動時必填', description: '變更在職、留停或停用狀態時，需記錄原因以供稽核。' },
     ],
     [
       { name: 'emergencyContactName', label: '緊急聯絡人', type: 'text', required: true, placeholder: '聯絡人姓名', description: '發生緊急事件時可聯繫的家屬或親友姓名。' },
@@ -194,10 +263,8 @@ function buildEmployeeWizardFields(
       { name: 'departmentId', label: '所屬部門', type: 'select', required: true, options: deptOptions, description: '員工所屬的行政部門，決定組織架構歸屬與成本中心歸屬。' },
       { name: 'jobTitleId', label: '職稱', type: 'select', required: true, options: titleOptions, description: '正式任用後的職稱，如工程師、課長、經理等，影響薪資與考核標準。' },
       { name: 'gradeId', label: '職等', type: 'select', required: true, options: gradeOptions, description: '薪資職等(如P1-P6或 Grade A-F)，決定薪資範圍與晉升路徑。' },
-      { name: 'jobCategory', label: '職務類別', type: 'select', options: [
-        { value: 'production', label: '生產部門' }, { value: 'admin', label: '管理部門' }, { value: 'service', label: '服務部門' },
-      ], description: '部門的業務屬性，用於HR統計分析與相關法規適用。' },
-      { name: 'hireDate', label: '到職日', type: 'date', required: true, description: '正式到公司報到的日期，作為年資計算、試用期起算與勞健保生效日依據。' },
+      { name: 'jobCategory', label: '職務類別', type: 'select', options: jobCategoryOptions, description: '依所屬部門的部門類型自動帶入。' },
+      { name: 'hireDate', label: '到職日', type: 'date', required: true, defaultValue: getLocalDateString(), description: '正式到公司報到的日期，預設為今天。' },
       { name: 'probationEndDate', label: '試用期截止日', type: 'date', description: '試用期期滿日期，試用期一般為3-6個月，屆滿前需完成考核以決定是否正式任用。' },
     ],
     [
@@ -205,7 +272,7 @@ function buildEmployeeWizardFields(
         { value: 'monthly', label: '月薪' }, { value: 'daily', label: '日薪' },
         { value: 'hourly', label: '時薪' }, { value: 'piece', label: '件計' },
       ], description: '薪資計算方式：月薪=固定月薪、日薪=按上班天數計算、時薪=按工時計算、件計=按產量計酬。' },
-      { name: 'baseSalary', label: '底薪（本薪）', type: 'number', required: true, placeholder: '29500', min: 0, description: '基本工資，不含津貼與獎金。作為勞健保投保金額、資遣費、職業災害計算基準。' },
+      baseSalaryField,
       { name: 'foodAllowance', label: '伙食津貼', type: 'number', placeholder: '0', min: 0, description: '每月固定伙食補助，如誤餐費或餐券補貼。' },
       { name: 'positionAllowance', label: '職務加給', type: 'number', placeholder: '0', min: 0, description: '因擔任特定職務而給予的加給，如主管加給、夜班津貼。' },
       { name: 'fullAttendanceBonus', label: '全勤獎金', type: 'number', placeholder: '0', min: 0, description: '全勤時發放的獎金金額，需符合公司全勤定義(如不遲到、未請假)。' },
@@ -242,13 +309,17 @@ export const HR: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<any>(null);
-  const [viewingEmployee, setViewingEmployee] = useState<any>(null);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeDto | null>(null);
+  const [loadingEmployeeId, setLoadingEmployeeId] = useState<string | null>(null);
+  const [viewingEmployee, setViewingEmployee] = useState<EmployeeDto | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [deptOptions, setDeptOptions] = useState<{ value: string; label: string }[]>([]);
-  const [titleOptions, setTitleOptions] = useState<{ value: string; label: string }[]>([]);
   const [gradeOptions, setGradeOptions] = useState<{ value: string; label: string }[]>([]);
-  const [terminatingEmployee, setTerminatingEmployee] = useState<any>(null);
+  const [departmentSources, setDepartmentSources] = useState<DepartmentOptionSource[]>([]);
+  const [jobTitleSources, setJobTitleSources] = useState<JobTitleOptionSource[]>([]);
+  const [jobGradeSources, setJobGradeSources] = useState<JobGradeOptionSource[]>([]);
+  const previousJobTitleId = useRef<string | undefined>(undefined);
+  const [terminatingEmployee, setTerminatingEmployee] = useState<EmployeeDto | null>(null);
   const [terminateDate, setTerminateDate] = useState('');
   const [terminateReason, setTerminateReason] = useState('');
   const [showAddLeave, setShowAddLeave] = useState(false);
@@ -273,6 +344,23 @@ export const HR: React.FC = () => {
   }, refreshKey);
 
   const employees = employeesResponse?.data ?? [];
+
+  const handleEditEmployee = async (employee: { id: string }) => {
+    setLoadingEmployeeId(employee.id);
+    try {
+      const response = await employeesApi.get(employee.id);
+      const detail = response.data?.data;
+      if (!detail) {
+        throw new Error('伺服器未回傳員工詳細資料');
+      }
+      setEditingEmployee(detail);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知錯誤';
+      alert(`載入員工資料失敗：${message}`);
+    } finally {
+      setLoadingEmployeeId(null);
+    }
+  };
 
   // Load attendance records
   useEffect(() => {
@@ -309,26 +397,32 @@ export const HR: React.FC = () => {
 
   // Load departments, job titles, and job grades when modal opens
   useEffect(() => {
+    previousJobTitleId.current = editingEmployee?.jobTitleId
+      ? String(editingEmployee.jobTitleId)
+      : undefined;
+
     if (showAdd || editingEmployee) {
       Promise.all([
         departmentsApi.flat(),
-        jobTitlesApi.list(),
-        jobGradesApi.list(),
+        jobTitlesApi.list({ isActive: 'true' }),
+        jobGradesApi.list({ isActive: 'true' }),
       ]).then(([deptRes, titleRes, gradeRes]) => {
         if (deptRes.data?.data) {
-          setDeptOptions(deptRes.data.data.map((d: { id: string; deptCode: string; deptName: string }) => ({
+          const departments = deptRes.data.data as DepartmentOptionSource[];
+          setDepartmentSources(departments);
+          setDeptOptions(departments.map(d => ({
             value: d.id,
             label: `${d.deptCode} - ${d.deptName}`,
           })));
         }
         if (titleRes.data?.data) {
-          setTitleOptions(titleRes.data.data.map((t: { id: string; titleCode: string; titleName: string }) => ({
-            value: t.id,
-            label: `${t.titleCode} - ${t.titleName}`,
-          })));
+          const titles = titleRes.data.data as JobTitleOptionSource[];
+          setJobTitleSources(titles);
         }
         if (gradeRes.data?.data) {
-          setGradeOptions(gradeRes.data.data.map((g: { id: string; gradeCode: string; gradeName: string; level: number }) => ({
+          const grades = gradeRes.data.data as JobGradeOptionSource[];
+          setJobGradeSources(grades);
+          setGradeOptions(grades.map(g => ({
             value: g.id,
             label: `${g.gradeCode} - ${g.gradeName}`,
           })));
@@ -336,9 +430,49 @@ export const HR: React.FC = () => {
       }).catch(err => console.error('Failed to load org data:', err));
     }
   }, [showAdd, editingEmployee]);
+  const getTitleOptionsForDepartment = (departmentId?: unknown) => {
+    const department = departmentSources.find(item => item.id === String(departmentId ?? ''));
+    return getApplicableJobTitles(jobTitleSources, department).map(title => ({
+      value: title.id,
+      label: `${title.titleCode} - ${title.titleName}`,
+    }));
+  };
+  const employeeTabs = buildEmployeeTabs(
+    deptOptions,
+    getTitleOptionsForDepartment(editingEmployee?.departmentId),
+    gradeOptions
+  );
+  const handleOrganizationFieldChange = (
+    values: Record<string, unknown>,
+    _setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+    setFieldOptions?: (fieldName: string, options: { value: string; label: string }[]) => void,
+    setFieldValues?: (updates: Record<string, unknown>) => void
+  ) => {
+    const department = departmentSources.find(item => item.id === String(values.departmentId ?? ''));
+    const selectedJobTitleId = values.jobTitleId ? String(values.jobTitleId) : undefined;
+    const availableTitles = getApplicableJobTitles(jobTitleSources, department);
+    const title = availableTitles.find(item => item.id === selectedJobTitleId);
+    setFieldOptions?.('jobTitleId', availableTitles.map(item => ({
+      value: item.id,
+      label: `${item.titleCode} - ${item.titleName}`,
+    })));
 
-  const employeeTabs = buildEmployeeTabs(deptOptions, titleOptions, gradeOptions);
-  const employeeWizardFields = buildEmployeeWizardFields(deptOptions, titleOptions, gradeOptions);
+    const updates: Record<string, unknown> = {};
+    if (department && values.jobCategory !== department.deptType) {
+      updates.jobCategory = department.deptType ?? '';
+    } else if (!values.departmentId && values.jobCategory) {
+      updates.jobCategory = '';
+    }
+    if (selectedJobTitleId && !title) {
+      updates.jobTitleId = '';
+      updates.gradeId = '';
+      previousJobTitleId.current = undefined;
+    } else if (selectedJobTitleId !== previousJobTitleId.current) {
+      previousJobTitleId.current = selectedJobTitleId;
+      updates.gradeId = title?.gradeId ?? '';
+    }
+    if (Object.keys(updates).length > 0) setFieldValues?.(updates);
+  };
 
   const tabs = [
     { key: 'employees' as TabType, label: '員工資料', icon: <Calendar size={14} /> },
@@ -438,7 +572,14 @@ export const HR: React.FC = () => {
                           <td>
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button className="icon-action-btn" title="查看" onClick={() => setViewingEmployee(emp)}><Eye size={14} /></button>
-                              <button className="icon-action-btn" title="編輯" onClick={() => setEditingEmployee(emp)}><Edit2 size={14} /></button>
+                              <button
+                                className="icon-action-btn"
+                                title="編輯"
+                                disabled={loadingEmployeeId !== null}
+                                onClick={() => void handleEditEmployee(emp)}
+                              >
+                                <Edit2 size={14} />
+                              </button>
                               {emp.status === 'active' && (
                                 <button className="icon-action-btn" title="離職" onClick={() => { setTerminatingEmployee(emp); setTerminateDate(new Date().toISOString().slice(0, 10)); setTerminateReason(''); }} style={{ color: 'var(--crimson-400)' }}><X size={14} /></button>
                               )}
@@ -691,9 +832,19 @@ export const HR: React.FC = () => {
       {/* Employee Modals */}
       <FormModal open={showAdd} title="新增員工" width={620}
         isWizard={true}
+        onChangeData={handleOrganizationFieldChange}
         wizardConfig={{
           stepTitles: ['身分資料', '緊急聯絡', '組織職位', '薪資金融', '法定保障', '出勤學經歷'],
-          getStepFields: (stepIndex) => employeeWizardFields[stepIndex] || []
+          getStepFields: (stepIndex, values) => {
+            const fields = buildEmployeeWizardFields(
+              deptOptions,
+              getTitleOptionsForDepartment(values.departmentId),
+              gradeOptions,
+              jobGradeSources,
+              values.gradeId
+            )[stepIndex] || [];
+            return fields;
+          }
         }}
         onClose={() => setShowAdd(false)}
         onSubmit={async (data: Record<string, unknown>) => {
@@ -712,6 +863,10 @@ export const HR: React.FC = () => {
               if (isNaN(num) || num < 0) {
                 throw new Error('底薪不可為負數');
               }
+              const grade = jobGradeSources.find(item => item.id === data.gradeId);
+              if (grade && (num < grade.minSalary || num > grade.maxSalary)) {
+                throw new Error(`底薪須在所選職等薪資區間 ${grade.minSalary.toLocaleString()}～${grade.maxSalary.toLocaleString()} 元內`);
+              }
             }
             if (data.probationEndDate && data.hireDate) {
               const probationEnd = new Date(data.probationEndDate as string);
@@ -729,14 +884,15 @@ export const HR: React.FC = () => {
             await employeesApi.create(cleaned);
             setShowAdd(false);
             setRefreshKey(k => k + 1);
-          } catch (err: any) {
-            alert('新增失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('新增失敗: ' + getErrorMessage(err));
             throw err;
           }
         }}
       />
 
       <FormModal open={!!editingEmployee} title="編輯員工" tabs={employeeTabs} width={620}
+        onChangeData={handleOrganizationFieldChange}
         initialValues={editingEmployee ? (() => {
           const vals: Record<string, unknown> = { ...editingEmployee };
           const dateFields = ['birthDate', 'hireDate', 'probationEndDate'];
@@ -762,8 +918,24 @@ export const HR: React.FC = () => {
             if (data.baseSalary != null && data.baseSalary !== '' && Number(data.baseSalary) < 0) {
               throw new Error('底薪不可為負數');
             }
+            const selectedGrade = jobGradeSources.find(item => item.id === data.gradeId);
+            const salary = Number(data.baseSalary);
+            if (selectedGrade && data.baseSalary !== '' && data.baseSalary != null
+              && (salary < selectedGrade.minSalary || salary > selectedGrade.maxSalary)) {
+              throw new Error(`底薪須在所選職等薪資區間 ${selectedGrade.minSalary.toLocaleString()}～${selectedGrade.maxSalary.toLocaleString()} 元內`);
+            }
             if (data.probationEndDate && data.hireDate && new Date(String(data.probationEndDate)) <= new Date(String(data.hireDate))) {
               throw new Error('試用期截止日必須晚於到職日');
+            }
+
+            if (data.status != null && data.status !== editingEmployee.status
+              && !String(data.statusChangeReason ?? '').trim()) {
+              throw new Error('變更員工狀態時必須填寫狀態異動原因');
+            }
+            const organizationChanged = ['departmentId', 'jobTitleId', 'gradeId']
+              .some(field => data[field] != null && data[field] !== editingEmployee[field]);
+            if (organizationChanged && !String(data.changeReason ?? '').trim()) {
+              throw new Error('變更部門、職稱或職等時必須填寫異動原因');
             }
             
             const cleaned: Record<string, unknown> = {};
@@ -773,14 +945,11 @@ export const HR: React.FC = () => {
               }
             }
             
-            console.log('更新員工 - 原始資料:', JSON.stringify(data));
-            console.log('更新員工 - 清理後:', JSON.stringify(cleaned));
-            const updateResponse = await employeesApi.update(editingEmployee.id, cleaned);
-            console.log('員工更新結果:', updateResponse);
+            await employeesApi.update(editingEmployee.id, cleaned);
             setEditingEmployee(null);
             setRefreshKey(k => k + 1);
-          } catch (err: any) {
-            alert('更新失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('更新失敗: ' + getErrorMessage(err));
             throw err;
           }
         }}
@@ -815,12 +984,13 @@ export const HR: React.FC = () => {
         onClose={() => setTerminatingEmployee(null)}
         onSubmit={async () => {
           if (!terminateDate) { alert('請選擇離職日期'); return; }
+          if (!terminateReason.trim()) { alert('請輸入離職原因'); return; }
           try {
-            await employeesApi.terminate(terminatingEmployee.id, terminateReason || '离职');
+            await employeesApi.terminate(terminatingEmployee.id, terminateReason, terminateDate);
             setTerminatingEmployee(null);
             setRefreshKey(k => k + 1);
-          } catch (err: any) {
-            alert('操作失败: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('操作失败: ' + getErrorMessage(err));
           }
         }}
       >
@@ -837,7 +1007,7 @@ export const HR: React.FC = () => {
                 style={{ width: '100%', padding: '8px 12px', background: 'var(--slate-800)', border: '1px solid var(--slate-700)', borderRadius: 6, color: 'var(--slate-200)', fontSize: 13, outline: 'none' }} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--slate-400)', display: 'block', marginBottom: 6 }}>離職原因</label>
+              <label style={{ fontSize: 12, color: 'var(--slate-400)', display: 'block', marginBottom: 6 }}>離職原因 *</label>
               <textarea value={terminateReason} onChange={e => setTerminateReason(e.target.value)} placeholder="請輸入離職原因..."
                 style={{ width: '100%', padding: '8px 12px', background: 'var(--slate-800)', border: '1px solid var(--slate-700)', borderRadius: 6, color: 'var(--slate-200)', fontSize: 13, outline: 'none', minHeight: 80, resize: 'vertical' }} />
             </div>
@@ -883,19 +1053,20 @@ export const HR: React.FC = () => {
 
           try {
             // 直接進行 API 調用
-            await leaveRequestsApi.create(finalPayload as any);
+            await leaveRequestsApi.create(finalPayload);
             setShowAddLeave(false);
             setRefreshKey(k => k + 1);
-          } catch (err: any) {
-            console.error('[LeaveRequest] 精密提交失敗具體原因:', err.response?.data);
+          } catch (err: unknown) {
+            const errorData = getErrorRecord(getErrorRecord(getErrorRecord(err)?.response)?.data);
+            console.error('[LeaveRequest] 精密提交失敗具體原因:', errorData);
             
             // 提取最深層的錯誤訊息
             let errorDetail = '資料驗證失敗 (可能是時間或時數格式問題)';
-            if (err.response?.data?.errors) {
-                const errorEntries = Object.entries(err.response.data.errors);
+            if (errorData?.errors && typeof errorData.errors === 'object') {
+                const errorEntries = Object.entries(errorData.errors);
                 errorDetail = errorEntries.map(([key, val]) => `${key}: ${JSON.stringify(val)}`).join('\n');
-            } else if (err.response?.data?.message) {
-                errorDetail = err.response.data.message;
+            } else if (typeof errorData?.message === 'string') {
+                errorDetail = errorData.message;
             }
             
             alert('儲存失敗詳情:\n' + errorDetail);
@@ -920,8 +1091,8 @@ export const HR: React.FC = () => {
             await attendanceApi.create(data);
             setShowAddAttendance(false);
             setRefreshKey(k => k + 1);
-          } catch (err: any) {
-            alert('建立失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('建立失敗: ' + getErrorMessage(err));
           }
         }}
         fields={[
@@ -946,8 +1117,8 @@ export const HR: React.FC = () => {
             await payrollApi.create(data);
             setShowAddPayroll(false);
             setRefreshKey(k => k + 1);
-          } catch (err: any) {
-            alert('建立失敗: ' + (err.response?.data?.message || err.message));
+          } catch (err: unknown) {
+            alert('建立失敗: ' + getErrorMessage(err));
           }
         }}
         fields={[

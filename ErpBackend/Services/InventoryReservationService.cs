@@ -98,8 +98,34 @@ public class InventoryReservationService : IInventoryReservationService
             .Where(r => r.SkuId == sku.Id && r.Status == "reserved")
             .SumAsync(r => r.Qty);
 
-        return onHand - reserved;
+        var quarantined = await _db.IqcReports
+            .Where(report => report.SkuId == sku.Id &&
+                             report.GoodsReceiptItemId != null &&
+                             report.Result != "pass" &&
+                             report.Result != "not_required")
+            .SumAsync(report => (decimal?)report.ReceivedQty) ?? 0m;
+
+        var fqcQuarantined = await _db.FqcInspectionLots
+            .Where(lot => lot.ProductSkuId == sku.Id &&
+                (lot.DispositionStatus == "Pending" || lot.DispositionStatus == "Concession"))
+            .SumAsync(lot => (decimal?)lot.QuarantinedQty) ?? 0m;
+
+        return onHand - reserved - quarantined - fqcQuarantined;
     }
+}
+
+public class InventoryReservation
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SkuId { get; set; }
+    public decimal Qty { get; set; }
+    public string OrderType { get; set; } = null!;
+    public Guid OrderId { get; set; }
+    public string Status { get; set; } = "reserved";
+    public DateTime ReservedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ReleasedAt { get; set; }
+
+    public Sku? Sku { get; set; }
 }
 
 public class ReservationResult

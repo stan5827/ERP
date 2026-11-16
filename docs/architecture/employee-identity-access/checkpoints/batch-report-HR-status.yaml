@@ -1,0 +1,263 @@
+batch_id: "B03-employee-status-access"
+completed_tasks: []
+blocked_tasks:
+  - task_id: "T014"
+    reason: "The user-approved authentication boundary and employee-state checks are implemented, but full current-role/permission evaluation requires the pending approved matrix and access-control service."
+    required_task_ids: ["T004", "T007", "T009"]
+  - task_id: "T015"
+    reason: "Organizational changes are audited and revoke existing tokens, but there is no approved department/job-title-to-role mapping or authorization review queue."
+    required_task_ids: ["T004", "T017"]
+  - task_id: "T016"
+    reason: "Lifecycle and ESS tests pass, but dedicated PostgreSQL lifecycle and transaction-rollback coverage remains."
+    required_task_ids: ["T013", "T014", "T015"]
+  - task_id: "T022"
+    reason: "Global authentication fallback and anonymous allow-list are implemented; per-module role/permission coverage remains unapproved and incomplete."
+    required_task_ids: ["T004", "T017", "T020"]
+files_changed:
+  T013:
+    - file: "src/ErpBackend/Services/EmployeeService.cs"
+      change_type: "modified"
+      description: "Audits employee status transitions, disables accounts for terminated/inactive employees, revokes JWTs via security-version increments, and leaves reactivated accounts disabled."
+    - file: "src/ErpBackend/Controllers/EmployeesController.cs"
+      change_type: "modified"
+      description: "Restricts employee management to Admin/HR and supplies the authenticated actor for audited changes."
+    - file: "src/ErpBackend/DTOs/EmployeeDtos.cs"
+      change_type: "modified"
+      description: "Adds reasons for employee status and organization changes."
+    - file: "src/ErpBackend/DTOs/HrDtos.cs"
+      change_type: "modified"
+      description: "Adds termination effective date and rehire reason request fields."
+    - file: "src/erp-frontend/src/api/hr.ts"
+      change_type: "modified"
+      description: "Sends termination date and rehire reason."
+    - file: "src/erp-frontend/src/hooks/useApi.ts"
+      change_type: "modified"
+      description: "Carries effective termination date through the employee mutation."
+    - file: "src/erp-frontend/src/pages/HR.tsx"
+      change_type: "modified"
+      description: "Requires a termination date/reason and reason fields for employee status and organization updates."
+  T014:
+    - file: "src/ErpBackend/Program.cs"
+      change_type: "modified"
+      description: "Adds a global authentication fallback and checks account, employee binding/status, security version and forced password change on each JWT request."
+    - file: "src/ErpBackend/Services/AuthService.cs"
+      change_type: "modified"
+      description: "Rejects unbound or non-active/non-leave employees at login and includes EmployeeId in signed tokens."
+    - file: "src/ErpBackend/Services/UserService.cs"
+      change_type: "modified"
+      description: "Requires a complete active employee profile for account provisioning and forces a password change at first login."
+    - file: "src/ErpBackend/Controllers/AuthController.cs"
+      change_type: "modified"
+      description: "Explicitly permits anonymous login while retaining the explicit registration-rejection route."
+    - file: "src/ErpBackend/Controllers/EmployeeEssController.cs"
+      change_type: "created"
+      description: "Adds employee-bound GET endpoints for payroll, attendance and leave requests."
+    - file: "src/ErpBackend/DTOs/EmployeeEssDtos.cs"
+      change_type: "created"
+      description: "Limits ESS payroll responses to personal salary summary fields."
+    - file: "src/ErpBackend/Controllers/UsersController.cs"
+      change_type: "modified"
+      description: "Returns explicit account-provisioning errors for incomplete HR profiles."
+  T015:
+    - file: "src/ErpBackend/Services/EmployeeService.cs"
+      change_type: "modified"
+      description: "Requires an audit reason, records old/new organizational identifiers and invalidates linked users' tokens."
+  T016:
+    - file: "tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Tests leave-only ESS access, own-payroll scoping, payroll data minimization, termination revocation and forced password change."
+    - file: "tests/ErpBackend.IntegrationTests/EmployeesDepartmentsIntegrationTests.cs"
+      change_type: "modified"
+      description: "Tests leave and termination audit/account effects, organizational-change reasons and token-version invalidation, and no automatic account reactivation."
+    - file: "tests/ErpBackend.Tests/Services/UserServiceTests.cs"
+      change_type: "modified"
+      description: "Tests HR profile completeness and mandatory initial password change."
+    - file: "tests/ErpBackend.IntegrationTests/FallbackAuthorizationIntegrationTests.cs"
+      change_type: "created"
+      description: "Tests anonymous business API rejection and anonymous health/login behavior."
+    - file: "tests/ErpBackend.IntegrationTests/CustomWebApplicationFactory.cs"
+      change_type: "modified"
+      description: "Provides an explicit anonymous test marker and a seeded authenticated test principal."
+    - file: "tests/ErpBackend.IntegrationTests/WipReportsControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Makes test authentication explicit and preserves anonymous WIP rejection coverage."
+    - file: "tests/ErpBackend.IntegrationTests/UserManagementAuthorizationIntegrationTests.cs"
+      change_type: "modified"
+      description: "Updates anonymous authorization requests and provisions a complete employee fixture."
+    - file: "tests/ErpBackend.IntegrationTests/SalesCreditNoteIntegrationTests.cs"
+      change_type: "modified"
+      description: "Marks the authentication-negative request explicitly anonymous."
+    - file: "tests/ErpBackend.IntegrationTests/SupplierDebitNoteIntegrationTests.cs"
+      change_type: "modified"
+      description: "Marks the authentication-negative request explicitly anonymous."
+    - file: "tests/ErpBackend.IntegrationTests/WorkOrderCostingControllerIntegrationTests.cs"
+      change_type: "modified"
+      description: "Marks authentication-negative requests explicitly anonymous."
+  T022:
+    - file: "src/ErpBackend/Program.cs"
+      change_type: "modified"
+      description: "Requires authentication by default and explicitly permits root/health endpoints."
+    - file: "src/ErpBackend/Controllers/AuthController.cs"
+      change_type: "modified"
+      description: "Explicitly allows anonymous login and legacy registration rejection."
+    - file: "tests/ErpBackend.IntegrationTests/CustomWebApplicationFactory.cs"
+      change_type: "modified"
+      description: "Separates authenticated requests from explicit anonymous test requests."
+  Documentation:
+    - file: "docs/architecture/employee-identity-access/authorization-decisions.md"
+      change_type: "modified"
+      description: "Records the selected employee-state rules, ESS scope, onboarding checks and rollout limitations."
+    - file: "docs/architecture/employee-identity-access/authorization-matrix.md"
+      change_type: "modified"
+      description: "Documents implemented state handling while leaving the full role matrix and formal HR signature pending."
+    - file: "docs/architecture/employee-identity-access/checkpoints/tasks-to-impl.yaml"
+      change_type: "modified"
+      description: "Records partial task progress, test evidence and remaining dependencies."
+upstream_artifacts_consumed:
+  T013:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.3"
+      used_for: "Employee status/account synchronization, revocation and no automatic reactivation on rehire."
+    - artifact: "docs/architecture/employee-identity-access/authorization-decisions.md"
+      used_for: "Selected active/leave/terminated/inactive behavior and token invalidation policy."
+  T014:
+    - artifact: "docs/architecture/employee-identity-access/authorization-matrix.md"
+      used_for: "Read-only leave ESS boundary and explicit distinction between authentication fallback and full RBAC."
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.3"
+      used_for: "Current employee status checks during login and protected requests."
+  T015:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.3"
+      used_for: "Preventing unapproved automatic role grants after department/job-title changes."
+  T016:
+    - artifact: "docs/architecture/employee-identity-access/plan.md#Step-3.4"
+      used_for: "Lifecycle acceptance scenarios for login, leave, termination and rehire."
+evidence_mapping:
+  T013:
+    - upstream: "plan.md#Step-3.3"
+      output: "EmployeeService.TerminateAsync/RehireAsync and EmployeesController"
+      evidence: "Integration tests verify leave keeps the account enabled; termination disables it and logs actor, state change and reason; rehire does not re-enable it."
+  T014:
+    - upstream: "authorization-matrix.md#員工狀態與登入政策"
+      output: "Program.cs#OnTokenValidated and EmployeeEssController"
+      evidence: "JWT tests verify active login, leave-only ESS GETs, rejection of non-ESS/POST requests, and employee-scoped payroll without bank-account fields."
+    - upstream: "authorization-decisions.md#員工狀態與 ESS 實作決定"
+      output: "UserService.CreateAsync and AuthService.LoginAsync"
+      evidence: "Unit/integration tests verify complete HR profile provisioning, first-password-change restriction and employee-state login behavior."
+  T015:
+    - upstream: "plan.md#Step-3.3"
+      output: "EmployeeService.UpdateAsync"
+      evidence: "Integration test rejects organization changes without a reason and confirms audit records plus security-version increment when supplied."
+  T022:
+    - upstream: "authorization-matrix.md#Phase-2 放行條件"
+      output: "Program.cs FallbackPolicy and anonymous endpoint metadata"
+      evidence: "Integration test confirms anonymous business access returns 401 while `/health` and login remain anonymous."
+traceability:
+  - requirement: "REQ-003"
+    plan_item: "3.3"
+    task: "T013"
+    files: ["src/ErpBackend/Services/EmployeeService.cs", "src/ErpBackend/Controllers/EmployeesController.cs"]
+    status: "partial"
+  - requirement: "REQ-004"
+    plan_item: "3.3"
+    task: "T014"
+    files: ["src/ErpBackend/Program.cs", "src/ErpBackend/Services/AuthService.cs", "src/ErpBackend/Controllers/EmployeeEssController.cs"]
+    status: "partial"
+  - requirement: "REQ-007"
+    plan_item: "3.3"
+    task: "T015"
+    files: ["src/ErpBackend/Services/EmployeeService.cs"]
+    status: "partial"
+  - requirement: "REQ-010"
+    plan_item: "3.3"
+    task: "T016"
+    files: ["tests/ErpBackend.IntegrationTests/AuthControllerIntegrationTests.cs", "tests/ErpBackend.IntegrationTests/EmployeesDepartmentsIntegrationTests.cs"]
+    status: "partial"
+  - requirement: "REQ-016"
+    plan_item: "4.4"
+    task: "T022"
+    files: ["src/ErpBackend/Program.cs", "src/ErpBackend/Controllers/AuthController.cs"]
+    status: "partial"
+protocol_violation: false
+errors: []
+warnings:
+  - severity: "HIGH"
+    message: "The full module role/permission matrix remains unapproved; authentication fallback must not be treated as complete RBAC."
+  - severity: "HIGH"
+    message: "Existing active accounts without EmployeeId will be rejected. Resolve the preflight anomaly with HR/system-owner approval before rollout."
+  - severity: "MEDIUM"
+    message: "Future-effective leave/transfer scheduling, automatic role recalculation, time-limited exceptions and a dedicated ESS UI are not implemented."
+  - severity: "MEDIUM"
+    message: "The added per-request employee-state lookup changes latency; remeasure with PostgreSQL before setting a production budget."
+  - severity: "HIGH"
+    message: "The existing security-version migration has not been applied to a shared or production database."
+test_results:
+  T013:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --no-restore"
+    passed: 273
+    failed: 0
+    skipped: 2
+    failures: []
+  T014:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --no-restore"
+    passed: 273
+    failed: 0
+    skipped: 2
+    failures: []
+  T016:
+    command: "dotnet test tests/ErpBackend.Tests/ErpBackend.Tests.csproj --no-restore"
+    passed: 440
+    failed: 0
+    skipped: 0
+    failures: []
+  T022:
+    command: "dotnet test tests/ErpBackend.IntegrationTests/ErpBackend.IntegrationTests.csproj --no-restore"
+    passed: 273
+    failed: 0
+    skipped: 2
+    failures: []
+  Build:
+    command: "dotnet build src/ErpBackend/ErpBackend.csproj --no-restore"
+    passed: 0
+    failed: 0
+    skipped: 0
+    failures: []
+    notes: "Build succeeded; two pre-existing nullable warnings remain in MpsService.cs."
+  Frontend:
+    command: "npm test -- --run; npm run build (src/erp-frontend)"
+    passed: 6
+    failed: 0
+    skipped: 0
+    failures: []
+    notes: "Three test files passed and the production Vite build succeeded."
+endpoint_probes:
+  - method: "POST"
+    path: "/api/erp/auth/login"
+    status: 200
+    result: "PASS: valid credentials issue a token for a linked active employee."
+  - method: "GET"
+    path: "/api/erp/ess/payroll"
+    status: 200
+    result: "PASS: leave employee sees only own payroll summary; bank-account field is excluded."
+  - method: "GET"
+    path: "/api/erp/ess/attendance"
+    status: 200
+    result: "PASS: leave employee can read own attendance."
+  - method: "GET"
+    path: "/api/erp/ess/leave-requests"
+    status: 200
+    result: "PASS: leave employee can read own leave requests."
+  - method: "GET"
+    path: "/api/erp/users"
+    status: 401
+    result: "PASS: leave employee is denied outside ESS."
+  - method: "GET"
+    path: "/api/erp/departments"
+    status: 401
+    result: "PASS: anonymous business API access is denied."
+  - method: "GET"
+    path: "/health"
+    status: 200
+    result: "PASS: health endpoint remains anonymous."
+  - method: "PATCH"
+    path: "/api/erp/employees/{id}/terminate"
+    status: 200
+    result: "PASS: termination updates employee/account state and invalidates existing token."

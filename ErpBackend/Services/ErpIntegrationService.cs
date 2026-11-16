@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Data;
 using ErpBackend.Data;
+using ErpBackend.DTOs;
 using ErpBackend.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,14 +18,6 @@ public interface IErpIntegrationService
     Task<ToolResult> SearchWorkOrdersAsync(string? woNumber, string? status);
     Task<ToolResult> SearchPurchaseOrdersAsync(string? poNumber, string? status);
     Task<ToolResult> GenerateInventoryReportAsync(string? warehouseId, DateTime? dateFrom, DateTime? dateTo);
-}
-
-public class PrItemDto
-{
-    public string SkuId { get; set; } = null!;
-    public decimal Quantity { get; set; }
-    public string? Unit { get; set; }
-    public string? Notes { get; set; }
 }
 
 public class ErpIntegrationService : IErpIntegrationService
@@ -88,14 +82,14 @@ public class ErpIntegrationService : IErpIntegrationService
             if (wo == null)
                 return new ToolResult { Success = false, Error = $"WorkOrder {woId} not found" };
 
-            wo.Status = status;
+            wo.Status = status.Trim().ToLowerInvariant();
             wo.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 
             return new ToolResult
             {
                 Success = true,
-                Data = JsonSerializer.Serialize(new { WorkOrderId = woId, Status = status, UpdatedAt = DateTime.UtcNow })
+                Data = JsonSerializer.Serialize(new { WorkOrderId = woId, Status = wo.Status, UpdatedAt = DateTime.UtcNow })
             };
         }
         catch (Exception ex)
@@ -165,26 +159,37 @@ public class ErpIntegrationService : IErpIntegrationService
     {
         try
         {
-            var sku = await _db.Skus.FindAsync(Guid.Parse(skuId));
+            await using var transactionScope = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted)
+                : null;
+            var parsedSkuId = Guid.Parse(skuId);
+            var sku = await LockSkuAsync(parsedSkuId);
             if (sku == null)
                 return new ToolResult { Success = false, Error = $"SKU {skuId} not found" };
+            if (sku.Qty + quantity < 0)
+                return new ToolResult { Success = false, Error = "庫存調整不可造成負庫存" };
 
+            var qtyBefore = sku.Qty;
             sku.Qty += quantity;
             sku.UpdatedAt = DateTime.UtcNow;
 
             var transaction = new ErpBackend.Models.Inventory.InventoryTransaction
             {
-                TrxId = $"ADJ-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                TrxId = $"ADJ-{Guid.NewGuid():N}"[..30],
                 Type = "adjustment",
-                SkuId = Guid.Parse(skuId),
+                SkuId = sku.Id,
                 QtyChange = quantity,
-                QtyBefore = sku.Qty,
-                QtyAfter = sku.Qty + quantity,
-                RelatedDocType = reason ?? "manual_adjustment"
+                QtyBefore = qtyBefore,
+                QtyAfter = sku.Qty,
+                WarehouseId = Guid.TryParse(warehouseId, out var parsedWarehouseId) ? parsedWarehouseId : null,
+                RelatedDocType = "ErpIntegrationAdjustment",
+                Notes = reason
             };
 
             _db.InventoryTransactions.Add(transaction);
             await _db.SaveChangesAsync();
+            if (transactionScope != null)
+                await transactionScope.CommitAsync();
 
             return new ToolResult
             {
@@ -201,6 +206,22 @@ public class ErpIntegrationService : IErpIntegrationService
         {
             return new ToolResult { Success = false, Error = ex.Message };
         }
+    }
+
+    private async Task<ErpBackend.Models.Inventory.Sku?> LockSkuAsync(Guid skuId)
+    {
+        if (_db.Database.IsRelational()
+            && _db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+        {
+            var sku = await _db.Skus
+                .FromSqlInterpolated($"SELECT * FROM \"Skus\" WHERE \"Id\" = {skuId} FOR UPDATE")
+                .SingleOrDefaultAsync();
+            if (sku != null)
+                await _db.Entry(sku).ReloadAsync();
+            return sku;
+        }
+
+        return await _db.Skus.FindAsync(skuId);
     }
 
     public async Task<ToolResult> SearchInventoryAsync(string? skuCode, string? warehouseId)

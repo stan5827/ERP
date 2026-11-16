@@ -1,4 +1,4 @@
-/* Dashboard-Luxury.css - 企業核心智能儀表板 */
+﻿/* Dashboard-Luxury.css - 企業核心智能儀表板 */
 :root {
   --lux-gold: #d4af37;
   --lux-gold-glow: rgba(212, 175, 55, 0.2);
@@ -11,8 +11,8 @@
 .dashboard-container {
   min-height: 100vh;
   padding: 2.5rem;
-  background-color: var(--lux-obsidian);
-  color: #fff;
+    background-color: var(--navy-900);
+    color: var(--slate-200);
   font-family: var(--font-body);
   background-image: 
     radial-gradient(circle at 0% 0%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
@@ -31,7 +31,7 @@
   font-size: 3rem;
   font-weight: 800;
   letter-spacing: -0.04em;
-  background: linear-gradient(to bottom, #fff, #94a3b8);
+    background: linear-gradient(to bottom, var(--slate-100), var(--slate-300));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;

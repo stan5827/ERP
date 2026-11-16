@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import React from 'react';
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, Download, Filter,
@@ -103,8 +103,7 @@ export const Calendar: React.FC = () => {
   const [newRoom, setNewRoom] = useState({ roomName: '', location: '', capacity: 8 });
   const [form, setForm] = useState<Record<string, unknown>>({
     title: '', description: '', categoryCode: 'meeting', location: '',
-    startDate: new Date().toISOString().slice(0, 16),
-    endDate: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+    startDate: '', endDate: '',
     isAllDay: false, visibility: 'department', meetingRoomId: '', participants: '', recurrenceRule: '',
   });
 
@@ -126,37 +125,34 @@ export const Calendar: React.FC = () => {
   const categories = (categoriesData?.data as CalendarCategoryDto[]) || [];
   const meetingRooms = meetingRoomsData?.data || [];
 
-  // Sync form state when modal opens
-  useEffect(() => {
-    if (showForm && editingEvent) {
-      setForm({
-        title: editingEvent.title,
-        description: editingEvent.description || '',
-        categoryCode: editingEvent.categoryCode || 'meeting',
-        location: editingEvent.location || '',
-        startDate: editingEvent.startDate.slice(0, 16),
-        endDate: editingEvent.endDate.slice(0, 16),
-        isAllDay: editingEvent.isAllDay,
-        visibility: editingEvent.visibility,
-        meetingRoomId: editingEvent.meetingRoomId || '',
-        participants: editingEvent.participants || '',
-        recurrenceRule: editingEvent.recurrenceRule || '',
-      });
-    } else if (showForm) {
-      setForm({
-        title: '', description: '', categoryCode: 'meeting', location: '',
-        startDate: new Date().toISOString().slice(0, 16),
-        endDate: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
-        isAllDay: false, visibility: 'department', meetingRoomId: '', participants: '', recurrenceRule: '',
-      });
-    }
-    if (showForm) {
-      setShowAddCategory(false);
-      setShowAddRoom(false);
-      setNewCategory({ name: '', code: '', color: '#3B82F6' });
-      setNewRoom({ roomName: '', location: '', capacity: 8 });
-    }
-  }, [showForm, editingEvent]);
+  const openForm = (event: CalendarEventDto | null) => {
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + 3600000);
+    setEditingEvent(event);
+    setForm(event ? {
+      title: event.title,
+      description: event.description || '',
+      categoryCode: event.categoryCode || 'meeting',
+      location: event.location || '',
+      startDate: event.startDate.slice(0, 16),
+      endDate: event.endDate.slice(0, 16),
+      isAllDay: event.isAllDay,
+      visibility: event.visibility,
+      meetingRoomId: event.meetingRoomId || '',
+      participants: event.participants || '',
+      recurrenceRule: event.recurrenceRule || '',
+    } : {
+      title: '', description: '', categoryCode: 'meeting', location: '',
+      startDate: startDate.toISOString().slice(0, 16),
+      endDate: endDate.toISOString().slice(0, 16),
+      isAllDay: false, visibility: 'department', meetingRoomId: '', participants: '', recurrenceRule: '',
+    });
+    setShowAddCategory(false);
+    setShowAddRoom(false);
+    setNewCategory({ name: '', code: '', color: '#3B82F6' });
+    setNewRoom({ roomName: '', location: '', capacity: 8 });
+    setShowForm(true);
+  };
 
   const navigate = useCallback((dir: number) => {
     setCurrentDate(prev => {
@@ -446,7 +442,7 @@ export const Calendar: React.FC = () => {
                   <button
                     className="btn btn-primary"
                     style={{ fontSize: 12, padding: '6px 14px' }}
-                    onClick={() => { setEditingEvent(evt); setSelectedEvent(null); setShowForm(true); }}
+                    onClick={() => { openForm(evt); setSelectedEvent(null); }}
                   >
                     <Edit2 size={13} style={{ marginRight: 4 }} />編輯
                   </button>
@@ -670,7 +666,7 @@ export const Calendar: React.FC = () => {
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>公司行事曆</h2>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-primary" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => { setEditingEvent(null); setShowForm(true); }}>
+          <button className="btn btn-primary" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => openForm(null)}>
             <Plus size={14} style={{ marginRight: 4 }} />新增事件
           </button>
           <button className="btn" style={{ fontSize: 12, padding: '7px 14px' }} onClick={handleExportIcs}>

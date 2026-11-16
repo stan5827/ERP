@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ErpUat
+      POSTGRES_USER: erp_uat
+      POSTGRES_PASSWORD: ${UAT_POSTGRES_PASSWORD:?Set UAT_POSTGRES_PASSWORD in deployment/.env.uat.local}
+    volumes:
+      - uat_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_uat -d ErpUat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.backend
+    image: erp-backend:uat
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DB_MAX_POOL_SIZE: 8
+      DB_CONNECTION_STRING: "Host=postgres;Port=5432;Database=ErpUat;Username=erp_uat;Password=${UAT_POSTGRES_PASSWORD:?Set UAT_POSTGRES_PASSWORD in deployment/.env.uat.local}"
+      JWT_SECRET_KEY: ${UAT_JWT_SECRET:?Set UAT_JWT_SECRET in deployment/.env.uat.local}
+      ADMIN_INITIAL_PASSWORD: ${UAT_ADMIN_INITIAL_PASSWORD:?Set UAT_ADMIN_INITIAL_PASSWORD in deployment/.env.uat.local}
+      AttendanceGeofence__TimeZoneId: Asia/Taipei
+      Cors__AdditionalOrigins__0: http://localhost:5177
+    ports:
+      - "127.0.0.1:5102:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.frontend
+    image: erp-frontend:uat
+    ports:
+      - "127.0.0.1:5176:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  uat_postgres_data:

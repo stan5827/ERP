@@ -111,7 +111,7 @@ export function createFieldValidators(field: FormField): ValidationRule[] {
     rules.push(validationRules.required());
   }
 
-  if (field.type === 'text' || field.type === 'textarea') {
+  if (field.type === 'text' || field.type === 'password' || field.type === 'textarea') {
     if (field.min !== undefined) {
       rules.push(validationRules.minLength(field.min));
     }

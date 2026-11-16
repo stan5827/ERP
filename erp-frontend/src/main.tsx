@@ -6,6 +6,7 @@ import { ThemeProvider } from './theme/ThemeProvider'
 import { RoleProvider } from './contexts/RoleContext'
 import './index.css'
 import App from './App.tsx'
+import './theme/GlobalVisualSystem.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,10 +14,10 @@ const queryClient = new QueryClient({
   },
 })
 
-function Root() {
+export function Root() {
   const stored = localStorage.getItem('erp_user');
   const user = stored ? JSON.parse(stored) : null;
-  const userId = user?.userId;
+  const userId = user?.mustChangePassword ? undefined : user?.userId;
 
   return (
     <StrictMode>

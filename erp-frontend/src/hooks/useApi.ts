@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../api/api';
+import type { WipReportRequest } from '../api/mes';
 
 // ========== Generic helper ==========
 function usePagedQuery<T>(key: string, fetcher: (params?: Record<string, string>) => Promise<unknown>, params?: Record<string, string>, refreshKey?: number) {
@@ -46,7 +47,12 @@ export const useCurrentUser = () => {
 
 // ========== Dashboard ==========
 export const useDashboard = () =>
-  useQuery({ queryKey: ['dashboard'], queryFn: () => api.dashboardApi.get().then(r => r.data) });
+  useQuery({
+    queryKey: ['dashboard'],
+    queryFn: () => api.dashboardApi.get().then(r => r.data),
+    refetchOnWindowFocus: true,
+    retry: 2,
+  });
 
 export const useSidebarBadges = () =>
   useQuery({ 
@@ -84,6 +90,32 @@ export const useDepartmentTree = () =>
 
 export const useEmployees = (params?: Record<string, string>, refreshKey?: number) =>
   usePagedQuery<api.EmployeeDto>('employees', api.employeesApi.list, params, refreshKey);
+export const useActiveEmployees = () =>
+  useQuery({
+    queryKey: ['employees', 'active', 'announcement-recipients'],
+    queryFn: async () => {
+      const pageSize = 100;
+      const getPage = async (page: number) => {
+        const response = await api.employeesApi.list({
+          status: 'active',
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        return response.data;
+      };
+
+      const firstPage = await getPage(1);
+      const pageCount = Math.ceil((firstPage.totalCount ?? firstPage.data?.length ?? 0) / pageSize);
+      const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) => getPage(index + 2))
+      );
+
+      return [
+        ...(firstPage.data ?? []),
+        ...remainingPages.flatMap(page => page.data ?? []),
+      ];
+    },
+  });
 export const useEmployee = (id: string) =>
   useQuery({ queryKey: ['employees', id], queryFn: () => api.employeesApi.get(id).then(r => r.data), enabled: !!id });
 export const useCreateEmployee = () => {
@@ -92,7 +124,7 @@ export const useCreateEmployee = () => {
 };
 export const useTerminateEmployee = () => {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => api.employeesApi.terminate(id, reason).then(r => r.data), onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }) });
+  return useMutation({ mutationFn: ({ id, reason, effectiveDate }: { id: string; reason: string; effectiveDate: string }) => api.employeesApi.terminate(id, reason, effectiveDate).then(r => r.data), onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }) });
 };
 
 // ========== Inventory ==========
@@ -145,8 +177,18 @@ export const useInvoices = (params?: Record<string, string>) =>
 export const useAgingAnalysis = () =>
   useQuery({ queryKey: ['invoices', 'aging'], queryFn: () => api.invoicesApi.aging().then(r => r.data) });
 
-export const useOrderToCash = (params?: Record<string, string>) =>
-  useQuery({ queryKey: ['sales-reports', 'order-to-cash', params], queryFn: () => api.salesReportsApi.orderToCash(params).then(r => r.data) });
+export const useOrderToCash = (params?: Record<string, string>, enabled = true) =>
+  useQuery({
+    queryKey: ['sales-reports', 'order-to-cash', params],
+    queryFn: async () => {
+      const response = await api.salesReportsApi.orderToCash(params);
+      if (!response.data.success) {
+        throw new Error(response.data.message || '載入銷售流程資料失敗');
+      }
+      return response.data;
+    },
+    enabled
+  });
 
 // ========== Procurement ==========
 export const useSuppliers = (params?: Record<string, string>) =>
@@ -269,15 +311,24 @@ export const useBatchSettleCosting = () => {
   return useMutation({ mutationFn: () => api.costingApi.batchSettle().then(r => r.data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['work-orders-costing-summary'] }); qc.invalidateQueries({ queryKey: ['work-orders'] }); } });
 };
 export const useWorkOrder = (id: string) =>
-  useQuery({ queryKey: ['work-orders', id], queryFn: () => api.workOrdersApi.get(id).then(r => r.data), enabled: !!id });
+  useQuery({
+    queryKey: ['work-orders', id],
+    queryFn: async () => {
+      const response = await api.workOrdersApi.get(id);
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || '無法載入工單詳情');
+      }
+      return response.data;
+    },
+    enabled: !!id
+  });
 
 export const useCreateWipReport = () => {
     const qc = useQueryClient();
     return useMutation({ 
-        mutationFn: (d: Record<string, unknown>) => api.wipReportsApi.create(d).then(r => r.data), 
-        onSuccess: (_, variables) => {
+        mutationFn: (d: WipReportRequest) => api.wipReportsApi.create(d).then(r => r.data),
+        onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['work-orders'] });
-            qc.invalidateQueries({ queryKey: ['work-orders', (variables as any).workOrderId] });
         } 
     });
 };
@@ -297,12 +348,16 @@ export const useCreateSupplyOrders = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: (id: string) => api.workOrdersApi.createSupplyOrders(id).then(r => r.data),
-        onSuccess: (data: any, id) => {
+        onSuccess: (data, id) => {
             qc.invalidateQueries({ queryKey: ['work-orders'] });
             qc.invalidateQueries({ queryKey: ['work-orders', id] });
             const msg = `轉單成功！\n已生成 ${data.data.prCount} 份請購單\n已生成 ${data.data.subWoCount} 份子工單`;
             alert(msg);
-        }
+        },
+        onError: (error: unknown) => {
+            const message = error instanceof Error ? error.message : '自動轉單補貨失敗，請稍後重試。';
+            alert(`自動轉單補貨失敗：${message}`);
+        },
     });
 };
 
@@ -348,16 +403,6 @@ export const useLaborBudgets = (versionId: string) =>
   useQuery({ queryKey: ['budget', 'labor-budgets', versionId], queryFn: () => api.budgetApi.laborBudgets(versionId).then(r => r.data), enabled: !!versionId });
 export const useCapexBudgets = (versionId: string) =>
   useQuery({ queryKey: ['budget', 'capex-budgets', versionId], queryFn: () => api.budgetApi.capexBudgets(versionId).then(r => r.data), enabled: !!versionId });
-export const useBudgetAlerts = () =>
-  useQuery({ queryKey: ['budget', 'alerts'], queryFn: async () => [] as api.BudgetAlertDto[] });
-export const useBudgetAnomalies = () =>
-  useQuery({ queryKey: ['budget', 'anomalies'], queryFn: async () => [] as api.BudgetAnomalyDto[] });
-export const useBudgetAnalysis = (deptCode: string, year: number) =>
-  useQuery({
-    queryKey: ['budget', 'analysis', deptCode, year],
-    queryFn: async () => null as api.BudgetAnalysisDto | null,
-    enabled: !!deptCode,
-  });
 
 // ========== Quality ==========
 export const useIqcReports = (params?: Record<string, string>) =>
@@ -388,7 +433,7 @@ export const useCreateRndLog = () => {
   });
 };
 export const useTrialProduction = (params?: Record<string, string>) =>
-  usePagedQuery<any>('trial-productions', api.trialProductionApi.list, params);
+  usePagedQuery<unknown>('trial-productions', api.trialProductionApi.list, params);
 export const useCreateTrialProduction = () => {
   const qc = useQueryClient();
   return useMutation({

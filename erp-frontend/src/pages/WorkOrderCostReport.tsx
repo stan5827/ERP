@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   X, BarChart3, PieChart as PieChartIcon, 
   TrendingDown, TrendingUp, DollarSign, 
-  Target, Calculator, Activity, Cpu
+  Target, Calculator, Activity
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -11,7 +11,6 @@ import {
   Tooltip, Legend 
 } from 'recharts';
 import { useWorkOrderCosting, useWorkOrderCostingSummary, useSettleCosting, useBatchSettleCosting } from '../hooks/useApi';
-import { api, ApiResponse } from '../api/api';
 import './styles/CostReport.css';
 
 export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () => void }> = ({ workOrderId: propId, onClose }) => {
@@ -48,9 +47,18 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
     const barData = [
       { name: '材料', 標準: costData.standardMaterialCost, 實際: costData.actualMaterialCost },
       { name: '人工', 標準: costData.standardLaborCost, 實際: costData.actualLaborCost },
+      { name: '製造費用', 標準: costData.standardOverheadCost, 實際: costData.actualOverheadCost },
     ];
 
-    const isPositiveVariance = costData.varianceAmount > 0;
+    const hasActualCost = costData.hasActualCost && costData.actualQty > 0;
+    const varianceAmount = costData.varianceAmount ?? 0;
+    const isPositiveVariance = varianceAmount > 0;
+    const canSettle = hasActualCost && costData.status.toLowerCase() === 'completed';
+
+    const formatVariance = (actual: number, standard: number) =>
+      hasActualCost && standard > 0
+        ? `${((actual - standard) / standard * 100).toFixed(1)}%`
+        : '--';
 
     return (
       <div className="cost-report-container">
@@ -72,18 +80,33 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={async () => {
-                if (selectedOrderId) {
-                  const res = await settleMutation.mutateAsync(selectedOrderId);
-                  if (res.success) alert('成本結轉成功！');
+                if (selectedOrderId && canSettle) {
+                  try {
+                    const res = await settleMutation.mutateAsync(selectedOrderId);
+                    if (res.success) alert('成本結轉成功！');
+                    else alert(res.message || '成本結轉失敗，請檢查工單成本資料。');
+                  } catch (error) {
+                    alert(error instanceof Error ? error.message : '成本結轉失敗，請稍後再試。');
+                  }
                 }
               }}
-              style={{ background: 'var(--lux-gold)', color: '#000', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: 600, cursor: 'pointer' }}
+              disabled={!canSettle || settleMutation.isPending}
+              title={!hasActualCost ? '尚未發生實際成本或尚無完工數，無法結轉' : undefined}
+              style={{ background: canSettle ? 'var(--lux-gold)' : 'var(--slate-700)', color: canSettle ? '#000' : 'var(--slate-400)', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: 600, cursor: canSettle ? 'pointer' : 'not-allowed' }}
             >
-              <Activity size={14} /> 結轉成本 (Settle)
+              <Activity size={14} /> {costData.status.toLowerCase() === 'settled' ? '已結轉' : '結轉成本 (Settle)'}
             </motion.button>
             {onClose && <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--slate-400)', cursor: 'pointer' }}><X size={24} /></button>}
           </div>
         </div>
+
+        {!hasActualCost && (
+          <div role="status" style={{ marginBottom: '1.5rem', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.35)', background: 'rgba(245, 158, 11, 0.08)', color: '#fbbf24' }}>
+            {costData.actualQty <= 0
+              ? '工單尚無完工數，暫不計算成本變異率與單位成本。'
+              : '尚未發生或尚未過帳實際成本，暫不計算成本變異率與單位成本。'}
+          </div>
+        )}
 
         {/* KPI Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -101,12 +124,16 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
               成本變異率
             </div>
             <div className="kpi-value" style={{ color: isPositiveVariance ? '#f87171' : '#34d399' }}>
-              {isPositiveVariance ? '+' : ''}{costData.variancePercentage}%
+              {costData.variancePercentage == null
+                ? '--'
+                : `${isPositiveVariance ? '+' : ''}${costData.variancePercentage}%`}
             </div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label"><BarChart3 size={14} /> 單位實際成本</div>
-            <div className="kpi-value" style={{ color: 'var(--lux-gold)' }}>${costData.unitCost.toLocaleString()}</div>
+            <div className="kpi-value" style={{ color: 'var(--lux-gold)' }}>
+              {costData.unitCost == null ? '--' : `$${costData.unitCost.toLocaleString()}`}
+            </div>
             <div style={{ fontSize: '10px', color: 'var(--slate-500)', marginTop: '0.25rem' }}>基於完工數: {costData.actualQty}</div>
           </div>
         </div>
@@ -116,7 +143,7 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
           <div className="chart-wrapper">
             <h3 className="chart-title"><PieChartIcon size={16} /> 實際成本構成 (Actual Breakdown)</h3>
             <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
+              {hasActualCost ? <ResponsiveContainer>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -137,14 +164,14 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
                   />
                   <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px', color: 'var(--slate-400)' }} />
                 </PieChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--slate-500)' }}>尚無實際成本資料</div>}
             </div>
           </div>
 
           <div className="chart-wrapper">
             <h3 className="chart-title"><BarChart3 size={16} /> 標準 vs 實際對比 (Variance Analysis)</h3>
             <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
+              {hasActualCost ? <ResponsiveContainer>
                 <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="name" stroke="var(--slate-500)" fontSize={11} axisLine={false} tickLine={false} />
@@ -157,7 +184,7 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
                   <Bar name="標準" dataKey="標準" fill="rgba(255,255,255,0.15)" radius={[4, 4, 0, 0]} barSize={30} />
                   <Bar name="實際" dataKey="實際" fill="var(--lux-gold)" radius={[4, 4, 0, 0]} barSize={30} />
                 </BarChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--slate-500)' }}>實際成本尚未建立，暫不提供差異分析</div>}
             </div>
           </div>
         </div>
@@ -179,7 +206,7 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
               <td>${costData.actualMaterialCost.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>
                 <span className={`variance-badge ${costData.actualMaterialCost > costData.standardMaterialCost ? 'variance-positive' : 'variance-negative'}`}>
-                  {costData.standardMaterialCost > 0 ? ((costData.actualMaterialCost - costData.standardMaterialCost)/costData.standardMaterialCost*100).toFixed(1) : '0'}%
+                  {formatVariance(costData.actualMaterialCost, costData.standardMaterialCost)}
                 </span>
               </td>
             </tr>
@@ -189,15 +216,19 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
               <td>${costData.actualLaborCost.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>
                 <span className={`variance-badge ${costData.actualLaborCost > costData.standardLaborCost ? 'variance-positive' : 'variance-negative'}`}>
-                  {costData.standardLaborCost > 0 ? ((costData.actualLaborCost - costData.standardLaborCost)/costData.standardLaborCost*100).toFixed(1) : '0'}%
+                  {formatVariance(costData.actualLaborCost, costData.standardLaborCost)}
                 </span>
               </td>
             </tr>
             <tr>
               <td style={{ fontWeight: 600 }}>製造費用 (Overhead)</td>
-              <td style={{ color: 'var(--slate-600)' }}>---</td>
+              <td>${costData.standardOverheadCost.toLocaleString()}</td>
               <td>${costData.actualOverheadCost.toLocaleString()}</td>
-              <td style={{ textAlign: 'right', color: 'var(--slate-600)' }}>---</td>
+              <td style={{ textAlign: 'right' }}>
+                <span className={`variance-badge ${costData.actualOverheadCost > costData.standardOverheadCost ? 'variance-positive' : 'variance-negative'}`}>
+                  {formatVariance(costData.actualOverheadCost, costData.standardOverheadCost)}
+                </span>
+              </td>
             </tr>
           </tbody>
           <tfoot>
@@ -207,7 +238,7 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
               <td style={{ color: 'var(--lux-gold-light)' }}>${costData.totalActualCost.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>
                 <span className={`variance-badge ${isPositiveVariance ? 'variance-positive' : 'variance-negative'}`}>
-                  {costData.variancePercentage}%
+                  {costData.variancePercentage == null ? '--' : `${costData.variancePercentage}%`}
                 </span>
               </td>
             </tr>
@@ -217,24 +248,11 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
         <div className="ai-insight-box" style={{ marginTop: '2rem', background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
           <DollarSign size={18} style={{ flexShrink: 0, color: 'var(--sky-400)' }} />
           <div style={{ width: '100%' }}>
-            <div style={{ fontWeight: 700, marginBottom: '0.5rem', color: 'var(--sky-400)' }}>會計分錄預覽 (FINANCE VOUCHER PREVIEW)</div>
+            <div style={{ fontWeight: 700, marginBottom: '0.5rem', color: 'var(--sky-400)' }}>成本結轉會計分錄</div>
             <div style={{ fontSize: '12px', color: 'var(--slate-400)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}>
-                <span>1200 在製品 - 直接材料</span>
-                <span style={{ color: 'var(--sky-400)' }}>Dr. ${costData.actualMaterialCost.toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}>
-                <span>1210 在製品 - 直接人工</span>
-                <span style={{ color: 'var(--sky-400)' }}>Dr. ${costData.actualLaborCost.toLocaleString()}</span>
-              </div>
-               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}>
-                <span>1220 在製品 - 製造費用</span>
-                <span style={{ color: 'var(--sky-400)' }}>Dr. ${costData.actualOverheadCost.toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', borderTop: '1px dashed rgba(255,255,255,0.1)', marginTop: '0.25rem' }}>
-                <span>1120 原物料 / 應付工資 / 製造費用分攤</span>
-                <span style={{ color: '#f87171' }}>Cr. ${costData.totalActualCost.toLocaleString()}</span>
-              </div>
+              {hasActualCost
+                ? '結轉時將以實際成本與已過帳完工入庫金額的差額，調整 1205 成品存貨及 1206 在製品；成本快照與必要的差額分錄於同一交易完成。'
+                : '尚無足夠的完工數與實際成本資料，不會產生結轉分錄。'}
             </div>
           </div>
         </div>
@@ -253,10 +271,15 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
         <button 
           onClick={async () => {
             if (confirm('確定要針對所有待結轉工單進行批次分析與結轉嗎？')) {
-               await batchSettleMutation.mutateAsync();
-               alert('批次結轉要求已送出');
+              try {
+                const res = await batchSettleMutation.mutateAsync();
+                alert(res.message || '批次結轉完成');
+              } catch (error) {
+                alert(error instanceof Error ? error.message : '批次結轉失敗，請稍後再試。');
+              }
             }
           }}
+          disabled={batchSettleMutation.isPending}
           style={{ background: 'var(--lux-gold)', color: '#000', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
           <Activity size={16} /> 分析並結轉 (Batch Settle)
@@ -288,7 +311,7 @@ export const WorkOrderCostReport: React.FC<{ workOrderId?: string; onClose?: () 
                   <td style={{ padding: '1rem' }}>${item.totalStandardCost?.toLocaleString()}</td>
                   <td style={{ padding: '1rem' }}>${(item.actualMaterialCost + item.actualLaborCost + item.actualOverheadCost).toLocaleString()}</td>
                   <td style={{ padding: '1rem' }}>
-                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '11px', background: item.status === 'Completed' ? 'rgba(52, 211, 153, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: item.status === 'Completed' ? '#34d399' : '#f59e0b' }}>
+                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '11px', background: item.status?.toLowerCase() === 'completed' ? 'rgba(52, 211, 153, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: item.status?.toLowerCase() === 'completed' ? '#34d399' : '#f59e0b' }}>
                       {item.status}
                     </span>
                   </td>

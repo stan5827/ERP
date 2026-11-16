@@ -7,7 +7,7 @@ export type Column<T> = {
   width?: string | number;
   sortable?: boolean;
   filterable?: boolean;
-  render?: (value: any, row: T, index: number) => React.ReactNode;
+  render?: (value: unknown, row: T, index: number) => React.ReactNode;
   align?: 'left' | 'center' | 'right';
 };
 

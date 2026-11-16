@@ -1,31 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Download, Eye, Edit2, CheckCircle, Loader2, Users, ClipboardCheck, Key, Lock, Unlock, Mail, Phone, MapPin, Star, AlertCircle, Trash2, XCircle, Send } from 'lucide-react';
+import { Search, Plus, Download, Edit2, CheckCircle, Loader2, Users, ClipboardCheck, Key, Lock, Mail, Phone, Star, XCircle, Send } from 'lucide-react';
 import { suppliersApi } from '../api/api';
 import type { SupplierDto } from '../api/api';
 import { FormModal } from '../components/FormModal';
 import type { FormField } from '../components/FormModal';
-import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+
+interface SupplierPortalUser {
+  id: string;
+  email: string;
+  username: string;
+  role: string;
+  isActive: boolean;
+  invitationStatus: string;
+}
+
+type SupplierRecord = SupplierDto & { approvalStatus?: string };
+
+function isSupplierPortalUser(value: unknown): value is SupplierPortalUser {
+  if (typeof value !== 'object' || value === null)
+    return false;
+  return 'id' in value
+    && typeof value.id === 'string'
+    && 'email' in value
+    && typeof value.email === 'string'
+    && 'username' in value
+    && typeof value.username === 'string'
+    && 'role' in value
+    && typeof value.role === 'string'
+    && 'isActive' in value
+    && typeof value.isActive === 'boolean'
+    && 'invitationStatus' in value
+    && typeof value.invitationStatus === 'string';
+}
 
 export const Suppliers: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterRating, setFilterRating] = useState('all');
-  const [supplierList, setSupplierList] = useState<SupplierDto[]>([]);
+  const [supplierList, setSupplierList] = useState<SupplierRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<SupplierDto | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierRecord | null>(null);
   const [showEval, setShowEval] = useState(false);
-  const [selectedEval, setSelectedEval] = useState<SupplierDto | null>(null);
-  const [portalUsers, setPortalUsers] = useState<Record<string, any[]>>({});
+  const [selectedEval, setSelectedEval] = useState<SupplierRecord | null>(null);
+  const [portalUsers, setPortalUsers] = useState<Record<string, SupplierPortalUser[]>>({});
   const [showPortalUserModal, setShowPortalUserModal] = useState(false);
-  const [selectedPortalUser, setSelectedPortalUser] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalSupplier, setApprovalSupplier] = useState<SupplierDto | null>(null);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | 'deactivate'>('approve');
   const [approvalComments, setApprovalComments] = useState('');
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const queryClient = useQueryClient();
+  const [, setCreateError] = useState<string | null>(null);
 
   const fetchSuppliers = async () => {
     setLoading(true);
@@ -35,10 +60,10 @@ export const Suppliers: React.FC = () => {
       setSupplierList(list);
       
       // Fetch portal users for each supplier
-      list.forEach(async (s: any) => {
+      list.forEach(async (s) => {
         try {
           const uRes = await suppliersApi.getPortalUsers(s.id);
-          setPortalUsers(prev => ({ ...prev, [s.id]: uRes.data?.data || [] }));
+          setPortalUsers(prev => ({ ...prev, [s.id]: (uRes.data?.data || []).filter(isSupplierPortalUser) }));
         } catch (e) {
           console.error(`Failed to fetch portal users for ${s.id}`, e);
         }
@@ -57,18 +82,9 @@ export const Suppliers: React.FC = () => {
   const stats = [
     { label: '註冊供應商', value: supplierList.length, color: 'var(--cobalt-400)', icon: <Users size={20} /> },
     { label: '優化評等 (A)', value: supplierList.filter(s => s.rating === 'A').length, color: 'var(--emerald-400)', icon: <Star size={20} /> },
-    { label: '待審批', value: supplierList.filter(s => (s as any).approvalStatus === 'PENDING' || (s as any).approvalStatus === 'UNDER_REVIEW').length, color: 'var(--amber-400)', icon: <ClipboardCheck size={20} /> },
-    { label: '已啟用', value: supplierList.filter(s => (s as any).status === 'ACTIVE').length, color: 'var(--emerald-400)', icon: <CheckCircle size={20} /> },
+    { label: '待審批', value: supplierList.filter(s => s.approvalStatus === 'PENDING' || s.approvalStatus === 'UNDER_REVIEW').length, color: 'var(--amber-400)', icon: <ClipboardCheck size={20} /> },
+    { label: '已啟用', value: supplierList.filter(s => s.status === 'ACTIVE').length, color: 'var(--emerald-400)', icon: <CheckCircle size={20} /> },
   ];
-
-  const getStatusBadge = (s: SupplierDto) => {
-    const approvalStatus = (s as any).approvalStatus;
-    const status = (s as any).status;
-    if (approvalStatus === 'REJECTED') return <span className="status-badge status-rejected">已駁回</span>;
-    if (approvalStatus === 'UNDER_REVIEW') return <span className="status-badge" style={{background:'rgba(251,191,36,0.2)',color:'var(--amber-400)'}}>審核中</span>;
-    if (status === 'ACTIVE') return <span className="status-badge status-active">啟用</span>;
-    return <span className="status-badge status-neutral">停用</span>;
-  };
 
   const basicFields: FormField[] = [
     { name: 'supplierCode', label: '供應商代碼 *', type: 'text', required: true, placeholder: '如: SUP-001', description: '用於系統唯一識別。' },
@@ -266,8 +282,8 @@ export const Suppliers: React.FC = () => {
             await suppliersApi.create(data);
             fetchSuppliers();
             setShowAdd(false);
-          } catch (err: any) {
-            const msg = err?.response?.data?.message || err?.message || '新增失敗，請確認必填欄位已填寫';
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : '新增失敗，請確認必填欄位已填寫';
             setCreateError(msg);
             console.error('建立供應商失敗:', err);
           }
@@ -284,33 +300,79 @@ export const Suppliers: React.FC = () => {
           stepTitles: ['基本資料', '聯絡地址', '交易條款', '入口帳號'],
           getStepFields: (idx) => idx === 3 ? [{ name: '入口帳號', type: 'custom' }] : [basicFields, contactFields, paymentFields][idx]
         }}
-        initialValues={(editingSupplier || {}) as any}
+        initialValues={editingSupplier ? { ...editingSupplier } : {}}
         customRenderers={{
           入口帳號: (
             <div style={{ padding: '8px 4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>供應商入口網帳號 (Portal)</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>供應商入口帳號（Keycloak）</span>
                 <button className="btn btn-outline btn-sm" onClick={() => setShowPortalUserModal(true)}>
                   <Plus size={12} /> 新增帳號
                 </button>
               </div>
               <table className="data-table" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
                 <thead>
-                   <tr><th>帳號名稱</th><th>角色</th><th>狀態</th><th>操作</th></tr>
+                   <tr><th>登入 Email</th><th>角色</th><th>邀請狀態</th><th>操作</th></tr>
                 </thead>
                 <tbody>
                   {(portalUsers[editingSupplier?.id || ''] || []).map(u => (
                     <tr key={u.id}>
-                      <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{u.username}</td>
-                      <td>{u.role === 'admin' ? '主管理員' : '一般檢視'}</td>
-                      <td><span className={`status-badge ${u.isActive ? 'status-active' : 'status-neutral'}`}>{u.isActive ? '有效' : '停用'}</span></td>
+                      <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{u.email}</td>
+                      <td>{u.role === 'finance' ? '財務' : u.role === 'sales' ? '業務' : '檢視者'}</td>
+                      <td><span className={`status-badge ${u.isActive ? 'status-active' : 'status-neutral'}`}>{({
+                        NotInvited: '未邀請',
+                        Provisioning: '處理中',
+                        InvitationSent: '已寄出',
+                        ProvisioningFailed: '處理失敗',
+                        Active: '已啟用',
+                        Cancelled: '已停用',
+                        Expired: '已逾期'
+                      } as Record<string, string>)[u.invitationStatus] || u.invitationStatus || '未邀請'}</span></td>
                       <td>
-                        <button className="icon-action-btn" onClick={() => { setSelectedPortalUser(u); setShowPortalUserModal(true); }}><Edit2 size={12} /></button>
+                        {!u.isActive && (u.invitationStatus === 'ProvisioningFailed' || u.invitationStatus === 'InvitationSent') && (
+                          <button
+                            className="icon-action-btn"
+                            title={u.invitationStatus === 'ProvisioningFailed' ? '重試邀請' : '重寄邀請'}
+                            onClick={async () => {
+                              try {
+                                if (u.invitationStatus === 'ProvisioningFailed') {
+                                  await suppliersApi.retryPortalInvitation(u.id);
+                                } else {
+                                  await suppliersApi.resendPortalInvitation(u.id);
+                                }
+                                toast.success(u.invitationStatus === 'ProvisioningFailed' ? '邀請處理已重試' : '邀請信已重寄');
+                                fetchSuppliers();
+                              } catch (error) {
+                                toast.error(`Keycloak 邀請操作失敗：${error instanceof Error ? error.message : '請稍後重試'}`);
+                              }
+                            }}
+                          >
+                            <Send size={12} />
+                          </button>
+                        )}
+                        {u.invitationStatus !== 'Cancelled' && u.invitationStatus !== 'Provisioning' && (
+                          <button
+                            className="icon-action-btn"
+                            title="停用帳號"
+                            onClick={async () => {
+                              if (!window.confirm(`確定停用 ${u.email} 的供應商入口帳號？`)) return;
+                              try {
+                                await suppliersApi.deletePortalUser(u.id);
+                                toast.success('供應商入口帳號已停用');
+                                fetchSuppliers();
+                              } catch (error) {
+                                toast.error(`停用供應商入口帳號失敗：${error instanceof Error ? error.message : '請稍後重試'}`);
+                              }
+                            }}
+                          >
+                            <Lock size={12} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
                   {portalUsers[editingSupplier?.id || '']?.length === 0 && (
-                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--slate-600)', fontSize: 12 }}>尚未建立入口帳號</td></tr>
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--slate-600)', fontSize: 12 }}>尚未邀請入口帳號</td></tr>
                   )}
                 </tbody>
               </table>
@@ -366,22 +428,17 @@ export const Suppliers: React.FC = () => {
       {/* 入口帳號 Modal */}
       <FormModal
         open={showPortalUserModal}
-        title={selectedPortalUser ? '編輯入口帳號' : '新增入口帳號'}
+        title="邀請供應商入口使用者"
         width={400}
         onClose={() => setShowPortalUserModal(false)}
         fields={[
-          { name: 'username', label: '帳號名稱', type: 'text', required: true, placeholder: '供應商登入用' },
-          { name: 'password', label: '登入密碼', type: 'text', required: !selectedPortalUser, placeholder: selectedPortalUser ? '留空則不修改' : '請設定密碼' },
-          { name: 'role', label: '角色', type: 'select', options: [{ value: 'admin', label: '管理員' }, { value: 'viewer', label: '檢視者' }] },
-          { name: 'isActive', label: '啟用帳號', type: 'checkbox' }
+          { name: 'email', label: '電子郵件', type: 'text', required: true, placeholder: 'vendor@example.com' },
+          { name: 'contactName', label: '聯絡人姓名', type: 'text', required: true },
+          { name: 'role', label: '入口角色', type: 'select', options: [{ value: 'viewer', label: '檢視者' }, { value: 'sales', label: '業務' }, { value: 'finance', label: '財務' }] }
         ]}
-        initialValues={selectedPortalUser || { isActive: true, role: 'viewer' }}
+        initialValues={{ role: 'viewer' }}
         onSubmit={async (values) => {
-          if (selectedPortalUser) {
-            await suppliersApi.updatePortalUser(selectedPortalUser.id, values);
-          } else {
-            await suppliersApi.createPortalUser(editingSupplier!.id, values);
-          }
+          await suppliersApi.createPortalInvitation(editingSupplier!.id, values);
           fetchSuppliers();
           setShowPortalUserModal(false);
         }}
@@ -417,20 +474,20 @@ export const Suppliers: React.FC = () => {
               <button 
                 className={`btn btn-sm ${approvalAction === 'approve' ? 'btn-primary' : approvalAction === 'reject' ? 'btn-danger' : 'btn-warning'}`}
                 onClick={async () => {
-                  const employeeId = 'current-user-id'; // 應該從認證取得
                   try {
                     if (approvalAction === 'approve') {
-                      await suppliersApi.approve(approvalSupplier.id, { employeeId, comments: approvalComments });
+                      await suppliersApi.approve(approvalSupplier.id, { comments: approvalComments });
                     } else if (approvalAction === 'reject') {
-                      await suppliersApi.reject(approvalSupplier.id, { employeeId, comments: approvalComments });
+                      await suppliersApi.reject(approvalSupplier.id, { comments: approvalComments });
                     } else {
-                      await suppliersApi.deactivate(approvalSupplier.id, { employeeId, comments: approvalComments });
+                      await suppliersApi.deactivate(approvalSupplier.id, { comments: approvalComments });
                     }
+                    toast.success(approvalAction === 'approve' ? '供應商已核准' : approvalAction === 'reject' ? '供應商已駁回' : '供應商已停用');
                     fetchSuppliers();
                     setShowApprovalModal(false);
                     setApprovalComments('');
                   } catch (err) {
-                    console.error('審批操作失敗', err);
+                    toast.error(`審批操作失敗：${err instanceof Error ? err.message : '請稍後重試'}`);
                   }
                 }}
               >

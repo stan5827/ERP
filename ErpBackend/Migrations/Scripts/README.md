@@ -1,0 +1,27 @@
+-- ERP Database Migration Scripts
+-- =================================
+-- This directory contains versioned migration scripts
+-- 
+-- Naming Convention: V{VERSION}_{DESCRIPTION}.sql
+-- Example: V001_CreateUsersTable.sql
+--
+-- Migration Order:
+-- 1. V001_InitialSchema.sql      - Initial database schema
+-- 2. V002_AddSecurityTables.sql  - Security related tables
+-- ...
+--
+-- For EF Core migrations, use:
+-- dotnet ef migrations add <MigrationName>
+-- dotnet ef database update
+
+-- =================================
+-- Historical Scripts (reference only)
+-- =================================
+-- These scripts were used during development
+-- and are kept for reference:
+--   - scratch/clear_skus.sql
+--   - scratch/clear_hr_supplier_v2.sql
+--   - scratch/clear_db.sql
+--   - fix_goods_receipt_columns.sql
+--   - add_cost_uom_id.sql
+--   - add_sku_fields.sql

@@ -1,51 +1,238 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 
-import { Search, Plus, AlertTriangle, Download, Eye, TrendingDown, RefreshCw, Timer, ArrowLeftRight, Edit2, Trash2, ClipboardCheck, Check, Truck, Package, CheckCircle, Loader2 } from 'lucide-react';
+import { Search, Plus, Download, Eye, RefreshCw, ArrowLeftRight, Edit2, Trash2, ClipboardCheck, Truck, Loader2, Printer } from 'lucide-react';
 
-import { useSkus, useLowStock, useWarehouses, useUoms, useBinLocations, useUomConversions } from '../hooks/useApi';
+import { useSkus, useWarehouses, useUoms, useBinLocations } from '../hooks/useApi';
 
 import { FormModal } from '../components/FormModal';
+import { InventoryStocktakePanel } from './InventoryStocktakePanel';
 
 import type { FormField } from '../components/FormModal';
 
-import { skusApi, suppliersApi, goodsReceiptsApi, binLocationsApi, warehousesApi, inventoryApi, inventoryTransfersApi, completionOrdersApi, deliveryOrdersApi, rccpApi } from '../api/api';
+import { skusApi, goodsReceiptsApi, binLocationsApi, warehousesApi, inventoryApi, inventoryTransfersApi, completionOrdersApi, deliveryOrdersApi, rccpApi } from '../api/api';
+import type { DeliveryInspectionReportDto } from '../api/api';
+import type {
+  BinLocationDto,
+  CompletableWorkOrderDto,
+  SkuDto,
+  WarehouseDto
+} from '../api/inventory';
+
+type CapacityResource = { id: string; resourceName: string };
+type CapacityBillItem = { resourceId: string; usagePerUnit: number; uom: string };
+type TransferLine = {
+  id: number;
+  skuId: string;
+  skuNumber: string;
+  skuName: string;
+  transferQty: number;
+  lotNumber: string;
+};
+type SkuFormSource = Partial<SkuDto> & {
+  IsPurchasable?: boolean;
+  IsSellable?: boolean;
+  IsMto?: boolean;
+  IsMts?: boolean;
+  IsCustom?: boolean;
+  IsManufacturable?: boolean;
+  IsOutsourced?: boolean;
+};
+type CompletionLine = {
+  skuId: string;
+  skuNumber?: string;
+  skuName?: string;
+  completedQty: number;
+  lotNumber: string;
+};
+type InventoryCompletableWorkOrder = CompletableWorkOrderDto & {
+  workOrderNumber: string;
+  skuId: string;
+  sku?: { skuNumber?: string; skuName?: string };
+};
+type DeliveryOrderDto = {
+  id: string;
+  deliveryNumber: string;
+  salesOrderNumber?: string;
+  deliveryDate?: string;
+  status: string;
+};
+type DeliveryOrderItem = {
+  id: string;
+  skuName?: string;
+  skuNumber?: string;
+  deliveredQty: number;
+  binLocationId?: string;
+  lotNumber?: string;
+  serialNumber?: string;
+};
+type DeliveryOrderDetail = DeliveryOrderDto & {
+  shippingMethod?: string;
+  deliveryAddress?: string;
+  items?: DeliveryOrderItem[];
+};
+type GoodsReceiptRow = {
+  id: string;
+  grNumber?: string;
+  createdAt: string;
+  purchaseOrderId?: string;
+  status?: string;
+  iqcStatus?: string;
+};
+type ApiError = {
+  message?: string;
+  response?: { data?: { message?: string } };
+};
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error !== 'object' || error === null) return fallback;
+  const apiError = error as ApiError;
+  return apiError.response?.data?.message || apiError.message || fallback;
+};
+
+const warehouseTypeOptions = [
+  { value: 'normal', label: '一般倉' },
+  { value: 'raw_material', label: '原料倉' },
+  { value: 'wip', label: '在製品倉' },
+  { value: 'production', label: '生產倉' },
+  { value: 'finished_goods', label: '成品倉' },
+  { value: 'shipping', label: '出貨倉' },
+  { value: 'scrap', label: '廢料倉' },
+];
+const warehouseTypeLabels = Object.fromEntries(warehouseTypeOptions.map(option => [option.value, option.label]));
+
+const goodsReceiptStatusLabels: Record<string, string> = {
+  received: '已收貨',
+  reversed: '已沖銷',
+  cancelled: '已取消',
+  canceled: '已取消',
+  pending: '待處理',
+  completed: '已完成',
+};
+
+const goodsReceiptIqcStatusLabels: Record<string, string> = {
+  pending: '待檢驗',
+  passed: '合格',
+  pass: '合格',
+  failed: '不合格',
+  fail: '不合格',
+  conditional: '條件通過',
+  cancelled: '已取消',
+  canceled: '已取消',
+  not_required: '免檢',
+};
+
+const getGoodsReceiptStatusLabel = (value?: string | null) =>
+  goodsReceiptStatusLabels[value?.toLowerCase() ?? ''] ?? '未知狀態';
+
+const getGoodsReceiptIqcStatusLabel = (value?: string | null) =>
+  goodsReceiptIqcStatusLabels[value?.toLowerCase() ?? ''] ?? '未知狀態';
+
+const requiredSkuNumberFields = [
+  'leadTimeDays',
+  'purchasePrice',
+  'standardCost',
+  'qty',
+  'safetyStock',
+  'reorderPoint',
+  'maxStock',
+  'latestPurchaseCost',
+];
+
+const optionalSkuNumberFields = [
+  'avgDailyConsumption',
+  'purchasePriceCeiling',
+  'floorPrice',
+  'discountRate',
+  'priceA',
+  'priceB',
+  'priceC',
+  'priceD',
+  'priceE',
+  'minPackingQty',
+  'shelfLifeDays',
+  'purchaseToBaseFactor',
+  'salesToBaseFactor',
+  'productionToBaseFactor',
+  'suggestedPrice',
+  'basePrice',
+  'supplierLeadTime',
+];
+
+const optionalSkuIdFields = [
+  'baseUomId',
+  'defaultWarehouseId',
+  'defaultBinLocationId',
+  'outsourceSupplierId',
+  'outsourceWarehouseId',
+  'purchaseUomId',
+  'salesUomId',
+  'productionUomId',
+  'defaultSupplierId',
+  'defaultBomId',
+  'defaultRoutingId',
+  'costUomId',
+];
 
 // 新增：SKU 庫存詳細資訊組件
-const SkuInventoryDetail: React.FC<{ sku: string }> = ({ sku }) => {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+const SkuInventoryDetail: React.FC<{ sku: string; warehouseCode: string | null; warehouseName: string | null }> = ({ sku, warehouseCode, warehouseName }) => {
+  const { data: balance, isLoading: balanceLoading, isError: balanceError } = useQuery({
+    queryKey: ['inventory-balance', sku],
+    queryFn: async () => {
+      const response = await inventoryApi.getSkuBalance(sku);
+      if (!response.data?.success || !response.data.data) {
+        throw new Error(response.data?.message || '載入庫存餘額失敗');
+      }
+      return response.data.data;
+    },
+    enabled: Boolean(sku),
+  });
+  const { data: atp, isLoading: atpLoading, isError: atpError } = useQuery({
+    queryKey: ['inventory-atp', sku],
+    queryFn: async () => {
+      const response = await inventoryApi.checkATP(sku, 0);
+      if (!response.data?.success || !response.data.data) {
+        throw new Error(response.data?.message || '載入可用庫存失敗');
+      }
+      return response.data.data;
+    },
+    enabled: Boolean(sku),
+  });
 
-  useEffect(() => {
-    if (!sku) return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await inventoryApi.checkATP(sku, 0);
-        setData(res.data);
-      } catch (e) {}
-      setLoading(false);
-    };
-    load();
-  }, [sku]);
+  if (balanceLoading || atpLoading) return <Loader2 size={12} className="animate-spin" />;
+  if (balanceError || !balance) return <span style={{ color: 'var(--crimson-300)', fontSize: 12 }}>庫存載入失敗</span>;
 
-  if (loading) return <Loader2 size={12} className="animate-spin" />;
-  if (!data) return null;
+  const warehouseBalances = (balance.by_warehouse || []).filter(
+    item => warehouseCode || warehouseName
+      ? Boolean(warehouseCode && String(item.warehouseCode ?? '').toLowerCase() === warehouseCode.toLowerCase())
+        || Boolean(warehouseName && String(item.warehouseName ?? '').trim() === warehouseName.trim())
+      : true
+  );
+  const warehouseOnHand = warehouseBalances.reduce(
+    (total: number, item) => total + Number(item.totalQty || 0),
+    0
+  );
+  const binBalances = warehouseBalances.filter(item => Number(item.totalQty || 0) !== 0);
 
   return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={{ fontSize: '0.65rem', color: 'var(--slate-500)' }}>現有</span>
-        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--slate-200)' }}>{data.on_hand}</span>
+        <span style={{ fontSize: '0.65rem', color: 'var(--slate-500)' }}>{warehouseCode ? '本倉現有' : '全倉現有'}</span>
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--slate-200)' }}>{warehouseOnHand}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={{ fontSize: '0.65rem', color: 'var(--amber-500)' }}>待出</span>
-        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--amber-400)' }}>{data.allocated}</span>
+        <span style={{ fontSize: '0.65rem', color: 'var(--amber-500)' }}>全倉待出</span>
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--amber-400)' }}>{atpError ? '—' : atp?.allocated}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={{ fontSize: '0.65rem', color: 'var(--emerald-500)' }}>可用</span>
-        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--lux-gold)' }}>{data.available}</span>
+        <span style={{ fontSize: '0.65rem', color: 'var(--emerald-500)' }}>全倉可用</span>
+        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--lux-gold)' }}>{atpError ? '—' : atp?.available}</span>
+      </div>
+      <div style={{ flexBasis: '100%', fontSize: 11, color: 'var(--slate-400)' }}>
+        儲位：{binBalances.length > 0
+          ? binBalances.map(item => `${item.binLocationCode || '未指定儲位'} ${item.totalQty}`).join('、')
+          : '無庫存'}
       </div>
     </div>
   );
@@ -66,6 +253,8 @@ const sourceTypeFields: FormField[] = [
     { value: 'outsource', label: '委外加工' },
     { value: 'make_or_outsource', label: '自製+委外' },
   ], defaultValue: 'make', description: '定義該物料的主要來源方式' },
+  { name: 'isPurchasable', label: '採購設定', type: 'checkbox', placeholder: '可採購', defaultValue: false, description: '勾選後，自動補貨可為此品號建立請購單' },
+  { name: 'isManufacturable', label: '生產設定', type: 'checkbox', placeholder: '可製造', defaultValue: true, description: '勾選後，自動補貨可為此品號建立子工單；需有有效 BOM' },
   { name: 'itemType', label: '品項類別', type: 'select', options: [
     { value: 'semi_finished', label: '半成品' },
     { value: 'finished', label: '成品' },
@@ -98,11 +287,12 @@ const inventoryFields = (warehouseOptions: { value: string; label: string }[], b
   { name: 'serialControlled', label: '序號管理', type: 'checkbox', placeholder: '啟用序號管制', description: '是否需要紀錄每一件產品的獨立序號資訊' },
   { name: 'iqcRequired', label: '進料檢驗(IQC)', type: 'checkbox', placeholder: '啟用 IQC', defaultValue: true, description: '入庫前是否需要進行品質檢驗' },
   { name: 'oqcRequired', label: '出貨檢驗(OQC)', type: 'checkbox', placeholder: '啟用 OQC', description: '出庫前是否需要進行品質檢驗' },
-  { name: 'defaultwarehouseId', label: '預設存放倉庫', type: 'select', options: warehouseOptions, description: '系統預設的收貨目的地址' },
+  { name: 'defaultWarehouseId', label: '預設存放倉庫', type: 'select', options: warehouseOptions, description: '系統預設的收貨目的地址' },
   { name: 'defaultBinLocationId', label: '預設存放儲位', type: 'select', options: binOptions, description: '系統預設的收貨目的地儲位' },
 ];
 
 const salesFields: FormField[] = [
+  { name: 'isSellable', label: '銷售設定', type: 'checkbox', placeholder: '設為可銷售商品', defaultValue: false, description: '勾選後可在報價單與銷售訂單明細中搜尋及選取此品號' },
   { name: 'suggestedPrice', label: '建議售價', type: 'number', placeholder: '0', min: 0, step: 0.01 },
   { name: 'basePrice', label: '基本原價', type: 'number', placeholder: '0', min: 0, step: 0.01 },
   { name: 'priceA', label: '價格 A (大宗客戶)', type: 'number', placeholder: '0', min: 0, step: 0.01 },
@@ -134,7 +324,7 @@ const costFields = (uomOptions: { value: string; label: string }[]): FormField[]
     { value: 'ma', label: '移動平均' },
     { value: 'fifo', label: '先進先出' },
   ], defaultValue: 'ma' },
-  { name: 'uomId', label: '基本單位', type: 'select', options: uomOptions, required: true },
+  { name: 'baseUomId', label: '基本單位', type: 'select', options: uomOptions, required: true },
   { name: 'purchaseUomId', label: '採購單位', type: 'select', options: uomOptions },
   { name: 'salesUomId', label: '銷售單位', type: 'select', options: uomOptions },
   { name: 'productionUomId', label: '生產單位', type: 'select', options: uomOptions },
@@ -144,24 +334,35 @@ function TransactionsPanel() {
 
   const [filterType, setFilterType] = useState('all');
 
-  const [search, setSearch] = useState('');
-
   const { data, isLoading } = useQuery({
 
-    queryKey: ['inventory-transactions', filterType],
+    queryKey: ['inventory-transactions'],
 
-    queryFn: () => inventoryApi.transactions(filterType !== 'all' ? { type: filterType } : undefined).then(res => res.data)
+    queryFn: () => inventoryApi.transactions().then(res => res.data)
 
   });
 
-  const transactions = data?.data || [];
+  const allTransactions = data?.data || [];
+  const transactions = allTransactions.filter(transaction => {
+    const type = String(transaction.type || '').toLowerCase();
+    const quantity = Number(transaction.qty_change) || 0;
+    if (filterType === 'in') return quantity > 0 && !type.includes('transfer');
+    if (filterType === 'out') return quantity < 0 && !type.includes('transfer');
+    if (filterType === 'transfer') return type.includes('transfer');
+    if (filterType === 'adj') return type.includes('adjust') || type.includes('adj');
+    return true;
+  });
 
-  const getStatusLabel = (status: string) => {
-
-    const map: any = { 'completed': '已完成', 'pending': '待處理', 'cancelled': '已取消' };
-
-    return map[status] || status;
-
+  const getTypeLabel = (type: string) => {
+    const normalizedType = type.toLowerCase();
+    if (normalizedType === 'purchase_receipt') return '採購入庫';
+    if (normalizedType === 'iqc_release_in') return '進料檢驗合格入庫';
+    if (normalizedType === 'iqc_release_out') return '進料檢驗隔離出庫';
+    if (normalizedType.includes('transfer')) return '撥移';
+    if (normalizedType.includes('adjust') || normalizedType.includes('adj')) return '庫存調整';
+    if (normalizedType === 'in' || normalizedType.includes('receipt')) return '入庫';
+    if (normalizedType === 'out' || normalizedType.includes('issue')) return '出庫';
+    return type || '異動';
   };
 
   return (
@@ -195,7 +396,7 @@ function TransactionsPanel() {
               <th>交易日期</th>
 
               <th>類型</th>
-
+              <th>物料品號</th>
               <th>物料名稱</th>
 
               <th>變動數量</th>
@@ -212,20 +413,25 @@ function TransactionsPanel() {
 
             {isLoading ? (
 
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20 }}>載入中...</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>載入中...</td></tr>
             ) : transactions.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20 }}>無交易紀錄</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>無交易紀錄</td></tr>
 
-            ) : transactions.map((t: any) => (
+            ) : transactions.map(t => (
 
-              <tr key={t.id}>
+              <tr key={t.trx_id}>
 
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{new Date(t.createdAt).toLocaleDateString()}</td>
-                <td><span className={`status-badge ${t.type}`}>{t.type === 'in' ? '入庫' : t.type === 'out' ? '出庫' : '異動'}</span></td>
-                <td>{t.sku?.skuName || '-'}</td>
-                <td style={{ fontWeight: 700, color: t.quantity > 0 ? 'var(--emerald-400)' : 'var(--crimson-400)' }}>{t.quantity > 0 ? '+' : ''}{t.quantity}</td>
-                <td>{t.warehouse?.name || '-'}</td>
-                <td>{getStatusLabel(t.status)}</td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                  {t.created_at ? new Date(t.created_at).toLocaleString() : '-'}
+                </td>
+                <td><span className={`status-badge ${t.type}`}>{getTypeLabel(t.type)}</span></td>
+                <td>{t.sku_code || '-'}</td>
+                <td>{t.sku_name || '-'}</td>
+                <td style={{ fontWeight: 700, color: t.qty_change > 0 ? 'var(--emerald-400)' : 'var(--crimson-400)' }}>
+                  {t.qty_change > 0 ? '+' : ''}{t.qty_change}
+                </td>
+                <td>{[t.warehouse, t.bin_location].filter(Boolean).join(' / ') || '-'}</td>
+                <td>已過帳</td>
               </tr>
             ))}
           </tbody>
@@ -236,31 +442,31 @@ function TransactionsPanel() {
 }
 
 const CapacityBillManager: React.FC<{ skuId: string }> = ({ skuId }) => {
-  const [items, setItems] = useState<any[]>([]);
-  const [resources, setResources] = useState<any[]>([]);
+  const [items, setItems] = useState<CapacityBillItem[]>([]);
+  const [resources, setResources] = useState<CapacityResource[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!skuId) return;
-    load();
-  }, [skuId]);
-
-  const load = async () => {
     setLoading(true);
     try {
       const [resList, irList] = await Promise.all([
         rccpApi.listResources(),
         rccpApi.getItemResources(skuId)
       ]);
-      setResources(resList.data?.data || []);
-      setItems(irList.data?.data || []);
+      setResources((resList.data?.data || []) as CapacityResource[]);
+      setItems((irList.data?.data || []) as CapacityBillItem[]);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [skuId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const addItem = () => {
     setItems([...items, { resourceId: '', usagePerUnit: 1, uom: 'Hrs' }]);
@@ -275,7 +481,7 @@ const CapacityBillManager: React.FC<{ skuId: string }> = ({ skuId }) => {
     try {
       await rccpApi.updateItemResources(items.map(it => ({ ...it, skuId })));
       alert('產能設定已儲存');
-    } catch (e) {
+    } catch {
       alert('儲存失敗');
     } finally {
       setSaving(false);
@@ -351,26 +557,7 @@ const CapacityBillManager: React.FC<{ skuId: string }> = ({ skuId }) => {
 };
 
 function CountPanel() {
-  const [countMode, setCountMode] = useState('pending');
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {['pending', 'in_progress', 'completed'].map(m => (
-            <button key={m} className={`btn btn-sm ${countMode === m ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCountMode(m as any)}>
-              {m === 'pending' ? '待盤點' : m === 'in_progress' ? '盤點中' : '已完成'}
-            </button>
-          ))}
-        </div>
-        <button className="btn btn-primary btn-sm" disabled title="功能開發中">
-          <Plus size={13} />建立盤點計畫
-        </button>
-      </div>
-      <div className="glass-card no-lift" style={{ padding: 40, textAlign: 'center', color: 'var(--slate-500)' }}>
-        請選擇盤點倉庫與日期範圍開始執行盤點作業
-      </div>
-    </div>
-  );
+  return <InventoryStocktakePanel />;
 }
 
 function AnalysisPanel() {
@@ -457,8 +644,8 @@ function TransferPanel() {
       setShowCreateModal(false);
       alert('調撥單已成功建立');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '建立失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '建立失敗'));
     }
   });
 
@@ -468,8 +655,8 @@ function TransferPanel() {
       queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
       alert('核准作業完成');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '核准失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '核准失敗'));
     }
   });
 
@@ -479,8 +666,8 @@ function TransferPanel() {
       queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
       alert('調撥執行完成');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '執行失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '執行失敗'));
     }
   });
 
@@ -490,8 +677,8 @@ function TransferPanel() {
       queryClient.invalidateQueries({ queryKey: ['inventory-transfers'] });
       alert('作廢作業完成');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '作廢失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '作廢失敗'));
     }
   });
 
@@ -544,14 +731,14 @@ function TransferPanel() {
               </tr>
             </thead>
             <tbody>
-              {transfers.filter((t: any) => !search || t.transferNumber?.includes(search)).map((t: any) => {
+              {transfers.filter(t => !search || t.transferNumber?.includes(search)).map(t => {
                 const badge = getStatusBadge(t.status);
                 return (
                   <tr key={t.id}>
                     <td style={{ color: 'var(--cobalt-300)', fontFamily: 'var(--font-mono)' }}>{t.transferNumber}</td>
                     <td><span className={`status-badge ${badge.className}`}>{badge.label}</span></td>
-                    <td>{warehouses.find((w: any) => w.id === t.sourceWarehouseId)?.warehouseName || t.sourceWarehouseId}</td>
-                    <td>{warehouses.find((w: any) => w.id === t.targetWarehouseId)?.warehouseName || t.targetWarehouseId}</td>
+                    <td>{warehouses.find(w => w.id === t.sourceWarehouseId)?.warehouseName || t.sourceWarehouseId}</td>
+                    <td>{warehouses.find(w => w.id === t.targetWarehouseId)?.warehouseName || t.targetWarehouseId}</td>
                     <td>{t.createdAt?.slice(0, 10)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
@@ -587,24 +774,29 @@ function TransferPanel() {
 }
 
 function TransferCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: {
-  warehouses: any[];
+  warehouses: WarehouseDto[];
   onClose: () => void;
   onSubmit: (data: Record<string, unknown>) => void;
   isSubmitting: boolean;
 }) {
-  const [form, setForm] = useState({ sourceWarehouseId: '', targetWarehouseId: '', items: [] as any[] });
+  const [form, setForm] = useState({
+    sourceWarehouseId: '',
+    targetWarehouseId: '',
+    items: [] as TransferLine[]
+  });
   const [showAddItem, setShowAddItem] = useState(false);
+  const nextItemId = useRef(0);
 
   const { data: skuData } = useQuery({ queryKey: ['skus'], queryFn: () => skusApi.list({ pageSize: '1000' }) });
   const skus = skuData?.data?.data || [];
 
-  const addItem = (item: any) => {
-    setForm({ ...form, items: [...form.items, { ...item, id: Date.now() }] });
+  const addItem = (item: Omit<TransferLine, 'id'>) => {
+    setForm({ ...form, items: [...form.items, { ...item, id: nextItemId.current++ }] });
     setShowAddItem(false);
   };
 
   const removeItem = (id: number) => {
-    setForm({ ...form, items: form.items.filter((i: any) => i.id !== id) });
+    setForm({ ...form, items: form.items.filter(item => item.id !== id) });
   };
 
   const handleSubmit = () => {
@@ -629,14 +821,14 @@ function TransferCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: {
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-400)', marginBottom: 6, display: 'block' }}>調出倉庫 *</label>
               <select className="form-input" style={{ width: '100%' }} value={form.sourceWarehouseId} onChange={e => setForm({ ...form, sourceWarehouseId: e.target.value })}>
                 <option value="">請選擇</option>
-                {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
+                {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-400)', marginBottom: 6, display: 'block' }}>調入倉庫 *</label>
               <select className="form-input" style={{ width: '100%' }} value={form.targetWarehouseId} onChange={e => setForm({ ...form, targetWarehouseId: e.target.value })}>
                 <option value="">請選擇</option>
-                {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
+                {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
               </select>
             </div>
           </div>
@@ -651,7 +843,7 @@ function TransferCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: {
               <table className="data-table" style={{ fontSize: 12 }}>
                 <thead><tr><th>料號</th><th>品名</th><th>數量</th><th>批號</th><th></th></tr></thead>
                 <tbody>
-                  {form.items.map((item: any) => (
+                  {form.items.map(item => (
                     <tr key={item.id}>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{item.skuNumber}</td>
                       <td>{item.skuName}</td>
@@ -682,7 +874,7 @@ function TransferCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: {
           <div className="glass-card" style={{ position: 'relative', width: 500, zIndex: 1, padding: 20 }}>
             <h4 style={{ marginBottom: 16 }}>選擇品項</h4>
             <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-              {skus.map((s: any) => (
+              {skus.map(s => (
                 <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--slate-700)', cursor: 'pointer' }} onClick={() => addItem({ skuId: s.id, skuNumber: s.skuNumber, skuName: s.skuName, transferQty: 1, lotNumber: '' })}>
                   <span style={{ fontFamily: 'var(--font-mono)' }}>{s.skuNumber}</span>
                   <span>{s.skuName}</span>
@@ -718,8 +910,8 @@ function CompletionPanel() {
       setShowCreateModal(false);
       alert('完工入庫單已成功建立');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '建立失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '建立失敗'));
     }
   });
 
@@ -729,8 +921,8 @@ function CompletionPanel() {
       queryClient.invalidateQueries({ queryKey: ['completion-orders'] });
       alert('核准入庫完成');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '核准失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '核准失敗'));
     }
   });
 
@@ -740,8 +932,8 @@ function CompletionPanel() {
       queryClient.invalidateQueries({ queryKey: ['completion-orders'] });
       alert('作廢作業完成');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '作廢失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '作廢失敗'));
     }
   });
 
@@ -791,12 +983,12 @@ function CompletionPanel() {
               </tr>
             </thead>
             <tbody>
-              {completions.filter((c: any) => !search || c.completionNumber?.includes(search)).map((c: any) => (
+              {completions.filter(c => !search || c.completionNumber?.includes(search)).map(c => (
                 <tr key={c.id}>
                   <td style={{ color: 'var(--cobalt-300)', fontFamily: 'var(--font-mono)' }}>{c.completionNumber}</td>
                   <td><span className={`status-badge ${getStatusBadge(c.status).className}`}>{getStatusBadge(c.status).label}</span></td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>{c.workOrderId}</td>
-                  <td>{warehouses.find((w: any) => w.id === c.warehouseId)?.warehouseName || c.warehouseId}</td>
+                  <td>{warehouses.find(w => w.id === c.warehouseId)?.warehouseName || c.warehouseId}</td>
                   <td>{c.createdAt?.slice(0, 10)}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -839,38 +1031,28 @@ function ShippingPanel() {
     queryFn: () => deliveryOrdersApi.list({ status: filterStatus !== 'all' ? filterStatus : undefined }).then(res => res.data)
   });
 
-  const deliveryOrders = Array.isArray(data?.data) ? data.data : [];
+  const deliveryOrders = (Array.isArray(data?.data) ? data.data : []) as DeliveryOrderDto[];
 
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string, status: string }) => deliveryOrdersApi.updateStatus(id, status),
+  const signDeliveryMutation = useMutation({
+    mutationFn: ({ id, signedBy }: { id: string, signedBy: string }) => deliveryOrdersApi.sign(id, signedBy),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
       queryClient.invalidateQueries({ queryKey: ['skus'] });
-      alert('出貨狀態已更新');
+      queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
+      alert('已完成出貨簽收與庫存扣帳');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '更新失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '出貨簽收失敗'));
     }
   });
 
   const getStatusBadge = (status: string) => {
     const map: Record<string, { label: string; className: string; color: string }> = {
-      pending:    { label: '待處理',  className: 'status-warning', color: 'var(--amber-400)' },
-      picking:    { label: '揀貨中',  className: 'info',           color: 'var(--cobalt-300)' },
-      packing:    { label: '包裝中',  className: 'info',           color: 'var(--indigo-300)' },
-      dispatched: { label: '已發貨',  className: 'status-active',  color: 'var(--emerald-400)' },
+      pending:    { label: '待出貨',  className: 'status-warning', color: 'var(--amber-400)' },
+      completed:  { label: '已簽收',  className: 'status-active',  color: 'var(--emerald-400)' },
       cancelled:  { label: '已作廢',  className: 'status-neutral', color: 'var(--slate-500)' }
     };
     return map[status] || { label: status, className: 'status-neutral', color: 'var(--slate-500)' };
-  };
-
-  const getNextAction = (status: string) => {
-    switch (status) {
-      case 'pending':    return { label: '開始揀貨', nextStatus: 'picking', icon: <ClipboardCheck size={14} /> };
-      case 'picking':    return { label: '完成揀貨', nextStatus: 'packing', icon: <Package size={14} /> };
-      case 'packing':    return { label: '確認出貨', nextStatus: 'dispatched', icon: <Truck size={14} /> };
-      default:           return null;
-    }
   };
 
   return (
@@ -879,9 +1061,7 @@ function ShippingPanel() {
         <select className="form-input" style={{ width: 140 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="all">所有狀態</option>
           <option value="pending">待處理</option>
-          <option value="picking">揀貨中</option>
-          <option value="packing">包裝中</option>
-          <option value="dispatched">已發貨</option>
+          <option value="completed">已簽收</option>
           <option value="cancelled">已取消</option>
         </select>
         <div className="filter-search">
@@ -907,8 +1087,7 @@ function ShippingPanel() {
               </tr>
             </thead>
             <tbody>
-              {deliveryOrders.filter((do_order: any) => !search || do_order.deliveryNumber?.includes(search)).map((do_order: any) => {
-                const action = getNextAction(do_order.status);
+              {deliveryOrders.filter(do_order => !search || do_order.deliveryNumber?.includes(search)).map(do_order => {
                 const badge = getStatusBadge(do_order.status);
                 return (
                   <tr key={do_order.id}>
@@ -922,22 +1101,19 @@ function ShippingPanel() {
                     <td>{do_order.deliveryDate?.slice(0, 10)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        {action && (
+                        {do_order.status === 'pending' && (
                           <button 
                             className="btn btn-primary btn-xs" 
                             style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}
                             onClick={() => {
-                              if (action.nextStatus === 'dispatched') {
-                                if (confirm('確認出貨後將自動扣除庫存並更新銷售單狀態，是否繼續？')) {
-                                  updateStatusMutation.mutate({ id: do_order.id, status: action.nextStatus });
-                                }
-                              } else {
-                                updateStatusMutation.mutate({ id: do_order.id, status: action.nextStatus });
+                              const signedBy = prompt('請輸入簽收人／出貨確認人姓名');
+                              if (signedBy?.trim() && confirm('確認出貨後將扣除指定批號、倉庫與儲位庫存，是否繼續？')) {
+                                signDeliveryMutation.mutate({ id: do_order.id, signedBy: signedBy.trim() });
                               }
                             }}
-                            disabled={updateStatusMutation.isPending}
+                            disabled={signDeliveryMutation.isPending}
                           >
-                            {action.icon}{action.label}
+                            <Truck size={14} />確認出貨並扣帳
                           </button>
                         )}
                         <button className="icon-action-btn" title="查看詳情" onClick={() => { setSelectedId(do_order.id); setShowDetailModal(true); }}>
@@ -964,12 +1140,28 @@ function ShippingPanel() {
 }
 
 function DeliveryOrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const [inspectionReport, setInspectionReport] = useState<DeliveryInspectionReportDto | null>(null);
+  const [inspectionReportError, setInspectionReportError] = useState('');
+  const [loadingInspectionReport, setLoadingInspectionReport] = useState(false);
   const { data: res, isLoading } = useQuery({
     queryKey: ['delivery-order', id],
     queryFn: () => deliveryOrdersApi.get(id).then(r => r.data)
   });
 
-  const order: any = res?.data;
+  const order = res?.data as DeliveryOrderDetail | undefined;
+  const loadInspectionReport = async () => {
+    setLoadingInspectionReport(true);
+    setInspectionReportError('');
+    try {
+      const response = await deliveryOrdersApi.inspectionReport(id);
+      setInspectionReport(response.data?.data ?? null);
+    } catch (error) {
+      const apiError = error as { response?: { data?: { message?: string } }; message?: string };
+      setInspectionReportError(apiError.response?.data?.message ?? apiError.message ?? '載入檢驗報告失敗');
+    } finally {
+      setLoadingInspectionReport(false);
+    }
+  };
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -998,7 +1190,12 @@ function DeliveryOrderDetailModal({ id, onClose }: { id: string; onClose: () => 
       <div className="glass-card" style={{ position: 'relative', width: 800, zIndex: 1, padding: 24, maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--slate-100)' }}>出貨單詳情: {order?.deliveryNumber}</h3>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>關閉</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => void loadInspectionReport()} disabled={loadingInspectionReport}>
+              <Printer size={13} />{loadingInspectionReport ? '載入中…' : '檢驗報告'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>關閉</button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -1032,7 +1229,7 @@ function DeliveryOrderDetailModal({ id, onClose }: { id: string; onClose: () => 
             </tr>
           </thead>
           <tbody>
-            {order?.items?.map((item: any) => (
+            {order?.items?.map(item => (
               <tr key={item.id}>
                 <td>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{item.skuName}</div>
@@ -1046,26 +1243,122 @@ function DeliveryOrderDetailModal({ id, onClose }: { id: string; onClose: () => 
             ))}
           </tbody>
         </table>
+        {inspectionReportError && <div role="alert" style={{ marginTop: 16, color: 'var(--crimson-300)' }}>{inspectionReportError}</div>}
+        {inspectionReport && (
+          <>
+            <div className="glass-card no-print" style={{ marginTop: 20, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div>
+                  <strong>工藝檢驗報告：{inspectionReport.deliveryNumber}</strong>
+                  <div style={{ marginTop: 4, color: 'var(--slate-400)', fontSize: 12 }}>
+                    結果：{inspectionReport.overallResult === 'pass' ? '合格' : inspectionReport.overallResult === 'fail' ? '不合格' : '資料未齊'}
+                    {' · '}此狀態僅供提示，不會阻擋出貨
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => window.print()}><Printer size={13} />列印報告</button>
+              </div>
+              {inspectionReport.warnings.length > 0 && (
+                <ul style={{ color: 'var(--amber-300)', fontSize: 12, paddingLeft: 20, margin: '12px 0 0' }}>
+                  {inspectionReport.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
+                </ul>
+              )}
+              {inspectionReport.items.map(item => (
+                <div key={item.deliveryOrderItemId} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--slate-700)' }}>
+                  <strong>{item.skuNumber} · {item.skuName} · 批號 {item.lotNumber || '未指定'} · {item.quantity}</strong>
+                  <span style={{ marginLeft: 8, color: item.result === 'pass' ? 'var(--emerald-300)' : 'var(--amber-300)' }}>
+                    {item.result === 'pass' ? '合格' : item.result === 'fail' ? '不合格' : '資料未齊'}
+                  </span>
+                  {item.reports.map(report => (
+                    <div key={report.id} style={{ padding: '8px 0 0 12px', color: 'var(--slate-300)', fontSize: 12 }}>
+                      {report.operationSeq}. {report.operationName} · {report.reportNumber} · {report.inspectorName} · {report.result === 'pass' ? '合格' : '不合格'}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="delivery-inspection-print">
+              <h1>出貨工藝檢驗報告</h1>
+              <div className="print-meta">
+                <span>出貨單號：{inspectionReport.deliveryNumber}</span>
+                <span>出貨日期：{inspectionReport.deliveryDate?.slice(0, 10)}</span>
+                <span>銷售訂單：{inspectionReport.salesOrderNumber || '—'}</span>
+                <span>客戶：{inspectionReport.customerName || '—'}</span>
+                <span>送貨地址：{inspectionReport.deliveryAddress || '—'}</span>
+                <span>整體判定：{inspectionReport.overallResult === 'pass' ? '合格' : inspectionReport.overallResult === 'fail' ? '不合格' : '資料未齊'}</span>
+              </div>
+              {inspectionReport.items.map(item => (
+                <section key={item.deliveryOrderItemId}>
+                  <h2>{item.skuNumber} · {item.skuName} · 批號 {item.lotNumber || '未指定'} · 出貨數量 {item.quantity}</h2>
+                  {item.warnings.length > 0 && <ul>{item.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
+                  {item.reports.map(report => (
+                    <div className="print-inspection-record" key={report.id}>
+                      <h3>{report.operationSeq}. {report.operationName}（{report.workCenterName || '未指定工作中心'}）</h3>
+                      <p>報告：{report.reportNumber} 範本：{report.templateName} v{report.templateVersion} 工單：{report.workOrderNumber}</p>
+                      <p>檢驗人員：{report.inspectorName} 檢驗時間：{new Date(report.inspectedAt).toLocaleString()} 抽樣數：{report.sampleQuantity} 判定：{report.result === 'pass' ? '合格' : '不合格'}</p>
+                      <table>
+                        <thead><tr><th>檢驗項目</th><th>規格 / 允收範圍</th><th>檢驗方法 / 量具</th><th>抽樣計畫</th><th>實測結果</th><th>判定</th><th>備註</th></tr></thead>
+                        <tbody>{report.items.map((inspectionItem, index) => (
+                          <tr key={`${report.id}-${index}`}>
+                            <td>{inspectionItem.itemName}{inspectionItem.isCritical ? '（重要特性）' : ''}</td>
+                            <td>{inspectionItem.specification || ''}{inspectionItem.lowerLimit !== undefined || inspectionItem.upperLimit !== undefined ? ` (${inspectionItem.lowerLimit ?? '−∞'} ~ ${inspectionItem.upperLimit ?? '∞'} ${inspectionItem.unit || ''})` : ''}</td>
+                            <td>{[inspectionItem.inspectionMethod, inspectionItem.instrument].filter(Boolean).join(' / ')}</td>
+                            <td>{inspectionItem.samplingPlan || ''}</td>
+                            <td>{inspectionItem.value || '—'} {inspectionItem.unit || ''}</td>
+                            <td>{inspectionItem.result === 'pass' ? '合格' : inspectionItem.result === 'na' ? '不適用' : '不合格'}</td>
+                            <td>{inspectionItem.notes || ''}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  ))}
+                </section>
+              ))}
+              {inspectionReport.warnings.length > 0 && <section><h2>追溯提醒</h2><ul>{inspectionReport.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></section>}
+              <footer>列印日期：{new Date().toLocaleString()}</footer>
+            </div>
+          </>
+        )}
       </div>
+      <style>{`
+        .delivery-inspection-print { position: fixed; left: -10000px; top: 0; width: 190mm; background: #fff; color: #111; padding: 10mm; font: 10pt Arial, sans-serif; }
+        .delivery-inspection-print h1 { text-align: center; font-size: 18pt; margin: 0 0 8mm; }
+        .delivery-inspection-print h2 { font-size: 12pt; margin: 7mm 0 3mm; }
+        .delivery-inspection-print h3 { font-size: 11pt; margin: 5mm 0 2mm; }
+        .delivery-inspection-print p { margin: 2mm 0; }
+        .delivery-inspection-print table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; }
+        .delivery-inspection-print th, .delivery-inspection-print td { border: 1px solid #555; padding: 2mm; text-align: left; }
+        .delivery-inspection-print .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 8mm; border: 1px solid #555; padding: 4mm; }
+        .delivery-inspection-print footer { margin-top: 8mm; text-align: right; }
+        @media print {
+          body * { visibility: hidden !important; }
+          .delivery-inspection-print, .delivery-inspection-print * { visibility: visible !important; }
+          .delivery-inspection-print { position: fixed; left: 0; top: 0; width: 190mm; height: auto; overflow: visible; z-index: 99999; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
 
 function CompletionCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: {
-  warehouses: any[];
+  warehouses: WarehouseDto[];
   onClose: () => void;
   onSubmit: (data: Record<string, unknown>) => void;
   isSubmitting: boolean;
 }) {
-  const [form, setForm] = useState({ workOrderId: '', warehouseId: '', items: [] as any[] });
+  const [form, setForm] = useState({
+    workOrderId: '',
+    warehouseId: '',
+    items: [] as CompletionLine[]
+  });
 
   const { data: workOrdersData } = useQuery({
     queryKey: ['completable-workorders'],
     queryFn: () => completionOrdersApi.getCompletableWorkOrders().then(res => res.data)
   });
-  const workOrders = workOrdersData?.data || [];
+  const workOrders = (workOrdersData?.data || []) as InventoryCompletableWorkOrder[];
 
-  const handleSelectWo = (wo: any) => {
+  const handleSelectWo = (wo: InventoryCompletableWorkOrder) => {
     setForm({
       ...form,
       workOrderId: wo.workOrderNumber,
@@ -1089,11 +1382,11 @@ function CompletionCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: 
             <div>
               <label style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 6, display: 'block' }}>關聯工單</label>
               <select className="form-input" style={{ width: '100%' }} value={form.workOrderId} onChange={e => {
-                const wo = workOrders.find((w: any) => w.workOrderNumber === e.target.value);
+                const wo = workOrders.find(w => w.workOrderNumber === e.target.value);
                 if (wo) handleSelectWo(wo);
               }}>
                 <option value="">選取待入庫工單</option>
-                {workOrders.map((wo: any) => (
+                {workOrders.map(wo => (
                   <option key={wo.id} value={wo.workOrderNumber}>{wo.workOrderNumber} - {wo.sku?.skuName}</option>
                 ))}
               </select>
@@ -1102,7 +1395,7 @@ function CompletionCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: 
               <label style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 6, display: 'block' }}>入庫目的地</label>
               <select className="form-input" style={{ width: '100%' }} value={form.warehouseId} onChange={e => setForm({...form, warehouseId: e.target.value})}>
                 <option value="">選擇倉庫</option>
-                {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
+                {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
               </select>
             </div>
           </div>
@@ -1150,8 +1443,9 @@ function CompletionCreateModal({ warehouses, onClose, onSubmit, isSubmitting }: 
 
 function BinLocationsPanel() {
   const [showAddBin, setShowAddBin] = useState(false);
+  const [editingBin, setEditingBin] = useState<BinLocationDto | null>(null);
   const [showAddWh, setShowAddWh] = useState(false);
-  const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
+  const [editingWarehouse, setEditingWarehouse] = useState<WarehouseDto | null>(null);
   const [showInactiveWh, setShowInactiveWh] = useState(false);
   const [selectedWh, setSelectedWh] = useState<string>('');
   const [search, setSearch] = useState('');
@@ -1169,12 +1463,29 @@ function BinLocationsPanel() {
   );
 
   const createBin = useMutation({
-    mutationFn: (data: any) => binLocationsApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => binLocationsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bin-locations'] });
+      setNewBin({ warehouseId: '', locationCode: '', zone: '', aisle: '', rack: '', level: '', position: '' });
       setShowAddBin(false);
       refetch();
-    }
+    },
+    onError: error => {
+      alert(getApiErrorMessage(error, '儲位建立失敗'));
+    },
+  });
+
+  const updateBin = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => binLocationsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bin-locations'] });
+      setEditingBin(null);
+      setNewBin({ warehouseId: '', locationCode: '', zone: '', aisle: '', rack: '', level: '', position: '' });
+      refetch();
+    },
+    onError: error => {
+      alert(getApiErrorMessage(error, '儲位更新失敗'));
+    },
   });
 
   const deleteBin = useMutation({
@@ -1194,26 +1505,26 @@ function BinLocationsPanel() {
   });
 
   const createWh = useMutation({
-    mutationFn: (data: any) => warehousesApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => warehousesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       setShowAddWh(false);
       alert('倉庫已建立');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '建立失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '建立失敗'));
     }
   });
 
   const updateWh = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => warehousesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => warehousesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       setEditingWarehouse(null);
       alert('倉庫已更新');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.message || '更新失敗');
+    onError: error => {
+      alert(getApiErrorMessage(error, '更新失敗'));
     }
   });
 
@@ -1232,7 +1543,7 @@ function BinLocationsPanel() {
         </div>
         <select className="form-input" style={{ width: 180 }} value={selectedWh} onChange={e => setSelectedWh(e.target.value)}>
           <option value="">所有倉庫</option>
-          {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.warehouseName}{!w.isActive ? ' (停用)' : ''}</option>)}
+          {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouseName}{!w.isActive ? ' (停用)' : ''}</option>)}
         </select>
         <button className="btn btn-primary btn-sm" onClick={() => setShowAddBin(true)}><Plus size={13} />新增儲位</button>
         <button className="btn btn-outline btn-sm" onClick={() => setShowAddWh(true)}><Plus size={13} />新增倉庫</button>
@@ -1244,7 +1555,7 @@ function BinLocationsPanel() {
             <tr><th>倉庫</th><th>儲位代碼</th><th>區域</th><th>走道</th><th>貨架</th><th>層</th><th>位置</th><th>狀態</th><th>操作</th></tr>
           </thead>
           <tbody>
-            {filteredBins.map((bin: any) => (
+            {filteredBins.map(bin => (
               <tr key={bin.id}>
                 <td style={{ fontWeight: 500 }}>{warehouses.find(w => w.id === bin.warehouseId)?.warehouseName || bin.warehouseId}</td>
                 <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{bin.locationCode}</td>
@@ -1256,6 +1567,24 @@ function BinLocationsPanel() {
                 <td><span className={`status-badge ${bin.isActive ? 'status-active' : 'status-neutral'}`}>{bin.isActive ? '啟用' : '停用'}</span></td>
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      className="icon-action-btn"
+                      title="修改儲位"
+                      onClick={() => {
+                        setEditingBin(bin);
+                        setNewBin({
+                          warehouseId: bin.warehouseId,
+                          locationCode: bin.locationCode,
+                          zone: bin.zone ?? '',
+                          aisle: bin.aisle ?? '',
+                          rack: bin.rack ?? '',
+                          level: bin.level ?? '',
+                          position: bin.position ?? '',
+                        });
+                      }}
+                    >
+                      <Edit2 size={13} />
+                    </button>
                     <button className="icon-action-btn" onClick={() => (bin.isActive ? deleteBin.mutate(bin.id) : activateBin.mutate(bin.id))}>
                       {bin.isActive ? <Trash2 size={13} /> : <RefreshCw size={13} />}
                     </button>
@@ -1275,11 +1604,11 @@ function BinLocationsPanel() {
               <tr><th>代碼</th><th>名稱</th><th>類型</th><th>地址</th><th>狀態</th><th>操作</th></tr>
             </thead>
             <tbody>
-              {warehouses.map((w: any) => (
+              {warehouses.map(w => (
                 <tr key={w.id}>
                   <td className="mono">{w.warehouseCode}</td>
                   <td>{w.warehouseName}</td>
-                  <td>{w.type}</td>
+                  <td>{warehouseTypeLabels[w.type] ?? w.type ?? '—'}</td>
                   <td>{w.address || '-'}</td>
                   <td><span className={`status-badge ${w.isActive ? 'status-active' : 'status-neutral'}`}>{w.isActive ? '啟用' : '停用'}</span></td>
                   <td>
@@ -1292,21 +1621,52 @@ function BinLocationsPanel() {
         </div>
       </div>
 
-      {showAddBin && (
+      {(showAddBin || editingBin) && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,8,15,0.8)' }} onClick={() => setShowAddBin(false)} />
-          <div className="glass-card" style={{ position: 'relative', width: 400, padding: 24 }}>
-            <h3 style={{ marginBottom: 16, fontSize: 16 }}>新增儲位</h3>
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(4,8,15,0.8)' }}
+            onClick={() => { setShowAddBin(false); setEditingBin(null); }}
+          />
+          <div className="glass-card" style={{ position: 'relative', width: 'min(520px, calc(100vw - 32px))', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+            <h3 style={{ marginBottom: 16, fontSize: 16 }}>{editingBin ? '修改儲位' : '新增儲位'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <select className="form-input" style={{ width: '100%' }} value={newBin.warehouseId} onChange={e => setNewBin({ ...newBin, warehouseId: e.target.value })}>
                 <option value="">選擇倉庫</option>
-                {warehouses.filter(w => w.isActive).map((w: any) => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
+                {warehouses.filter(w => w.isActive).map(w => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
               </select>
-              <input className="form-input" placeholder="儲位代碼 (如 A-01-01)" value={newBin.locationCode} onChange={e => setNewBin({ ...newBin, locationCode: e.target.value })} />
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, color: 'var(--slate-400)', fontSize: 12 }}>
+                儲位代碼 *
+                <input className="form-input" placeholder="例如 A-01-01" value={newBin.locationCode} onChange={e => setNewBin({ ...newBin, locationCode: e.target.value })} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                {([
+                  ['zone', '區域', '例如 A 區'],
+                  ['aisle', '走道', '例如 01'],
+                  ['rack', '貨架', '例如 R01'],
+                  ['level', '層', '例如 02'],
+                  ['position', '位置', '例如 P03'],
+                ] as const).map(([field, label, placeholder]) => (
+                  <label key={field} style={{ display: 'flex', flexDirection: 'column', gap: 6, color: 'var(--slate-400)', fontSize: 12 }}>
+                    {label}
+                    <input
+                      className="form-input"
+                      placeholder={placeholder}
+                      value={newBin[field]}
+                      onChange={e => setNewBin(current => ({ ...current, [field]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowAddBin(false)}>取消</button>
-              <button className="btn btn-primary btn-sm" onClick={() => createBin.mutate(newBin)} disabled={createBin.isPending}>建立</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddBin(false); setEditingBin(null); }}>取消</button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => editingBin ? updateBin.mutate({ id: editingBin.id, data: newBin }) : createBin.mutate(newBin)}
+                disabled={createBin.isPending || updateBin.isPending || !newBin.warehouseId || !newBin.locationCode.trim()}
+              >
+                {createBin.isPending || updateBin.isPending ? '儲存中...' : editingBin ? '儲存修改' : '建立'}
+              </button>
             </div>
           </div>
         </div>
@@ -1320,7 +1680,7 @@ function BinLocationsPanel() {
           fields={[
             { name: 'warehouseCode', label: '倉庫代碼 *', type: 'text', required: true },
             { name: 'warehouseName', label: '倉庫名稱 *', type: 'text', required: true },
-            { name: 'type', label: '類型', type: 'select', options: [{ value: 'normal', label: '一般倉' }, { value: 'wip', label: '在製品倉' }, { value: 'scrap', label: '廢料倉' }] },
+            { name: 'type', label: '類型', type: 'select', options: warehouseTypeOptions },
             { name: 'address', label: '地址', type: 'text' },
             { name: 'isActive', label: '啟用狀態', type: 'checkbox', defaultValue: true }
           ]}
@@ -1331,12 +1691,12 @@ function BinLocationsPanel() {
       {editingWarehouse && (
         <FormModal
           open={!!editingWarehouse}
-          initialValues={editingWarehouse}
+          initialValues={{ ...editingWarehouse }}
           title={`編輯倉庫: ${editingWarehouse.warehouseName}`}
           onClose={() => setEditingWarehouse(null)}
           fields={[
              { name: 'warehouseName', label: '倉庫名稱 *', type: 'text', required: true },
-             { name: 'type', label: '類型', type: 'select', options: [{ value: 'normal', label: '一般倉' }, { value: 'wip', label: '在製品倉' }, { value: 'scrap', label: '廢料倉' }] },
+             { name: 'type', label: '類型', type: 'select', options: warehouseTypeOptions },
              { name: 'address', label: '地址', type: 'text' },
              { name: 'isActive', label: '啟用狀態', type: 'checkbox' }
           ]}
@@ -1354,21 +1714,19 @@ export const Inventory: React.FC = () => {
   const [showEdit, setShowEdit] = useState(false);
   const [editSku, setEditSku] = useState<Record<string, unknown> | null>(null);
   const [activeTab, setActiveTab] = useState<'skus' | 'receipts' | 'expiry' | 'transfers' | 'completions' | 'bins' | 'analysis' | 'transactions' | 'count' | 'shipping'>('skus');
-  const [hiddenFields, setHiddenFields] = useState<string[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [filterItemType, setFilterItemType] = useState('');
-  const [filterSourceType, setFilterSourceType] = useState('');
+  const [filterSourceType] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [warehouses, setWarehouses] = useState<{ value: string; label: string }[]>([]);
-  const [suppliers, setSuppliers] = useState<{ value: string; label: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<{ value: string; label: string; code: string }[]>([]);
   const [uoms, setUoms] = useState<{ value: string; label: string }[]>([]);
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null);
+  const [selectedWarehouseCode, setSelectedWarehouseCode] = useState<string | null>(null);
   const [modalWarehouseId, setModalWarehouseId] = useState<string | null>(null);
   const [modalBinOptions, setModalBinOptions] = useState<{ value: string; label: string }[]>([]);
 
   const mapSkuToFormData = (sku: Record<string, unknown>) => {
     const formData: Record<string, unknown> = { ...sku };
-    const s = sku as any;
+    const s = sku as SkuFormSource;
     formData.isPurchasable = s.isPurchasable ?? s.IsPurchasable;
     formData.isSellable = s.isSellable ?? s.IsSellable;
     formData.isMto = s.isMto ?? s.IsMto;
@@ -1379,7 +1737,7 @@ export const Inventory: React.FC = () => {
     return formData;
   };
 
-  const { data: skusData, isLoading } = useSkus({ 
+  const { data: skusData } = useSkus({
     pageSize: '10', 
     page: currentPage.toString(), 
     status: showInactive ? 'inactive' : 'active', 
@@ -1390,7 +1748,30 @@ export const Inventory: React.FC = () => {
 
   const { data: warehouseData } = useWarehouses();
   const { data: uomData } = useUoms();
-  const { data: conversionData } = useUomConversions();
+  const prepareSkuPayload = (data: Record<string, unknown>) => {
+    const selectedUom = uomData?.data?.find(
+      (uom: { id: string; uomCode: string }) => uom.id === data.baseUomId
+    );
+    if (!selectedUom) throw new Error('請選擇有效的基本單位');
+    const payload = {
+      ...data,
+      unit: selectedUom.uomCode,
+      effectiveFrom: data.effectiveFrom || null,
+      effectiveTo: data.effectiveTo || null,
+    };
+
+    for (const field of requiredSkuNumberFields) {
+      if (payload[field] === '' || payload[field] == null) payload[field] = 0;
+    }
+    for (const field of optionalSkuNumberFields) {
+      if (payload[field] === '') payload[field] = null;
+    }
+    for (const field of optionalSkuIdFields) {
+      if (payload[field] === '') payload[field] = null;
+    }
+
+    return payload;
+  };
 
   const receiptsQuery = useQuery({ 
     queryKey: ['goods-receipts'], 
@@ -1400,25 +1781,41 @@ export const Inventory: React.FC = () => {
 
   React.useEffect(() => {
     if (warehouseData?.data) {
-      const whList = warehouseData.data.map((w: any) => ({
+      const whList = warehouseData.data.map(w => ({
         value: w.id,
-        label: w.warehouseName
+        label: w.warehouseName,
+        code: w.warehouseCode
       }));
       setWarehouses(whList);
-      if (!selectedWarehouseId && whList.length > 0) {
-        setSelectedWarehouseId(whList[0].value);
+      if (!selectedWarehouseCode && whList.length > 0) {
+        setSelectedWarehouseCode(whList[0].code);
       }
     }
-  }, [warehouseData, selectedWarehouseId]);
+  }, [warehouseData, selectedWarehouseCode]);
 
   React.useEffect(() => {
     if (modalWarehouseId) {
       binLocationsApi.getByWarehouse(modalWarehouseId).then(r => {
         if (r.data?.data) {
-          setModalBinOptions(r.data.data.map((bl: any) => ({
-            value: bl.id,
-            label: `${bl.locationCode} - ${bl.warehouseName}`
-          })));
+          setModalBinOptions(r.data.data.map(bl => {
+            const locationDetails = [
+              ['區域', bl.zone],
+              ['走道', bl.aisle],
+              ['貨架', bl.rack],
+              ['層', bl.level],
+              ['位置', bl.position],
+            ]
+              .filter(([, value]) => typeof value === 'string' && value.trim())
+              .map(([label, value]) => `${label}：${value}`)
+              .join('、');
+
+            return {
+              value: bl.id,
+              label: locationDetails
+                ? `${bl.locationCode}（${locationDetails}）`
+                : bl.locationCode,
+            };
+          }));
         }
       });
     } else {
@@ -1428,27 +1825,15 @@ export const Inventory: React.FC = () => {
 
   React.useEffect(() => {
     if (uomData?.data) {
-      setUoms(uomData.data.map((u: any) => ({
+      setUoms(uomData.data.map(u => ({
         value: u.id,
         label: `${u.uomCode} - ${u.uomName}`
       })));
     }
   }, [uomData]);
 
-  React.useEffect(() => {
-    suppliersApi.list().then(res => {
-      const data = res.data?.data || [];
-      if (Array.isArray(data)) {
-        setSuppliers(data.map((s: any) => ({
-          value: s.id,
-          label: s.supplierName || s.supplierCode || '未命名供應商'
-        })));
-      }
-    });
-  }, []);
-
   const skus = Array.isArray(skusData?.data) ? skusData.data : [];
-  const receipts = Array.isArray(receiptsQuery.data?.data) ? receiptsQuery.data.data : [];
+  const receipts = (Array.isArray(receiptsQuery.data?.data) ? receiptsQuery.data.data : []) as GoodsReceiptRow[];
 
   const tabs = [
     { id: 'skus', label: '品碼清單', desc: 'SKU' },
@@ -1482,7 +1867,7 @@ export const Inventory: React.FC = () => {
           <button
             key={tab.id}
             className={`inv-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
           >
             <span className="inv-tab-label">{tab.label}</span>
             <span className="inv-tab-desc">{tab.desc}</span>
@@ -1501,9 +1886,9 @@ export const Inventory: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--lux-gold)' }}>WH</span>
-            <select className="form-input" style={{ width: 140 }} value={selectedWarehouseId || ''} onChange={e => setSelectedWarehouseId(e.target.value)}>
+            <select className="form-input" style={{ width: 180 }} value={selectedWarehouseCode || ''} onChange={e => setSelectedWarehouseCode(e.target.value || null)}>
               <option value="">所有倉庫</option>
-              {warehouses.map(wh => <option key={wh.value} value={wh.value}>{wh.label}</option>)}
+              {warehouses.map(wh => <option key={wh.value} value={wh.code}>{wh.code} - {wh.label}</option>)}
             </select>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -1550,13 +1935,17 @@ export const Inventory: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {skus.map((sku: any) => (
+                  {skus.map(sku => (
                     <tr key={sku.id}>
                       <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{sku.skuNumber}</td>
                       <td style={{ fontWeight: 500 }}>{sku.skuName}</td>
                       <td>{sku.specification || '-'}</td>
                       <td>
-                        <SkuInventoryDetail sku={sku.skuNumber} />
+                        <SkuInventoryDetail
+                          sku={sku.skuNumber}
+                          warehouseCode={selectedWarehouseCode}
+                          warehouseName={warehouses.find(warehouse => warehouse.code === selectedWarehouseCode)?.label ?? null}
+                        />
                       </td>
                       <td className="mono">{sku.standardCost?.toLocaleString()}</td>
                       <td>
@@ -1566,7 +1955,7 @@ export const Inventory: React.FC = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="icon-action-btn" title="編輯" onClick={() => { setEditSku(mapSkuToFormData(sku)); setModalWarehouseId(sku.defaultWarehouseId || null); setShowEdit(true); }}>
+                          <button className="icon-action-btn" title="編輯" onClick={() => { setEditSku(mapSkuToFormData({ ...sku })); setModalWarehouseId(sku.defaultWarehouseId || null); setShowEdit(true); }}>
                             <Edit2 size={13} />
                           </button>
                         </div>
@@ -1602,13 +1991,21 @@ export const Inventory: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {receipts.map((r: any) => (
+                {receipts.map(r => (
                   <tr key={r.id}>
                     <td className="mono" style={{ color: 'var(--cobalt-300)' }}>{r.grNumber}</td>
                     <td>{new Date(r.createdAt).toLocaleDateString()}</td>
                     <td className="mono">{r.purchaseOrderId || '-'}</td>
-                    <td><span className="status-badge status-active">{r.status}</span></td>
-                    <td><span className={`status-badge ${r.iqcStatus === 'passed' ? 'status-active' : 'status-warning'}`}>{r.iqcStatus || 'pending'}</span></td>
+                    <td>
+                      <span className={`status-badge ${['reversed', 'cancelled', 'canceled'].includes(String(r.status || '').toLowerCase()) ? 'status-warning' : 'status-active'}`}>
+                        {getGoodsReceiptStatusLabel(r.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status-badge ${['passed', 'pass'].includes(String(r.iqcStatus || '').toLowerCase()) ? 'status-active' : 'status-warning'}`}>
+                        {getGoodsReceiptIqcStatusLabel(r.iqcStatus)}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1637,18 +2034,14 @@ export const Inventory: React.FC = () => {
           ]}
           onClose={() => setShowAdd(false)}
           onChangeData={(values) => {
-            if (values.defaultwarehouseId !== modalWarehouseId) {
-              setModalWarehouseId(values.defaultwarehouseId as string);
+            if (values.defaultWarehouseId !== modalWarehouseId) {
+              setModalWarehouseId(values.defaultWarehouseId as string);
             }
           }}
           onSubmit={async (data) => {
-            try {
-              await skusApi.create(data);
-              queryClient.invalidateQueries({ queryKey: ['skus'] });
-              setShowAdd(false);
-            } catch (err: any) {
-              alert(err.response?.data?.message || '新增失敗');
-            }
+            await skusApi.create(prepareSkuPayload(data));
+            queryClient.invalidateQueries({ queryKey: ['skus'] });
+            setShowAdd(false);
           }}
         />
       )}
@@ -1670,19 +2063,15 @@ export const Inventory: React.FC = () => {
           }}
           onClose={() => { setShowEdit(false); setEditSku(null); }}
           onChangeData={(values) => {
-            if (values.defaultwarehouseId !== modalWarehouseId) {
-              setModalWarehouseId(values.defaultwarehouseId as string);
+            if (values.defaultWarehouseId !== modalWarehouseId) {
+              setModalWarehouseId(values.defaultWarehouseId as string);
             }
           }}
           onSubmit={async (data) => {
-            try {
-              await skusApi.update(editSku.id as string, data);
-              queryClient.invalidateQueries({ queryKey: ['skus'] });
-              setShowEdit(false);
-              setEditSku(null);
-            } catch (err: any) {
-              alert(err.response?.data?.message || '更新失敗');
-            }
+            await skusApi.update(editSku.id as string, prepareSkuPayload(data));
+            queryClient.invalidateQueries({ queryKey: ['skus'] });
+            setShowEdit(false);
+            setEditSku(null);
           }}
         />
       )}
@@ -1702,5 +2091,3 @@ export const Inventory: React.FC = () => {
     </div>
   );
 };
-
-

@@ -1,17 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  Play, RefreshCw, Calendar, Package, AlertTriangle, 
-  CheckCircle, TrendingUp, Clock, Plus, BarChart2, 
-  Search, ChevronRight, Filter, Download, Info, LineChart,
-  Eye, History, Settings, MoreVertical, Layers, Loader2, Zap, X
+  RefreshCw, Calendar, Package, AlertTriangle,
+  TrendingUp, Plus, BarChart2,
+  Search, Info, LineChart,
+  Eye, History, Settings, Layers, Loader2, Zap, X
 } from 'lucide-react';
-import { mpsApi, skusApi, MpsHeaderDto, MpsDetailDto, MpsLineDto, ApiResponse } from '../api/api';
+import { mpsApi, skusApi } from '../api/api';
+import type { CreateMpsRequest, MpsHeaderDto, MpsDetailDto, MpsLineDto, RccpStatusDto, ResourceLoadDto, SkuDto } from '../api/api';
 import { FormModal } from '../components/FormModal';
 import './MpsPlanning.css';
 import './PremiumDesign.css';
 
 interface MpsPlanningProps {
   onNavigate?: (module: string) => void;
+}
+
+type DisplayUnit = 'BASE' | 'PURCHASE' | 'SALES' | 'PROD';
+
+interface ResourceLoadGroup {
+  id: string;
+  code: string;
+  name: string;
+  buckets: Map<string, ResourceLoadDto>;
 }
 
 export const MpsPlanning: React.FC<MpsPlanningProps> = ({ onNavigate }) => {
@@ -22,50 +32,45 @@ export const MpsPlanning: React.FC<MpsPlanningProps> = ({ onNavigate }) => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'grid' | 'exceptions' | 'traceability'>('grid');
   
-  const [skus, setSkus] = useState<Array<{value: string, label: string}>>([]);
   const [showCreateMps, setShowCreateMps] = useState(false);
   const [showTraceability, setShowTraceability] = useState<MpsLineDto | null>(null);
   
   // Multi-UOM / Multi-Currency / RCCP
-  const [displayUnit, setDisplayUnit] = useState<'BASE' | 'PURCHASE' | 'SALES' | 'PROD'>('BASE');
+  const [displayUnit, setDisplayUnit] = useState<DisplayUnit>('BASE');
   const [displayCurrency, setDisplayCurrency] = useState('TWD');
-  const [rccpStatus, setRccpStatus] = useState<any>(null);
-  const [skuDetails, setSkuDetails] = useState<Record<string, any>>({});
+  const [rccpStatus, setRccpStatus] = useState<RccpStatusDto | null>(null);
+  const [skuDetails, setSkuDetails] = useState<Record<string, SkuDto>>({});
 
-  useEffect(() => {
-    loadHeaders();
-    loadSkus();
-  }, []);
-
-  const loadHeaders = async () => {
+  const loadHeaders = useCallback(async () => {
     setLoading(true);
     try {
       const res = await mpsApi.list();
       const data = res.data?.data || [];
       setHeaders(data);
-      if (data.length > 0 && !selectedVersionId) {
-        setSelectedVersionId(data[0].id);
-      }
+      setSelectedVersionId(current => current || data[0]?.id || null);
     } catch (err) {
       console.error('Failed to load MPS headers:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadSkus = async () => {
+  const loadSkus = useCallback(async () => {
     try {
       const res = await skusApi.all();
       const items = res.data?.data || [];
-      setSkus(items.map(s => ({ value: s.id, label: `${s.skuNumber} - ${s.skuName}` })));
-      
-      const details: Record<string, any> = {};
+      const details: Record<string, SkuDto> = {};
       items.forEach(s => { details[s.id] = s; });
       setSkuDetails(details);
     } catch (err) {
       console.error('Failed to load SKUs:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void loadHeaders();
+    void loadSkus();
+  }, [loadHeaders, loadSkus]);
 
   const loadDetail = async (id: string) => {
     setDetailLoading(true);
@@ -117,8 +122,8 @@ export const MpsPlanning: React.FC<MpsPlanningProps> = ({ onNavigate }) => {
       await mpsApi.runConsumption(selectedVersionId);
       alert('預測沖銷計算完成！');
       loadDetail(selectedVersionId);
-    } catch (err: any) {
-      alert('計算失敗：' + err.message);
+    } catch (err: unknown) {
+      alert('計算失敗：' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -157,12 +162,19 @@ export const MpsPlanning: React.FC<MpsPlanningProps> = ({ onNavigate }) => {
   const rccpByResource = useMemo(() => {
     if (!rccpStatus) return [];
     // Groups loads by resource for display
-    const map = new Map<string, any>();
-    rccpStatus.loads.forEach((l: any) => {
-      if (!map.has(l.resourceId)) {
-        map.set(l.resourceId, { id: l.resourceId, code: l.resourceCode, name: l.resourceName, buckets: new Map() });
+    const map = new Map<string, ResourceLoadGroup>();
+    rccpStatus.loads.forEach(load => {
+      let group = map.get(load.resourceId);
+      if (!group) {
+        group = {
+          id: load.resourceId,
+          code: load.resourceCode,
+          name: load.resourceName,
+          buckets: new Map(),
+        };
+        map.set(load.resourceId, group);
       }
-      map.get(l.resourceId).buckets.set(l.bucketCode, l);
+      group.buckets.set(load.bucketCode, load);
     });
     return Array.from(map.values());
   }, [rccpStatus]);
@@ -252,7 +264,12 @@ export const MpsPlanning: React.FC<MpsPlanningProps> = ({ onNavigate }) => {
           <div className="reporting-bar glass-card p-3">
             <div className="filter-group">
               <label><Package size={14} /> 顯示單位:</label>
-              <select value={displayUnit} onChange={e => setDisplayUnit(e.target.value as any)}>
+              <select value={displayUnit} onChange={e => {
+                const value = e.target.value;
+                if (value === 'BASE' || value === 'PURCHASE' || value === 'SALES' || value === 'PROD') {
+                  setDisplayUnit(value);
+                }
+              }}>
                 <option value="BASE">基本單位 (Base)</option>
                 <option value="PURCHASE">採購單位 (Purchase)</option>
                 <option value="SALES">銷售單位 (Sales)</option>
@@ -450,13 +467,32 @@ export const MpsPlanning: React.FC<MpsPlanningProps> = ({ onNavigate }) => {
           { name: 'baseOn', label: '初始策略', type: 'select', options: [{value:'FORECAST', label:'預測導向'}, {value:'SALES_ORDER', label:'訂單導向'}, {value:'MIXED', label:'混合平衡'}], defaultValue: 'MIXED' }
         ]}
         onClose={() => setShowCreateMps(false)}
-        onSubmit={async (values: any) => {
+        onSubmit={async (values: Record<string, unknown>) => {
           try {
-            await mpsApi.create({ ...values, lines: [] });
+            const { planName, horizonStart, horizonEnd, timeBucketType, baseOn } = values;
+            if (
+              typeof planName !== 'string'
+              || typeof horizonStart !== 'string'
+              || typeof horizonEnd !== 'string'
+              || typeof timeBucketType !== 'string'
+              || typeof baseOn !== 'string'
+            ) {
+              throw new Error('計劃資料格式無效');
+            }
+
+            const request: CreateMpsRequest = {
+              planName,
+              horizonStart,
+              horizonEnd,
+              timeBucketType,
+              baseOn,
+              lines: [],
+            };
+            await mpsApi.create(request);
             setShowCreateMps(false);
-            loadHeaders();
-          } catch (err: any) {
-            alert('建立失敗: ' + err.message);
+            await loadHeaders();
+          } catch (err: unknown) {
+            alert('建立失敗: ' + (err instanceof Error ? err.message : String(err)));
           }
         }}
       />

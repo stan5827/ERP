@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using ErpBackend.Data;
 using ErpBackend.Services;
 using ErpBackend.Models.MES;
+using ErpBackend.DTOs;
 
 namespace ErpBackend.Controllers;
 
@@ -9,13 +9,11 @@ namespace ErpBackend.Controllers;
 [Route("api/erp/[controller]")]
 public class ApsController : Controller
 {
-    private readonly ErpGeneralDbContext _db;
     private readonly IApsScheduler _scheduler;
     private readonly ILogger<ApsController> _logger;
 
-    public ApsController(ErpGeneralDbContext db, IApsScheduler scheduler, ILogger<ApsController> logger)
+    public ApsController(IApsScheduler scheduler, ILogger<ApsController> logger)
     {
-        _db = db;
         _scheduler = scheduler;
         _logger = logger;
     }
@@ -208,22 +206,4 @@ public class ApsController : Controller
             return StatusCode(500, new { error = $"獲取失敗: {ex.Message}" });
         }
     }
-}
-
-public class GenerateScheduleRequest
-{
-    public DateTime? HorizonStart { get; set; }
-    public DateTime? HorizonEnd { get; set; }
-    public string? ScheduleType { get; set; }
-}
-
-public class OptimizationRequest
-{
-    public string? PrimaryGoal { get; set; }
-}
-
-public class RescheduleRequest
-{
-    public DateTime NewStart { get; set; }
-    public DateTime NewEnd { get; set; }
 }

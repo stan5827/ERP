@@ -17,7 +17,7 @@ namespace ErpBackend.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -191,7 +191,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -245,7 +245,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -352,7 +352,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -402,7 +402,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -463,7 +463,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -519,7 +519,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -626,7 +626,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -712,7 +712,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -776,7 +776,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -829,7 +829,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -911,7 +911,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -957,7 +957,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -1059,7 +1059,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -1173,7 +1173,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -1301,7 +1301,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -1329,6 +1329,41 @@ namespace ErpBackend.Migrations
                     b.HasIndex("AnnouncementId");
 
                     b.ToTable("AnnouncementReadLogs");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Collaboration.AnnouncementRecipient", b =>
+                {
+                    b.Property<Guid>("AnnouncementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("AnnouncementId", "EmployeeId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("AnnouncementRecipients");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Collaboration.CalendarCategory", b =>
@@ -1520,7 +1555,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -1905,7 +1940,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2333,7 +2368,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2394,7 +2429,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2492,8 +2527,6 @@ namespace ErpBackend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SourceId");
-
                     b.ToTable("GhgEmissionRecords");
                 });
 
@@ -2506,7 +2539,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2538,9 +2571,6 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<Guid?>("SkuId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("SourceCode")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -2556,9 +2586,6 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Active");
-
-                    b.Property<Guid?>("WorkCenterId")
-                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2641,7 +2668,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2738,7 +2765,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2790,7 +2817,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2803,6 +2830,9 @@ namespace ErpBackend.Migrations
 
                     b.Property<Guid>("GLAccountId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Memo")
                         .HasMaxLength(200)
@@ -2834,6 +2864,57 @@ namespace ErpBackend.Migrations
                     b.ToTable("AccountingEntries");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Finance.AccountingPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PeriodCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PeriodCode")
+                        .IsUnique();
+
+                    b.ToTable("AccountingPeriods");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Finance.AccountingVoucher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2843,7 +2924,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -2864,16 +2945,29 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("PostedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("PostingPurpose")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid?>("ReferenceId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("ReferenceType")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("ReversalOfVoucherId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SubmittedBy")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("VoucherDate")
                         .HasColumnType("timestamp with time zone");
@@ -2890,12 +2984,20 @@ namespace ErpBackend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ReversalOfVoucherId")
+                        .IsUnique()
+                        .HasFilter("\"ReversalOfVoucherId\" IS NOT NULL");
+
                     b.HasIndex("VoucherDate");
 
                     b.HasIndex("VoucherNumber")
                         .IsUnique();
 
                     b.HasIndex("ReferenceType", "ReferenceId");
+
+                    b.HasIndex("ReferenceType", "ReferenceId", "PostingPurpose")
+                        .IsUnique()
+                        .HasFilter("\"ReferenceType\" IS NOT NULL AND \"ReferenceId\" IS NOT NULL AND \"PostingPurpose\" IS NOT NULL");
 
                     b.ToTable("AccountingVouchers");
                 });
@@ -3054,7 +3156,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -3066,6 +3168,9 @@ namespace ErpBackend.Migrations
 
                     b.Property<decimal>("CurrentBalance")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("GLAccountId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -3083,6 +3188,8 @@ namespace ErpBackend.Migrations
                         .HasDefaultValue("Active");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GLAccountId");
 
                     b.ToTable("BankAccounts");
                 });
@@ -3405,6 +3512,53 @@ namespace ErpBackend.Migrations
                     b.ToTable("GLAccounts");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Finance.GLAccountMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GLAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MappingKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GLAccountId");
+
+                    b.HasIndex("MappingKey")
+                        .IsUnique();
+
+                    b.ToTable("GLAccountMappings");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Finance.Guarantee", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3466,10 +3620,9 @@ namespace ErpBackend.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
-                        .ValueGeneratedOnAdd()
+                        .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -3568,7 +3721,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -3698,7 +3851,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -3737,6 +3890,338 @@ namespace ErpBackend.Migrations
                     b.HasIndex("LoanId");
 
                     b.ToTable("LoanRepaymentSchedules");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SalesCreditNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BaseTotalAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CreditNoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<decimal>("CustomerAdvanceAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("DeliveryOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("decimal(12,6)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime?>("PostedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PostedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("ReceivableAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditNoteNumber")
+                        .IsUnique();
+
+                    b.HasIndex("DeliveryOrderId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("SalesCreditNotes");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SalesCreditNoteApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApprovalRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ApproverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SalesCreditNoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesCreditNoteId", "ApprovalRole")
+                        .IsUnique();
+
+                    b.HasIndex("SalesCreditNoteId", "ApproverId")
+                        .IsUnique();
+
+                    b.ToTable("SalesCreditNoteApprovals");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SupplierDebitNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountsPayableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BaseCogsAllocation")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("BaseInventoryAllocation")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("BaseNetAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("BaseTaxAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("BaseTotalAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("CogsAllocation")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("DebitNoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("decimal(12,6)");
+
+                    b.Property<Guid>("GoodsReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GoodsReceiptItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("InventoryAllocation")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("IqcReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime?>("PostedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PostedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("ReturnedQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountsPayableId");
+
+                    b.HasIndex("DebitNoteNumber")
+                        .IsUnique();
+
+                    b.HasIndex("GoodsReceiptId");
+
+                    b.HasIndex("GoodsReceiptItemId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("IqcReportId");
+
+                    b.HasIndex("SkuId");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("SupplierDebitNotes");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SupplierDebitNoteApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApprovalRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ApproverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("SupplierDebitNoteId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierDebitNoteId", "ApprovalRole")
+                        .IsUnique();
+
+                    b.HasIndex("SupplierDebitNoteId", "ApproverId")
+                        .IsUnique();
+
+                    b.ToTable("SupplierDebitNoteApprovals");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.TreasuryTransfer", b =>
@@ -3867,10 +4352,16 @@ namespace ErpBackend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("AbnormalCost")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("CapitalizedActualCost")
+                        .HasColumnType("decimal(18, 2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -3895,6 +4386,15 @@ namespace ErpBackend.Migrations
 
                     b.Property<DateTime?>("SettledAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("StandardLaborCost")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("StandardMaterialCost")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("StandardOverheadCost")
+                        .HasColumnType("decimal(18, 2)");
 
                     b.Property<decimal>("StandardUnitCost")
                         .HasColumnType("decimal(18, 2)");
@@ -3927,6 +4427,121 @@ namespace ErpBackend.Migrations
                     b.HasIndex("WorkOrderId");
 
                     b.ToTable("work_order_costs");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderCostVarianceAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceType", "SourceId");
+
+                    b.HasIndex("WorkOrderId", "Status");
+
+                    b.ToTable("work_order_cost_variance_allocations");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderCostVarianceAllocationApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AllocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApprovalRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ApproverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllocationId", "ApprovalRole")
+                        .IsUnique();
+
+                    b.HasIndex("AllocationId", "ApproverId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_work_order_cost_variance_allocation_approvals_AllocationId~1");
+
+                    b.ToTable("work_order_cost_variance_allocation_approvals");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderLaborActual", b =>
@@ -3998,6 +4613,9 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("EquipmentUsageRecordId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("MachineRate")
                         .HasColumnType("decimal(18, 2)");
 
@@ -4009,6 +4627,12 @@ namespace ErpBackend.Migrations
 
                     b.Property<int>("OperationSeq")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("OverheadAmount")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("OverheadRate")
+                        .HasColumnType("decimal(18, 2)");
 
                     b.Property<string>("Status")
                         .ValueGeneratedOnAdd()
@@ -4030,6 +4654,9 @@ namespace ErpBackend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EquipmentUsageRecordId")
+                        .IsUnique();
+
                     b.HasIndex("WipReportId");
 
                     b.HasIndex("WorkCenterId");
@@ -4048,7 +4675,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -4191,7 +4818,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -4848,7 +5475,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -5372,7 +5999,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -5486,7 +6113,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -5543,7 +6170,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -5764,7 +6391,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -5891,7 +6518,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -6048,7 +6675,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -6090,56 +6717,6 @@ namespace ErpBackend.Migrations
                         .IsUnique();
 
                     b.ToTable("InventoryLots");
-                });
-
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryReservation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OrderType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Qty")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("ReleasedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ReservedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("SkuId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SkuId");
-
-                    b.ToTable("InventoryReservations");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransaction", b =>
@@ -6193,6 +6770,9 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<Guid?>("ReversalOfTransactionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SkuId")
                         .HasColumnType("uuid");
 
@@ -6227,112 +6807,19 @@ namespace ErpBackend.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("ReversalOfTransactionId")
+                        .IsUnique()
+                        .HasFilter("\"ReversalOfTransactionId\" IS NOT NULL");
+
                     b.HasIndex("WarehouseId");
+
+                    b.HasIndex("RelatedDocType", "RelatedDocId")
+                        .IsUnique()
+                        .HasFilter("\"RelatedDocType\" = 'SupplierDebitNote'");
 
                     b.HasIndex("SkuId", "CreatedAt");
 
                     b.ToTable("InventoryTransactions");
-                });
-
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransfer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ApprovedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SourceWarehouseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("TargetWarehouseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("TransferDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("TransferNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedBy");
-
-                    b.HasIndex("SourceWarehouseId");
-
-                    b.HasIndex("TargetWarehouseId");
-
-                    b.HasIndex("TransferNumber")
-                        .IsUnique();
-
-                    b.ToTable("InventoryTransfers");
-                });
-
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransferItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("InventoryTransferId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LotNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SkuId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("TransferQty")
-                        .HasColumnType("decimal(14,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InventoryTransferId");
-
-                    b.HasIndex("SkuId");
-
-                    b.ToTable("InventoryTransferItems");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssue", b =>
@@ -6340,6 +6827,10 @@ namespace ErpBackend.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("BomVersion")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -6370,6 +6861,13 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ReversalOfIssueId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -6382,6 +6880,10 @@ namespace ErpBackend.Migrations
 
                     b.HasIndex("IssueNumber")
                         .IsUnique();
+
+                    b.HasIndex("IssueWarehouseId");
+
+                    b.HasIndex("ReversalOfIssueId");
 
                     b.HasIndex("WorkOrderId");
 
@@ -6397,10 +6899,13 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("BinLocationId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("ClosedShortageQty")
+                        .HasColumnType("decimal(14,2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -6424,6 +6929,10 @@ namespace ErpBackend.Migrations
                     b.Property<decimal>("RequiredQty")
                         .HasColumnType("decimal(14,2)");
 
+                    b.Property<string>("ShortageClosureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<decimal>("ShortageQty")
                         .HasColumnType("decimal(14,2)");
 
@@ -6435,11 +6944,83 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("WorkOrderMaterialId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IssueId");
 
+                    b.HasIndex("SkuId");
+
+                    b.HasIndex("WorkOrderMaterialId");
+
                     b.ToTable("MaterialIssueItems");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssueItemAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BinLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("InventoryTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IssueItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("IssuedQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(14,4)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BinLocationId");
+
+                    b.HasIndex("InventoryTransactionId");
+
+                    b.HasIndex("IssueItemId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("MaterialIssueItemAllocations");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialReturn", b =>
@@ -6502,7 +7083,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -6604,7 +7185,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -6637,6 +7218,126 @@ namespace ErpBackend.Migrations
                     b.ToTable("MaterialSupplementItems");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Inventory.ProductionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReceivedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceiptNumber")
+                        .IsUnique();
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("ProductionReceipts");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.ProductionReceiptItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BinLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FqcInspectionLotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductionReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(14,4)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BinLocationId");
+
+                    b.HasIndex("FqcInspectionLotId");
+
+                    b.HasIndex("SkuId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("ProductionReceiptId", "FqcInspectionLotId")
+                        .IsUnique();
+
+                    b.ToTable("ProductionReceiptItems");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Inventory.SerialNumber", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6646,7 +7347,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -7191,7 +7892,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -7247,7 +7948,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -7526,6 +8227,98 @@ namespace ErpBackend.Migrations
                     b.ToTable("SubstituteUsageLogs");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Inventory.TransferOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceWarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TargetWarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TransferNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransferNumber")
+                        .IsUnique();
+
+                    b.ToTable("TransferOrders");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.TransferOrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TransferOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TransferQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SkuId");
+
+                    b.HasIndex("TransferOrderId");
+
+                    b.ToTable("TransferOrderItems");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Inventory.Uom", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7763,7 +8556,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -7804,57 +8597,6 @@ namespace ErpBackend.Migrations
                         .IsUnique();
 
                     b.ToTable("Warehouses");
-                });
-
-            modelBuilder.Entity("ErpBackend.Models.Inventory.WarehouseType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Status")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Active");
-
-                    b.Property<string>("TypeCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("TypeName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("WarehouseTypes");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.MES.ApsScheduleResult", b =>
@@ -8006,7 +8748,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8119,7 +8861,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8182,7 +8924,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8246,7 +8988,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8339,7 +9081,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8399,7 +9141,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8636,7 +9378,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8740,7 +9482,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8896,7 +9638,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -8934,6 +9676,73 @@ namespace ErpBackend.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("EquipmentHistories");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.EquipmentUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EquipmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("MachineHours")
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("OperationSeq")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RecordedByEmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RecordedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ShiftClass")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId");
+
+                    b.HasIndex("RecordedByEmployeeId");
+
+                    b.HasIndex("WorkOrderId", "OperationSeq", "EquipmentId", "StartTime");
+
+                    b.ToTable("EquipmentUsageRecords");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.MES.ExchangeRate", b =>
@@ -9017,7 +9826,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9144,7 +9953,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9283,7 +10092,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9568,7 +10377,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9693,7 +10502,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9771,7 +10580,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9839,7 +10648,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9945,7 +10754,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -9993,7 +10802,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -10067,7 +10876,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -10124,7 +10933,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -10234,7 +11043,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -10303,7 +11112,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -10387,9 +11196,19 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DispositionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DispositionBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("DispositionCode")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("FqcInspectionLotId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -10401,8 +11220,16 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ScrapNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<decimal>("ScrapQty")
                         .HasColumnType("decimal(14,2)");
+
+                    b.Property<string>("ScrapStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid>("SkuId")
                         .HasColumnType("uuid");
@@ -10417,6 +11244,9 @@ namespace ErpBackend.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FqcInspectionLotId")
+                        .IsUnique();
 
                     b.ToTable("ScrapRecords");
                 });
@@ -10522,8 +11352,16 @@ namespace ErpBackend.Migrations
                     b.Property<decimal?>("EnergyConsumption")
                         .HasColumnType("decimal(14,2)");
 
+                    b.Property<string>("FinishedLotNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<bool>("HasAnomaly")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("MachineCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("MaterialLotNumber")
                         .HasMaxLength(50)
@@ -10538,13 +11376,42 @@ namespace ErpBackend.Migrations
                     b.Property<int>("OperationSeq")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ProxyReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("ReportNumber")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("ReportType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ReviewComments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("RunHours")
+                        .HasColumnType("decimal(8,2)");
+
                     b.Property<decimal>("ScrapQty")
                         .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("SetupHours")
+                        .HasColumnType("decimal(8,2)");
 
                     b.Property<string>("ShiftClass")
                         .HasMaxLength(20)
@@ -10554,10 +11421,15 @@ namespace ErpBackend.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
-                        .ValueGeneratedOnAdd()
+                        .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("WorkOrderId")
                         .HasColumnType("uuid");
@@ -10572,6 +11444,150 @@ namespace ErpBackend.Migrations
                     b.ToTable("WipReports");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReportAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChangesJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("WipReportId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WipReportId");
+
+                    b.ToTable("WipReportAuditEvents");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReportEquipmentHour", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EquipmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("MachineHours")
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("WipReportId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId");
+
+                    b.HasIndex("WipReportId", "EquipmentId")
+                        .IsUnique();
+
+                    b.ToTable("WipReportEquipmentHours");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReportParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ActualManHours")
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("WipReportId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("WipReportId", "EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("WipReportParticipants");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.MES.WorkCenter", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10584,7 +11600,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -10692,6 +11708,13 @@ namespace ErpBackend.Migrations
                     b.Property<Guid>("ProductSkuId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ProductionUomCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("ReceivedQty")
+                        .HasColumnType("decimal(14,2)");
+
                     b.Property<DateTime?>("RescheduleTriggeredAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -10752,12 +11775,18 @@ namespace ErpBackend.Migrations
                     b.Property<decimal>("BomStandardQty")
                         .HasColumnType("decimal(14,4)");
 
+                    b.Property<decimal>("ClosedShortageQty")
+                        .HasColumnType("decimal(14,2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FqcInspectionLotId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("IssuedQty")
@@ -10786,10 +11815,16 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid>("WorkOrderId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FqcInspectionLotId");
 
                     b.HasIndex("SkuId");
 
@@ -10810,7 +11845,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11027,7 +12062,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11082,7 +12117,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11217,7 +12252,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11275,7 +12310,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11344,6 +12379,26 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("IdentityProviderSubject")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("InvitationAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("InvitationCorrelationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("InvitationExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InvitationLastError")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("InvitationSentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -11359,6 +12414,11 @@ namespace ErpBackend.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("PortalInvitationStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -11380,6 +12440,12 @@ namespace ErpBackend.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IdentityProviderSubject")
+                        .IsUnique();
+
+                    b.HasIndex("InvitationCorrelationId")
+                        .IsUnique();
 
                     b.HasIndex("SupplierId");
 
@@ -11517,12 +12583,6 @@ namespace ErpBackend.Migrations
                     b.HasIndex("ApNumber")
                         .IsUnique();
 
-                    b.HasIndex("GoodsReceiptId");
-
-                    b.HasIndex("PurchaseOrderId");
-
-                    b.HasIndex("SupplierId");
-
                     b.ToTable("AccountsPayables");
                 });
 
@@ -11541,7 +12601,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11570,8 +12630,6 @@ namespace ErpBackend.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AccountsPayableId");
-
-                    b.HasIndex("SkuId");
 
                     b.ToTable("AccountsPayableItems");
                 });
@@ -11648,7 +12706,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11797,7 +12855,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -11961,7 +13019,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12142,7 +13200,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12200,6 +13258,112 @@ namespace ErpBackend.Migrations
                     b.HasIndex("SkuId");
 
                     b.ToTable("PurchaseOrderItems");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseOrderSupplierResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PurchaseOrderVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ResponseType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SupplierUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("PurchaseOrderId", "SubmittedAt");
+
+                    b.ToTable("PurchaseOrderSupplierResponses");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseOrderSupplierResponseItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProposedDeliveryDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ProposedQuantity")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("PurchaseOrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("SupplierResponseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseOrderItemId");
+
+                    b.HasIndex("SupplierResponseId");
+
+                    b.ToTable("PurchaseOrderSupplierResponseItems");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseRequisition", b =>
@@ -12315,7 +13479,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12353,7 +13517,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12463,7 +13627,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12506,6 +13670,50 @@ namespace ErpBackend.Migrations
                     b.ToTable("RfqItems");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Procurement.RfqSupplierInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("InvitedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RfqId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("RfqId", "SupplierId")
+                        .IsUnique();
+
+                    b.ToTable("RfqSupplierInvitations");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Procurement.RfqSupplierResponse", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12515,7 +13723,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12539,6 +13747,9 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTime?>("PromisedDeliveryDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("RfqId")
                         .HasColumnType("uuid");
 
@@ -12550,6 +13761,9 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Active");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uuid");
@@ -12672,6 +13886,395 @@ namespace ErpBackend.Migrations
                     b.ToTable("Suppliers");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CurrentRevisionNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("GeneratedAccountsPayableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("IdempotencyRequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SubmissionNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("SubmittedBySupplierUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierInvoiceNumberKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GeneratedAccountsPayableId")
+                        .IsUnique()
+                        .HasFilter("\"GeneratedAccountsPayableId\" IS NOT NULL");
+
+                    b.HasIndex("SubmissionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SubmittedBySupplierUserId");
+
+                    b.HasIndex("SupplierId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("SupplierId", "SupplierInvoiceNumberKey")
+                        .IsUnique()
+                        .HasFilter("\"SupplierInvoiceNumberKey\" IS NOT NULL");
+
+                    b.HasIndex("SupplierId", "Status", "CreatedAt");
+
+                    b.ToTable("SupplierApSubmissions");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ScanResult")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ScannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UploadedBySupplierUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UploadedBySupplierUserId");
+
+                    b.HasIndex("RevisionId", "ScanStatus");
+
+                    b.HasIndex("SubmissionId", "RevokedAt");
+
+                    b.ToTable("SupplierApSubmissionAttachments");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountsPayableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MatchResult")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("MatchRuleVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("MatchSnapshot")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ReviewerRole")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("ReviewerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountsPayableId");
+
+                    b.HasIndex("ReviewerUserId");
+
+                    b.HasIndex("RevisionId");
+
+                    b.HasIndex("SubmissionId", "CreatedAt");
+
+                    b.ToTable("SupplierApSubmissionReviews");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("GoodsReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("InvoiceAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SubmittedBySupplierUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("SupplierInvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("SupplierInvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoodsReceiptId");
+
+                    b.HasIndex("PurchaseOrderId");
+
+                    b.HasIndex("SubmittedBySupplierUserId");
+
+                    b.HasIndex("SubmissionId", "RevisionNumber")
+                        .IsUnique();
+
+                    b.ToTable("SupplierApSubmissionRevisions");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionRevisionLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GoodsReceiptItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("InvoicedQuantity")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid?>("PurchaseOrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(14,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoodsReceiptItemId");
+
+                    b.HasIndex("PurchaseOrderItemId");
+
+                    b.HasIndex("RevisionId", "GoodsReceiptItemId")
+                        .IsUnique();
+
+                    b.ToTable("SupplierApSubmissionRevisionLines");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierBankAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12697,7 +14300,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12741,7 +14344,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12783,6 +14386,351 @@ namespace ErpBackend.Migrations
                     b.ToTable("SupplierContacts");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.QA.FqcInspectionFinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DefectCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("DefectQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<string>("FindingName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("FqcInspectionLotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsCritical")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FqcInspectionLotId");
+
+                    b.ToTable("FqcInspectionFindings");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.FqcInspectionLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ApprovedQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CriticalDefectFound")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DecisionBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DefectCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("DefectiveQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<DateTime?>("DispositionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DispositionBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DispositionStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("InspectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InspectionNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("InspectionStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("InspectorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("ProducedQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("QuarantineBinLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("QuarantineWarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("QuarantinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("QuarantinedQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<Guid?>("ReworkWorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("SampledQty")
+                        .HasColumnType("decimal(14,2)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InspectionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("ProductSkuId");
+
+                    b.HasIndex("QuarantineBinLocationId");
+
+                    b.HasIndex("QuarantineWarehouseId");
+
+                    b.HasIndex("WorkOrderId", "LotNumber")
+                        .IsUnique();
+
+                    b.ToTable("FqcInspectionLots");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<string>("TemplateCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperationId");
+
+                    b.HasIndex("ProductSkuId");
+
+                    b.HasIndex("TemplateCode", "Version")
+                        .IsUnique();
+
+                    b.ToTable("InspectionTemplates");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplateItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InputType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("InspectionMethod")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Instrument")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsCritical")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ItemCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal?>("LowerLimit")
+                        .HasColumnType("decimal(20,6)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OptionsJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SamplingPlan")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Specification")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal?>("UpperLimit")
+                        .HasColumnType("decimal(20,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId");
+
+                    b.ToTable("InspectionTemplateItems");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.QA.IpqcReport", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12799,7 +14747,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12870,7 +14818,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12935,7 +14883,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -12943,10 +14891,13 @@ namespace ErpBackend.Migrations
                     b.Property<Guid>("GoodsReceiptId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("GoodsReceiptItemId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("InspectionDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("InspectorId")
+                    b.Property<Guid?>("InspectorId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("LotNumber")
@@ -12959,8 +14910,14 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("ReceivedQty")
+                        .HasColumnType("decimal(14,2)");
+
                     b.Property<int>("RejectNumber")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("ReleaseBinLocationId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ReportNumber")
                         .IsRequired()
@@ -12979,6 +14936,9 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid?>("SkuId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
@@ -12990,8 +14950,18 @@ namespace ErpBackend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("GoodsReceiptId");
+
+                    b.HasIndex("GoodsReceiptItemId")
+                        .IsUnique()
+                        .HasFilter("\"GoodsReceiptItemId\" IS NOT NULL");
+
+                    b.HasIndex("ReleaseBinLocationId");
+
                     b.HasIndex("ReportNumber")
                         .IsUnique();
+
+                    b.HasIndex("SkuId");
 
                     b.HasIndex("SupplierId");
 
@@ -13011,7 +14981,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -13022,6 +14992,9 @@ namespace ErpBackend.Migrations
 
                     b.Property<Guid>("IqcReportId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("LowerLimit")
+                        .HasColumnType("decimal(14,4)");
 
                     b.Property<string>("MeasuredValue")
                         .HasMaxLength(100)
@@ -13048,6 +15021,9 @@ namespace ErpBackend.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Active");
 
+                    b.Property<decimal?>("UpperLimit")
+                        .HasColumnType("decimal(14,4)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IqcReportId");
@@ -13060,17 +15036,6 @@ namespace ErpBackend.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("AttachmentUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ClosureReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
 
                     b.Property<decimal>("CostImpact")
                         .HasColumnType("decimal(14,2)");
@@ -13107,10 +15072,6 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("ResponsiblePerson")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<Guid>("SkuId")
                         .HasColumnType("uuid");
 
@@ -13145,7 +15106,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -13196,30 +15157,31 @@ namespace ErpBackend.Migrations
                     b.ToTable("OqcReports");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.QA.QaReviewLog", b =>
+            modelBuilder.Entity("ErpBackend.Models.QA.ProcessInspectionReport", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ActionType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ActorName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("AttachmentUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime>("InspectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InspectorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -13231,9 +15193,24 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<string>("ResponsiblePerson")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                    b.Property<int>("OperationSeq")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReportNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("SampleQuantity")
+                        .HasColumnType("decimal(14,2)");
 
                     b.Property<string>("Status")
                         .ValueGeneratedOnAdd()
@@ -13241,19 +15218,119 @@ namespace ErpBackend.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Active");
 
-                    b.Property<Guid>("TargetId")
+                    b.Property<Guid>("TemplateId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("TargetType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
+                    b.Property<int>("TemplateVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TargetType", "TargetId", "CreatedAt");
+                    b.HasIndex("ProductSkuId");
 
-                    b.ToTable("QaReviewLogs");
+                    b.HasIndex("ReportNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TemplateId");
+
+                    b.HasIndex("WorkOrderId", "OperationSeq", "LotNumber");
+
+                    b.ToTable("ProcessInspectionReports");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.ProcessInspectionReportItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InputType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("InspectionMethod")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Instrument")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsCritical")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal?>("LowerLimit")
+                        .HasColumnType("decimal(20,6)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SamplingPlan")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Specification")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid?>("TemplateItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal?>("UpperLimit")
+                        .HasColumnType("decimal(20,6)");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportId");
+
+                    b.HasIndex("TemplateItemId");
+
+                    b.ToTable("ProcessInspectionReportItems");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapa", b =>
@@ -13262,21 +15339,10 @@ namespace ErpBackend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AttachmentUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<string>("CapaNumber")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ClosureReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid>("ComplaintId")
                         .HasColumnType("uuid");
@@ -13318,10 +15384,6 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("ModifiedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ResponsiblePerson")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -13344,22 +15406,218 @@ namespace ErpBackend.Migrations
                     b.ToTable("SupplierCapas");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.QA.SupplierComplaint", b =>
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapaAttachment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AttachmentUrl")
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ScanResult")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ScannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<DateTime?>("ClosedAt")
+                    b.Property<Guid>("SupplierCapaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SupplierCapaResponseRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UploadedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ClosureReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                    b.Property<Guid>("UploadedBySupplierUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierCapaResponseRevisionId");
+
+                    b.HasIndex("SupplierCapaId", "RevokedAt");
+
+                    b.ToTable("SupplierCapaAttachments");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapaResponseRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("D1_Team")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("D2_ProblemDescription")
+                        .HasColumnType("text");
+
+                    b.Property<string>("D3_InterimContainment")
+                        .HasColumnType("text");
+
+                    b.Property<string>("D4_RootCause")
+                        .HasColumnType("text");
+
+                    b.Property<string>("D5_PermanentAction")
+                        .HasColumnType("text");
+
+                    b.Property<string>("D6_Verification")
+                        .HasColumnType("text");
+
+                    b.Property<string>("D7_Prevention")
+                        .HasColumnType("text");
+
+                    b.Property<string>("D8_Closure")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("SupplierCapaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SupplierUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierCapaId", "RevisionNumber")
+                        .IsUnique();
+
+                    b.ToTable("SupplierCapaResponseRevisions");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapaReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReviewerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("SupplierCapaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SupplierCapaResponseRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierCapaResponseRevisionId");
+
+                    b.HasIndex("SupplierCapaId", "SupplierCapaResponseRevisionId", "CreatedAt");
+
+                    b.ToTable("SupplierCapaReviews");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierComplaint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ComplaintNumber")
                         .IsRequired()
@@ -13403,10 +15661,6 @@ namespace ErpBackend.Migrations
 
                     b.Property<Guid?>("PurchaseOrderId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("ResponsiblePerson")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<Guid?>("SkuId")
                         .HasColumnType("uuid");
@@ -13521,7 +15775,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -13660,7 +15914,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -13723,7 +15977,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -13822,7 +16076,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -14068,6 +16322,13 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("TWD");
+
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
 
@@ -14115,6 +16376,8 @@ namespace ErpBackend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BankAccountId");
+
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("ReceiptNumber")
@@ -14138,10 +16401,13 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("decimal(14,2)");
 
                     b.Property<decimal>("ExchangeGainLoss")
                         .HasColumnType("decimal(14,2)");
@@ -14353,7 +16619,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -14475,7 +16741,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -14509,11 +16775,18 @@ namespace ErpBackend.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Active");
 
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("BinLocationId");
 
                     b.HasIndex("DeliveryOrderId");
 
                     b.HasIndex("SkuId");
+
+                    b.HasIndex("WarehouseId");
 
                     b.ToTable("DeliveryOrderItems");
                 });
@@ -14596,7 +16869,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -14726,7 +16999,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -14813,6 +17086,9 @@ namespace ErpBackend.Migrations
                     b.Property<Guid?>("DeliveryOrderId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("DiscountedAmount")
+                        .HasColumnType("decimal(14,2)");
+
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -14898,7 +17174,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15119,7 +17395,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15238,7 +17514,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15358,7 +17634,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15473,6 +17749,86 @@ namespace ErpBackend.Migrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.System.DisclosureLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DataClassification")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("DisclosedFields")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("PolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<string>("ToolName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TraceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TraceId");
+
+                    b.HasIndex("ActorUserId", "CreatedAt");
+
+                    b.ToTable("DisclosureLogs");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.System.NotificationQueue", b =>
                 {
                     b.Property<Guid>("Id")
@@ -15577,7 +17933,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15648,6 +18004,9 @@ namespace ErpBackend.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsSystem")
                         .HasColumnType("boolean");
 
@@ -15685,7 +18044,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15735,7 +18094,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15770,66 +18129,6 @@ namespace ErpBackend.Migrations
                         .IsUnique();
 
                     b.ToTable("SystemConfigs");
-                });
-
-            modelBuilder.Entity("ErpBackend.Models.System.SystemJob", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CurrentStep")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
-
-                    b.Property<string>("JobName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("JobType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Parameters")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Progress")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Result")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("SystemJobs");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.System.User", b =>
@@ -15889,6 +18188,11 @@ namespace ErpBackend.Migrations
                     b.Property<int>("PasswordHistoryCount")
                         .HasColumnType("integer");
 
+                    b.Property<long>("SecurityVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
                     b.Property<string>("Status")
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
@@ -15924,7 +18228,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -15966,7 +18270,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -16009,6 +18313,56 @@ namespace ErpBackend.Migrations
                     b.ToTable("UserThemePreferences");
                 });
 
+            modelBuilder.Entity("ErpBackend.Services.InventoryReservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrderType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Qty")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ReservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SkuId");
+
+                    b.ToTable("InventoryReservations");
+                });
+
             modelBuilder.Entity("ErpBackend.Services.SupplierRating", b =>
                 {
                     b.Property<Guid>("Id")
@@ -16024,7 +18378,7 @@ namespace ErpBackend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
@@ -16178,6 +18532,25 @@ namespace ErpBackend.Migrations
                     b.Navigation("Announcement");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Collaboration.AnnouncementRecipient", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Collaboration.Announcement", "Announcement")
+                        .WithMany("Recipients")
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.HR.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Announcement");
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Collaboration.CalendarEvent", b =>
                 {
                     b.HasOne("ErpBackend.Models.Collaboration.CalendarCategory", "Category")
@@ -16227,17 +18600,6 @@ namespace ErpBackend.Migrations
                     b.Navigation("Room");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.Digital.GhgEmissionRecord", b =>
-                {
-                    b.HasOne("ErpBackend.Models.Digital.GhgEmissionSource", "Source")
-                        .WithMany()
-                        .HasForeignKey("SourceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Source");
-                });
-
             modelBuilder.Entity("ErpBackend.Models.Finance.AccountingEntry", b =>
                 {
                     b.HasOne("ErpBackend.Models.Finance.CostCenter", "CostCenter")
@@ -16261,6 +18623,16 @@ namespace ErpBackend.Migrations
                     b.Navigation("GLAccount");
 
                     b.Navigation("Voucher");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.AccountingVoucher", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Finance.AccountingVoucher", "ReversalOfVoucher")
+                        .WithOne("ReversedByVoucher")
+                        .HasForeignKey("ErpBackend.Models.Finance.AccountingVoucher", "ReversalOfVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ReversalOfVoucher");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.ActivityType", b =>
@@ -16291,6 +18663,16 @@ namespace ErpBackend.Migrations
                     b.Navigation("SourceCostCenter");
 
                     b.Navigation("TargetCostCenter");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.BankAccount", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Finance.GLAccount", "GLAccount")
+                        .WithMany()
+                        .HasForeignKey("GLAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("GLAccount");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.CostCenter", b =>
@@ -16370,6 +18752,17 @@ namespace ErpBackend.Migrations
                     b.Navigation("ParentAccount");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Finance.GLAccountMapping", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Finance.GLAccount", "GLAccount")
+                        .WithMany()
+                        .HasForeignKey("GLAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GLAccount");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Finance.InvestmentValuation", b =>
                 {
                     b.HasOne("ErpBackend.Models.Finance.Investment", "Investment")
@@ -16390,6 +18783,98 @@ namespace ErpBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Loan");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SalesCreditNote", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Sales.DeliveryOrder", "DeliveryOrder")
+                        .WithMany()
+                        .HasForeignKey("DeliveryOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Sales.SalesInvoice", "SalesInvoice")
+                        .WithMany()
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DeliveryOrder");
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SalesCreditNoteApproval", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Finance.SalesCreditNote", "SalesCreditNote")
+                        .WithMany("Approvals")
+                        .HasForeignKey("SalesCreditNoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SalesCreditNote");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SupplierDebitNote", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.AccountsPayable", "AccountsPayable")
+                        .WithMany()
+                        .HasForeignKey("AccountsPayableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceipt", "GoodsReceipt")
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceiptItem", "GoodsReceiptItem")
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.IqcReport", "IqcReport")
+                        .WithMany()
+                        .HasForeignKey("IqcReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
+                        .WithMany()
+                        .HasForeignKey("SkuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AccountsPayable");
+
+                    b.Navigation("GoodsReceipt");
+
+                    b.Navigation("GoodsReceiptItem");
+
+                    b.Navigation("IqcReport");
+
+                    b.Navigation("Sku");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SupplierDebitNoteApproval", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Finance.SupplierDebitNote", "SupplierDebitNote")
+                        .WithMany("Approvals")
+                        .HasForeignKey("SupplierDebitNoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SupplierDebitNote");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.WorkCenterCost", b =>
@@ -16422,6 +18907,28 @@ namespace ErpBackend.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderCostVarianceAllocation", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderCostVarianceAllocationApproval", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Finance.WorkOrderCostVarianceAllocation", "Allocation")
+                        .WithMany("Approvals")
+                        .HasForeignKey("AllocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Allocation");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderLaborActual", b =>
                 {
                     b.HasOne("ErpBackend.Models.MES.WipReport", "WipReport")
@@ -16441,6 +18948,11 @@ namespace ErpBackend.Migrations
 
             modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderMachineActual", b =>
                 {
+                    b.HasOne("ErpBackend.Models.MES.EquipmentUsageRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentUsageRecordId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ErpBackend.Models.MES.WipReport", "WipReport")
                         .WithMany()
                         .HasForeignKey("WipReportId");
@@ -16744,22 +19256,16 @@ namespace ErpBackend.Migrations
                     b.Navigation("Sku");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryReservation", b =>
-                {
-                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
-                        .WithMany()
-                        .HasForeignKey("SkuId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Sku");
-                });
-
             modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransaction", b =>
                 {
                     b.HasOne("ErpBackend.Models.Inventory.BinLocation", "BinLocation")
                         .WithMany()
                         .HasForeignKey("BinLocationId");
+
+                    b.HasOne("ErpBackend.Models.Inventory.InventoryTransaction", null)
+                        .WithMany()
+                        .HasForeignKey("ReversalOfTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
                         .WithMany("Transactions")
@@ -16778,57 +19284,28 @@ namespace ErpBackend.Migrations
                     b.Navigation("Warehouse");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransfer", b =>
-                {
-                    b.HasOne("ErpBackend.Models.HR.Employee", "CreatedByEmployee")
-                        .WithMany()
-                        .HasForeignKey("CreatedBy");
-
-                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "SourceWarehouse")
-                        .WithMany()
-                        .HasForeignKey("SourceWarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "TargetWarehouse")
-                        .WithMany()
-                        .HasForeignKey("TargetWarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByEmployee");
-
-                    b.Navigation("SourceWarehouse");
-
-                    b.Navigation("TargetWarehouse");
-                });
-
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransferItem", b =>
-                {
-                    b.HasOne("ErpBackend.Models.Inventory.InventoryTransfer", "InventoryTransfer")
-                        .WithMany("Items")
-                        .HasForeignKey("InventoryTransferId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
-                        .WithMany()
-                        .HasForeignKey("SkuId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("InventoryTransfer");
-
-                    b.Navigation("Sku");
-                });
-
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssue", b =>
                 {
-                    b.HasOne("ErpBackend.Models.MES.WorkOrder", null)
+                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "IssueWarehouse")
+                        .WithMany()
+                        .HasForeignKey("IssueWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ErpBackend.Models.Inventory.MaterialIssue", "OriginalIssue")
+                        .WithMany("Reversals")
+                        .HasForeignKey("ReversalOfIssueId");
+
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
                         .WithMany()
                         .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("IssueWarehouse");
+
+                    b.Navigation("OriginalIssue");
+
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssueItem", b =>
@@ -16839,7 +19316,52 @@ namespace ErpBackend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
+                        .WithMany()
+                        .HasForeignKey("SkuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.MES.WorkOrderMaterial", "WorkOrderMaterial")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderMaterialId");
+
                     b.Navigation("Issue");
+
+                    b.Navigation("Sku");
+
+                    b.Navigation("WorkOrderMaterial");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssueItemAllocation", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.BinLocation", "BinLocation")
+                        .WithMany()
+                        .HasForeignKey("BinLocationId");
+
+                    b.HasOne("ErpBackend.Models.Inventory.InventoryTransaction", "InventoryTransaction")
+                        .WithMany()
+                        .HasForeignKey("InventoryTransactionId");
+
+                    b.HasOne("ErpBackend.Models.Inventory.MaterialIssueItem", "IssueItem")
+                        .WithMany("Allocations")
+                        .HasForeignKey("IssueItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BinLocation");
+
+                    b.Navigation("InventoryTransaction");
+
+                    b.Navigation("IssueItem");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialReturnItem", b =>
@@ -16862,6 +19384,60 @@ namespace ErpBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Supplement");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.ProductionReceipt", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.ProductionReceiptItem", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.BinLocation", "BinLocation")
+                        .WithMany()
+                        .HasForeignKey("BinLocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.FqcInspectionLot", "FqcInspectionLot")
+                        .WithMany("ReceiptItems")
+                        .HasForeignKey("FqcInspectionLotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.ProductionReceipt", "ProductionReceipt")
+                        .WithMany("Items")
+                        .HasForeignKey("ProductionReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
+                        .WithMany()
+                        .HasForeignKey("SkuId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BinLocation");
+
+                    b.Navigation("FqcInspectionLot");
+
+                    b.Navigation("ProductionReceipt");
+
+                    b.Navigation("Sku");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.SerialNumber", b =>
@@ -16992,6 +19568,25 @@ namespace ErpBackend.Migrations
                     b.Navigation("SubstituteSku");
 
                     b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.TransferOrderItem", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
+                        .WithMany()
+                        .HasForeignKey("SkuId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.TransferOrder", "TransferOrder")
+                        .WithMany("Items")
+                        .HasForeignKey("TransferOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sku");
+
+                    b.Navigation("TransferOrder");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.UomConversion", b =>
@@ -17149,6 +19744,33 @@ namespace ErpBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Equipment");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.EquipmentUsageRecord", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.HR.Employee", "RecordedByEmployee")
+                        .WithMany()
+                        .HasForeignKey("RecordedByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("RecordedByEmployee");
+
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.MES.ForecastConsumptionDetail", b =>
@@ -17362,6 +19984,15 @@ namespace ErpBackend.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.MES.ScrapRecord", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.FqcInspectionLot", "FqcInspectionLot")
+                        .WithMany("ScrapRecords")
+                        .HasForeignKey("FqcInspectionLotId");
+
+                    b.Navigation("FqcInspectionLot");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.MES.ScrapRecordExt", b =>
                 {
                     b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
@@ -17392,6 +20023,55 @@ namespace ErpBackend.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReportAuditEvent", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.WipReport", "WipReport")
+                        .WithMany("AuditEvents")
+                        .HasForeignKey("WipReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("WipReport");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReportEquipmentHour", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.MES.WipReport", "WipReport")
+                        .WithMany("EquipmentHours")
+                        .HasForeignKey("WipReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("WipReport");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReportParticipant", b =>
+                {
+                    b.HasOne("ErpBackend.Models.HR.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.MES.WipReport", "WipReport")
+                        .WithMany("Participants")
+                        .HasForeignKey("WipReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("WipReport");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.MES.WorkOrder", b =>
                 {
                     b.HasOne("ErpBackend.Models.Inventory.Sku", "ProductSku")
@@ -17405,6 +20085,10 @@ namespace ErpBackend.Migrations
 
             modelBuilder.Entity("ErpBackend.Models.MES.WorkOrderMaterial", b =>
                 {
+                    b.HasOne("ErpBackend.Models.QA.FqcInspectionLot", "FqcInspectionLot")
+                        .WithMany()
+                        .HasForeignKey("FqcInspectionLotId");
+
                     b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
                         .WithMany()
                         .HasForeignKey("SkuId")
@@ -17416,6 +20100,8 @@ namespace ErpBackend.Migrations
                         .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("FqcInspectionLot");
 
                     b.Navigation("Sku");
 
@@ -17482,29 +20168,6 @@ namespace ErpBackend.Migrations
                     b.Navigation("Supplier");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.Procurement.AccountsPayable", b =>
-                {
-                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceipt", "GoodsReceipt")
-                        .WithMany()
-                        .HasForeignKey("GoodsReceiptId");
-
-                    b.HasOne("ErpBackend.Models.Procurement.PurchaseOrder", "PurchaseOrder")
-                        .WithMany()
-                        .HasForeignKey("PurchaseOrderId");
-
-                    b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
-                        .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("GoodsReceipt");
-
-                    b.Navigation("PurchaseOrder");
-
-                    b.Navigation("Supplier");
-                });
-
             modelBuilder.Entity("ErpBackend.Models.Procurement.AccountsPayableItem", b =>
                 {
                     b.HasOne("ErpBackend.Models.Procurement.AccountsPayable", "AccountsPayable")
@@ -17513,15 +20176,7 @@ namespace ErpBackend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
-                        .WithMany()
-                        .HasForeignKey("SkuId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("AccountsPayable");
-
-                    b.Navigation("Sku");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Procurement.Asn", b =>
@@ -17657,6 +20312,44 @@ namespace ErpBackend.Migrations
                     b.Navigation("Sku");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseOrderSupplierResponse", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.PurchaseOrder", "PurchaseOrder")
+                        .WithMany("SupplierResponses")
+                        .HasForeignKey("PurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseOrder");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseOrderSupplierResponseItem", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.PurchaseOrderItem", "PurchaseOrderItem")
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.PurchaseOrderSupplierResponse", "SupplierResponse")
+                        .WithMany("Items")
+                        .HasForeignKey("SupplierResponseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseOrderItem");
+
+                    b.Navigation("SupplierResponse");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseRequisition", b =>
                 {
                     b.HasOne("ErpBackend.Models.HR.Department", "Department")
@@ -17738,6 +20431,25 @@ namespace ErpBackend.Migrations
                     b.Navigation("Sku");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Procurement.RfqSupplierInvitation", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.Rfq", "Rfq")
+                        .WithMany("SupplierInvitations")
+                        .HasForeignKey("RfqId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Rfq");
+
+                    b.Navigation("Supplier");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Procurement.RfqSupplierResponse", b =>
                 {
                     b.HasOne("ErpBackend.Models.Procurement.Rfq", "Rfq")
@@ -17765,6 +20477,154 @@ namespace ErpBackend.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmission", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.AccountsPayable", "GeneratedAccountsPayable")
+                        .WithMany()
+                        .HasForeignKey("GeneratedAccountsPayableId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ErpBackend.Models.Portal.SupplierUser", "SubmittedBySupplierUser")
+                        .WithMany()
+                        .HasForeignKey("SubmittedBySupplierUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GeneratedAccountsPayable");
+
+                    b.Navigation("SubmittedBySupplierUser");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionAttachment", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.SupplierApSubmissionRevision", "Revision")
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.SupplierApSubmission", "Submission")
+                        .WithMany("Attachments")
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Portal.SupplierUser", "UploadedBySupplierUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedBySupplierUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Revision");
+
+                    b.Navigation("Submission");
+
+                    b.Navigation("UploadedBySupplierUser");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionReview", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.AccountsPayable", "AccountsPayable")
+                        .WithMany()
+                        .HasForeignKey("AccountsPayableId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ErpBackend.Models.System.User", "Reviewer")
+                        .WithMany()
+                        .HasForeignKey("ReviewerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.SupplierApSubmissionRevision", "Revision")
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.SupplierApSubmission", "Submission")
+                        .WithMany("Reviews")
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AccountsPayable");
+
+                    b.Navigation("Reviewer");
+
+                    b.Navigation("Revision");
+
+                    b.Navigation("Submission");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionRevision", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceipt", "GoodsReceipt")
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.PurchaseOrder", "PurchaseOrder")
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.SupplierApSubmission", "Submission")
+                        .WithMany("Revisions")
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Portal.SupplierUser", "SubmittedBySupplierUser")
+                        .WithMany()
+                        .HasForeignKey("SubmittedBySupplierUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GoodsReceipt");
+
+                    b.Navigation("PurchaseOrder");
+
+                    b.Navigation("Submission");
+
+                    b.Navigation("SubmittedBySupplierUser");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionRevisionLine", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceiptItem", "GoodsReceiptItem")
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.PurchaseOrderItem", "PurchaseOrderItem")
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ErpBackend.Models.Procurement.SupplierApSubmissionRevision", "Revision")
+                        .WithMany("Lines")
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GoodsReceiptItem");
+
+                    b.Navigation("PurchaseOrderItem");
+
+                    b.Navigation("Revision");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierBankAccount", b =>
                 {
                     b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
@@ -17787,6 +20647,77 @@ namespace ErpBackend.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.QA.FqcInspectionFinding", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.FqcInspectionLot", "FqcInspectionLot")
+                        .WithMany("Findings")
+                        .HasForeignKey("FqcInspectionLotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FqcInspectionLot");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.FqcInspectionLot", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "ProductSku")
+                        .WithMany()
+                        .HasForeignKey("ProductSkuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.BinLocation", "QuarantineBinLocation")
+                        .WithMany()
+                        .HasForeignKey("QuarantineBinLocationId");
+
+                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "QuarantineWarehouse")
+                        .WithMany()
+                        .HasForeignKey("QuarantineWarehouseId");
+
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProductSku");
+
+                    b.Navigation("QuarantineBinLocation");
+
+                    b.Navigation("QuarantineWarehouse");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplate", b =>
+                {
+                    b.HasOne("ErpBackend.Models.MES.Operation", "Operation")
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "ProductSku")
+                        .WithMany()
+                        .HasForeignKey("ProductSkuId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Operation");
+
+                    b.Navigation("ProductSku");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplateItem", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.InspectionTemplate", "Template")
+                        .WithMany("Items")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.QA.IpqcReportItem", b =>
                 {
                     b.HasOne("ErpBackend.Models.QA.IpqcReport", "IpqcReport")
@@ -17800,11 +20731,40 @@ namespace ErpBackend.Migrations
 
             modelBuilder.Entity("ErpBackend.Models.QA.IqcReport", b =>
                 {
+                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceipt", "GoodsReceipt")
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.Procurement.GoodsReceiptItem", "GoodsReceiptItem")
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ErpBackend.Models.Inventory.BinLocation", "ReleaseBinLocation")
+                        .WithMany()
+                        .HasForeignKey("ReleaseBinLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
+                        .WithMany()
+                        .HasForeignKey("SkuId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ErpBackend.Models.Procurement.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("GoodsReceipt");
+
+                    b.Navigation("GoodsReceiptItem");
+
+                    b.Navigation("ReleaseBinLocation");
+
+                    b.Navigation("Sku");
 
                     b.Navigation("Supplier");
                 });
@@ -17820,6 +20780,51 @@ namespace ErpBackend.Migrations
                     b.Navigation("IqcReport");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.QA.ProcessInspectionReport", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "ProductSku")
+                        .WithMany()
+                        .HasForeignKey("ProductSkuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.InspectionTemplate", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.MES.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProductSku");
+
+                    b.Navigation("Template");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.ProcessInspectionReportItem", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.ProcessInspectionReport", "Report")
+                        .WithMany("Items")
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.InspectionTemplateItem", "TemplateItem")
+                        .WithMany()
+                        .HasForeignKey("TemplateItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Report");
+
+                    b.Navigation("TemplateItem");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapa", b =>
                 {
                     b.HasOne("ErpBackend.Models.QA.SupplierComplaint", "Complaint")
@@ -17829,6 +20834,54 @@ namespace ErpBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Complaint");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapaAttachment", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.SupplierCapa", "SupplierCapa")
+                        .WithMany("Attachments")
+                        .HasForeignKey("SupplierCapaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.SupplierCapaResponseRevision", "ResponseRevision")
+                        .WithMany()
+                        .HasForeignKey("SupplierCapaResponseRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ResponseRevision");
+
+                    b.Navigation("SupplierCapa");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapaResponseRevision", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.SupplierCapa", "SupplierCapa")
+                        .WithMany("ResponseRevisions")
+                        .HasForeignKey("SupplierCapaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SupplierCapa");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapaReview", b =>
+                {
+                    b.HasOne("ErpBackend.Models.QA.SupplierCapa", "SupplierCapa")
+                        .WithMany("Reviews")
+                        .HasForeignKey("SupplierCapaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ErpBackend.Models.QA.SupplierCapaResponseRevision", "ResponseRevision")
+                        .WithMany()
+                        .HasForeignKey("SupplierCapaResponseRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ResponseRevision");
+
+                    b.Navigation("SupplierCapa");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.SupplierComplaint", b =>
@@ -17907,11 +20960,18 @@ namespace ErpBackend.Migrations
 
             modelBuilder.Entity("ErpBackend.Models.Sales.CashReceipt", b =>
                 {
+                    b.HasOne("ErpBackend.Models.Finance.BankAccount", "BankAccount")
+                        .WithMany()
+                        .HasForeignKey("BankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ErpBackend.Models.Sales.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("BankAccount");
 
                     b.Navigation("Customer");
                 });
@@ -17955,6 +21015,11 @@ namespace ErpBackend.Migrations
 
             modelBuilder.Entity("ErpBackend.Models.Sales.DeliveryOrderItem", b =>
                 {
+                    b.HasOne("ErpBackend.Models.Inventory.BinLocation", "BinLocation")
+                        .WithMany()
+                        .HasForeignKey("BinLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ErpBackend.Models.Sales.DeliveryOrder", "DeliveryOrder")
                         .WithMany("Items")
                         .HasForeignKey("DeliveryOrderId")
@@ -17967,9 +21032,18 @@ namespace ErpBackend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ErpBackend.Models.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BinLocation");
+
                     b.Navigation("DeliveryOrder");
 
                     b.Navigation("Sku");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Sales.Quote", b =>
@@ -18216,6 +21290,17 @@ namespace ErpBackend.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ErpBackend.Services.InventoryReservation", b =>
+                {
+                    b.HasOne("ErpBackend.Models.Inventory.Sku", "Sku")
+                        .WithMany()
+                        .HasForeignKey("SkuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Sku");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.Asset.Asset", b =>
                 {
                     b.Navigation("Depreciations");
@@ -18256,6 +21341,8 @@ namespace ErpBackend.Migrations
             modelBuilder.Entity("ErpBackend.Models.Collaboration.Announcement", b =>
                 {
                     b.Navigation("ReadLogs");
+
+                    b.Navigation("Recipients");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Collaboration.CalendarEvent", b =>
@@ -18271,6 +21358,8 @@ namespace ErpBackend.Migrations
             modelBuilder.Entity("ErpBackend.Models.Finance.AccountingVoucher", b =>
                 {
                     b.Navigation("Entries");
+
+                    b.Navigation("ReversedByVoucher");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Finance.CostCenter", b =>
@@ -18308,6 +21397,21 @@ namespace ErpBackend.Migrations
             modelBuilder.Entity("ErpBackend.Models.Finance.Loan", b =>
                 {
                     b.Navigation("RepaymentSchedules");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SalesCreditNote", b =>
+                {
+                    b.Navigation("Approvals");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.SupplierDebitNote", b =>
+                {
+                    b.Navigation("Approvals");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Finance.WorkOrderCostVarianceAllocation", b =>
+                {
+                    b.Navigation("Approvals");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.HR.Department", b =>
@@ -18356,14 +21460,16 @@ namespace ErpBackend.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("ErpBackend.Models.Inventory.InventoryTransfer", b =>
-                {
-                    b.Navigation("Items");
-                });
-
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssue", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("Reversals");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialIssueItem", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialReturn", b =>
@@ -18372,6 +21478,11 @@ namespace ErpBackend.Migrations
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.MaterialSupplement", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.ProductionReceipt", b =>
                 {
                     b.Navigation("Items");
                 });
@@ -18402,6 +21513,11 @@ namespace ErpBackend.Migrations
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Inventory.SubstituteGroup", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Inventory.TransferOrder", b =>
                 {
                     b.Navigation("Items");
                 });
@@ -18469,6 +21585,15 @@ namespace ErpBackend.Migrations
                     b.Navigation("Operations");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.MES.WipReport", b =>
+                {
+                    b.Navigation("AuditEvents");
+
+                    b.Navigation("EquipmentHours");
+
+                    b.Navigation("Participants");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.MES.WorkOrder", b =>
                 {
                     b.Navigation("Materials");
@@ -18509,6 +21634,13 @@ namespace ErpBackend.Migrations
             modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseOrder", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("SupplierResponses");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseOrderSupplierResponse", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.Procurement.PurchaseRequisition", b =>
@@ -18520,6 +21652,8 @@ namespace ErpBackend.Migrations
                 {
                     b.Navigation("Items");
 
+                    b.Navigation("SupplierInvitations");
+
                     b.Navigation("SupplierResponses");
                 });
 
@@ -18530,6 +21664,34 @@ namespace ErpBackend.Migrations
                     b.Navigation("Contacts");
                 });
 
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmission", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Reviews");
+
+                    b.Navigation("Revisions");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.Procurement.SupplierApSubmissionRevision", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.FqcInspectionLot", b =>
+                {
+                    b.Navigation("Findings");
+
+                    b.Navigation("ReceiptItems");
+
+                    b.Navigation("ScrapRecords");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.InspectionTemplate", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("ErpBackend.Models.QA.IpqcReport", b =>
                 {
                     b.Navigation("Items");
@@ -18538,6 +21700,20 @@ namespace ErpBackend.Migrations
             modelBuilder.Entity("ErpBackend.Models.QA.IqcReport", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.ProcessInspectionReport", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ErpBackend.Models.QA.SupplierCapa", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("ResponseRevisions");
+
+                    b.Navigation("Reviews");
                 });
 
             modelBuilder.Entity("ErpBackend.Models.QA.SupplierComplaint", b =>
