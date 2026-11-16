@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Backend API Integration', () => {
-  const apiBase = 'http://localhost:5100';
+  const apiBase = process.env.ERP_API_BASE_URL ?? 'http://localhost:5100';
+
+  test.skip(
+    !process.env.ERP_API_BASE_URL,
+    'Set ERP_API_BASE_URL to run backend smoke tests against a live API.',
+  );
 
   test('GET /health returns healthy status', async ({ request }) => {
     const response = await request.get(`${apiBase}/health`);
